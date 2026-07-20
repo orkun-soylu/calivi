@@ -56,10 +56,14 @@ export function EditButton({ onEdit }) {
 }
 
 // Document attachment chip (📎 file name). If onRemove is given it can be removed with ×.
-export function AttachmentChip({ name, onRemove }) {
+// onAccent: when the chip sits on a colored (accent) message bubble. The neutral palette
+// inverts to near-white in the light theme, which left white bubble text on a near-white chip
+// (unreadable). On an accent bubble use a translucent-white chip that stays legible in both themes.
+export function AttachmentChip({ name, onRemove, onAccent = false }) {
   const t = useT();
+  const tone = onAccent ? "bg-white/20 text-white" : "bg-neutral-800";
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-lg bg-neutral-800 px-2 py-1 text-xs max-w-[220px]">
+    <span className={`inline-flex items-center gap-1.5 rounded-lg ${tone} px-2 py-1 text-xs max-w-[220px]`}>
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
         <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
       </svg>
