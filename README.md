@@ -1,4 +1,4 @@
-# Calivi
+# calivi
 
 A self-hosted, multi-user chat interface for Ollama and OpenAI-compatible servers.
 You pick which model runs where — no hidden routing.
