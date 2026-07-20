@@ -7,7 +7,7 @@ no way to trigger one.
 Keying is **by account only** (not IP): nginx does not forward X-Forwarded-For on `/api/`
 and uvicorn does not run with `--proxy-headers`, so `request.client.host` is identical for
 every user (the nginx container). To key by IP that chain must be fixed first; see
-CLAUDE.md "Brute-force protection".
+ARCHITECTURE.md "Brute-force protection".
 """
 import time
 from collections import deque

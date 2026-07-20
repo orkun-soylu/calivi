@@ -50,7 +50,7 @@ llama.cpp-server — all from the same chat window.
 **Requirements:** Docker and Docker Compose. Nothing else.
 
 ```bash
-git clone <repo-url> calivi
+git clone https://github.com/orkun-soylu/calivi.git
 cd calivi
 docker compose up -d --build
 ```
@@ -164,8 +164,9 @@ When the backend runs separately, the frontend is served from a different origin
 (`:5173`), so `CORS_ORIGINS` comes into play — it already defaults to
 `http://localhost:5173`.
 
-**See `CLAUDE.md` for architecture, design decisions and known pitfalls** — the component
-map, tool loop, security notes and "don't fall into this again" warnings live there.
+**See [`ARCHITECTURE.md`](ARCHITECTURE.md) for architecture, design decisions and known
+pitfalls** — the component map, tool loop, security notes and "don't fall into this again"
+warnings live there.
 
 ---
 

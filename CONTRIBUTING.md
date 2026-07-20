@@ -113,8 +113,9 @@ module level, so the environment must be set up *before* `app` is imported.
 should explain **why**, not what; if a decision looks counter-intuitive, write down the
 reason.
 
-> Note: existing code comments and `CLAUDE.md` are written in Turkish. Follow whatever
-> the file you are editing already does.
+Comments, docstrings and test names are in English throughout. The one deliberate exception
+is the Turkish locale block in `frontend/src/i18n.js` — that is product content (one of the
+nine shipped languages), not a comment, and must not be "translated".
 
 **Commit subjects:** `type: short description`. Types used in this project:
 
@@ -126,7 +127,7 @@ Explain the **why** in the body. If you are fixing a bug, describe the symptom, 
 cause, and how you verified the fix — this project treats its history as a diagnostic
 resource.
 
-**Architectural decisions belong in `CLAUDE.md`.** If you made a lasting design decision,
+**Architectural decisions belong in `ARCHITECTURE.md`.** If you made a lasting design decision,
 or discovered a pitfall someone else will hit again, write it down there. The component
 map, tool loop, security notes and "don't fall into this again" warnings all live there.
 
@@ -139,7 +140,7 @@ map, tool loop, security notes and "don't fall into this again" warnings all liv
 - [ ] Frontend tests pass (`npm test`)
 - [ ] Frontend build is clean (`npm run build`)
 - [ ] If you added a guard, you ran a **mutation test**
-- [ ] `CLAUDE.md` updated if behaviour changed
+- [ ] `ARCHITECTURE.md` updated if behaviour changed
 - [ ] No secrets: no `.env`, API keys, tokens or real hosts/IPs committed
 
 For behavioural changes, verify your work by **actually running it** — don't rely on
