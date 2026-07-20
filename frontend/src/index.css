@@ -1,0 +1,112 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Theme palette: neutral shades as CSS variables. The Tailwind config reads them via rgb(var()).
+   DARK (default) = Tailwind's default neutral shades (the existing look, suited to GNOME dark).
+   LIGHT = GNOME Adwaita light shades, ramp inverted (high number = light surface, low = dark text). */
+:root,
+[data-theme="dark"] {
+  --n-50: 250 250 250;
+  --n-100: 245 245 245;
+  --n-200: 229 229 229;
+  --n-300: 212 212 212;
+  --n-400: 163 163 163;
+  --n-500: 115 115 115;
+  --n-600: 82 82 82;
+  --n-700: 64 64 64;
+  --n-800: 38 38 38;
+  --n-900: 23 23 23;
+  --n-950: 10 10 10;
+  --scrollbar-thumb: 255 255 255;
+  /* accent derivatives (dark theme): lighten the fill hover slightly, lighten the text/link accent noticeably. */
+  --accent-hover: color-mix(in srgb, rgb(var(--accent)), white 12%);
+  --accent-text: color-mix(in srgb, rgb(var(--accent)), white 42%);
+  color-scheme: dark;
+}
+
+[data-theme="light"] {
+  --n-950: 250 250 251; /* #fafafb — window/page background (Adwaita window_bg) */
+  --n-900: 255 255 255; /* #ffffff — sidebar, modal, main surfaces (view_bg) */
+  --n-800: 235 235 237; /* #ebebed — hover/input/secondary button (Adwaita headerbar) */
+  --n-700: 218 217 214; /* #dad9d6 — strong hover/active, menus */
+  --n-600: 195 194 191; /* #c3c2bf */
+  --n-500: 122 120 116; /* #7a7874 — muted/tertiary text */
+  --n-400: 99 97 93;    /* #63615d — secondary text */
+  --n-300: 74 72 69;
+  --n-200: 51 50 48;    /* #333230 */
+  --n-100: 33 32 31;    /* #212120 — primary text */
+  --n-50: 20 20 19;
+  --scrollbar-thumb: 20 20 20;
+  /* accent derivatives (light theme): darken the hover slightly, darken the text/link accent (contrast on white). */
+  --accent-hover: color-mix(in srgb, rgb(var(--accent)), black 10%);
+  --accent-text: color-mix(in srgb, rgb(var(--accent)), black 22%);
+  color-scheme: light;
+}
+
+/* Accent colour — the 9 GNOME 47+ Adwaita colours (selected via data-accent). Default: Adwaita blue.
+   Only the raw triplet is defined here; hover/text shades are derived theme-aware with color-mix above. */
+:root,
+[data-accent="blue"]   { --accent:  53 132 228; }
+[data-accent="teal"]   { --accent:  33 144 164; }
+[data-accent="green"]  { --accent:  58 148  74; }
+[data-accent="yellow"] { --accent: 200 136   0; }
+[data-accent="orange"] { --accent: 237  91   0; }
+[data-accent="red"]    { --accent: 230  45  66; }
+[data-accent="pink"]   { --accent: 213  97 153; }
+[data-accent="purple"] { --accent: 145  65 172; }
+[data-accent="slate"]  { --accent: 111 131 150; }
+
+/* JetBrains Mono Nerd Font (self-hosted). Regular ilk yüklenir; diğer ağırlıklar
+   sadece o glyph render edilince (lazy) iner. */
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("./fonts/JetBrainsMonoNerdFont-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("./fonts/JetBrainsMonoNerdFont-Medium.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("./fonts/JetBrainsMonoNerdFont-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("./fonts/JetBrainsMonoNerdFont-Italic.woff2") format("woff2");
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+
+html {
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* Remove all border lines (corner rounding and backgrounds are preserved). */
+*,
+::before,
+::after {
+  border-width: 0 !important;
+}
+
+/* Shared themed scrollbar (message area + config editor): fixed 10px, slim thumb. */
+.themed-scroll::-webkit-scrollbar {
+  width: 10px;
+}
+.themed-scroll::-webkit-scrollbar-thumb {
+  background: rgb(var(--scrollbar-thumb) / 0.22);
+  border-radius: 9999px;
+}
+.themed-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}

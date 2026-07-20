@@ -1,0 +1,38 @@
+# Calivi — per-model system prompts (example)
+#
+# Copy this file to `config/system_prompts.yml` and edit it. Your own copy is
+# git-ignored, so your prompts stay private and survive `git pull`.
+#
+# The system prompt is prepended to the messages before they are sent to the model.
+# - Key: the exact model name (the NAME from `ollama list`). Quote it, because model names
+#   contain ':'.
+# - 'default': used for any model without its own entry.
+# - Delete a model's key to fall back to 'default'.
+# - Read on every request (hot-reload) — no restart needed after editing.
+# - Editable from the UI: Settings → System Prompts. The "Default" button restores the
+#   factory defaults from `backend/app/defaults/system_prompts.yml`.
+#
+# If this file is missing entirely, Calivi still works — no system message is sent.
+
+default: |
+  You are a helpful, honest and concise assistant. Answer the request as accurately and
+  clearly as you can. Where you are unsure, say so rather than guessing.
+
+# --- Examples: give a model a role that matches what it is good at ---------------------
+# Uncomment and adapt. The names below are illustrative; use your own model names.
+
+# "qwen3:8b": |
+#   You are a coding assistant. Explain briefly and give working, runnable code.
+#   Prefer a complete example over a partial snippet.
+
+# "gemma3:12b": |
+#   You are a fast, general-purpose assistant. Keep answers short and to the point;
+#   this model is used for summarising, classifying and everyday questions.
+
+# Some models hosted behind an OpenAI-compatible API do not know their own identity
+# (their training data contains other assistants' output, so they may claim to be a
+# different model). Stating it explicitly helps:
+#
+# "some-model-name": |
+#   You are <model>, developed by <vendor>. You specialise in software engineering
+#   tasks: writing code, debugging and refactoring.

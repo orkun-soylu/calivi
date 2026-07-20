@@ -1,0 +1,11 @@
+# Calivi — vision (image) capability overrides
+#
+# Vision detection is automatic:
+#   - Ollama: when "vision" appears in /api/show capabilities.
+#   - OpenAI-compatible: when the model name carries a vision hint
+#     (vision, -vl, 4o, gemini, pixtral, llava...).
+# Use the lists below to force it when detection gets it wrong. Values are SUBSTRINGS
+# (lowercase); matching anywhere in the model name is enough. Read on every request (hot-reload).
+
+force_vision: []   # models containing these substrings COUNT as vision (when the heuristic misses)
+force_text: []     # models containing these substrings are NOT vision (kills a false positive)

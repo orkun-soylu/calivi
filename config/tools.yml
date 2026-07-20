@@ -1,0 +1,10 @@
+# Tool layer config — hot-reloaded (read on every request).
+# enabled: the master switch. When off, no tools are offered even if 🔍 is on.
+# max_iterations: upper bound on the agentic loop (call tool → run → repeat), 1-20.
+# tools.<name>.enabled: whether that tool is offered to the model.
+enabled: true
+max_iterations: 5
+tools:
+  web_search:
+    enabled: true
+    num_results: 5

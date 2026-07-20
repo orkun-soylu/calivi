@@ -1,0 +1,25 @@
+# SearXNG bundled into Calivi — used only for calivi-backend's JSON searches.
+# No port is published (it is Calivi's internal search engine). use_default_settings
+# inherits the image's default settings/engines; the entries below override them.
+use_default_settings:
+  engines:
+    # ahmia + torch are Tor onion search engines; they need a Tor proxy and are pointless for
+    # Calivi's internal JSON search → they logged a "can't register engine" error on every
+    # start. Removed.
+    remove:
+      - ahmia
+      - torch
+
+server:
+  # A single internal instance with no external exposure → a fixed secret is enough.
+  # Change this if you ever expose it publicly.
+  secret_key: "calivi-searxng-internal-key-change-if-public"
+  limiter: false          # bot limiter off, so it does not block the backend's JSON requests (no redis needed either)
+  image_proxy: false
+
+search:
+  formats:
+    - html
+    - json                # the Calivi backend uses the JSON API (OFF by default in SearXNG)
+  autocomplete: ""
+  default_lang: "auto"

@@ -1,0 +1,16 @@
+# Calivi — per-model system prompts
+#
+# The system prompt prepended to the messages before they are sent to the model.
+# - Key: the exact model name (the NAME from `ollama list`). Quote it, because model names
+#   contain ':'.
+# - 'default': used for any model without its own entry.
+# - Delete a model's key to fall back to 'default'.
+# - Read on every request (hot-reload) — no restart needed after editing.
+
+default: |
+  You are a helpful, honest and concise assistant. Answer the request as accurately and
+  clearly as you can. Where you are unsure, say so rather than guessing.
+
+# Example of a model-specific prompt (uncomment and edit):
+# "qwen3:8b": |
+#   You are a coding assistant. Keep explanations minimal and give working code.

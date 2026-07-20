@@ -1,0 +1,20 @@
+node_modules/
+dist/
+__pycache__/
+*.pyc
+.venv/
+.venv-test/
+.pytest_cache/
+*.db
+.env
+
+# Raw TTF font sources (the build only uses the woff2 files in frontend/src/fonts)
+/fonts/
+
+# Local system prompts: personal, may name your own hardware/models.
+# Ships as config/system_prompts.example.yml instead.
+/config/system_prompts.yml
+
+# Deployment notes for this specific install (hostnames, IPs, routing). The portable
+# design rationale lives in ARCHITECTURE.md, which IS tracked.
+/CLAUDE.md

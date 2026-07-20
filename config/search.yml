@@ -1,0 +1,15 @@
+# Web search (🔍) settings — hot-reloaded, changes take effect immediately (no restart).
+# This file can also be edited from Settings > Web Search.
+
+# The instruction given to the model while the search toggle is on. The model reads the
+# conversation context and produces a SINGLE-LINE search query, or NONE when no current or
+# external information is needed.
+query_prompt: |
+  You are a web search query generator. Read the conversation context below and produce a
+  single-line, concise search query that would help answer the user's LAST message. Output
+  only the query text — no quotes, explanation or extra prose. If no current or external
+  information is needed (a greeting, writing code, a question answerable from context),
+  output only NONE.
+
+# How many results are taken from SearXNG and given to the model as context (1-20).
+num_results: 5
