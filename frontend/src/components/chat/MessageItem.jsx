@@ -43,7 +43,7 @@ export default function MessageItem({ m, onEdit, onDelete, onImageClick }) {
         {m.attachments?.length > 0 && (
           <div className="flex gap-2 flex-wrap mb-2">
             {m.attachments.map((a, i) => (
-              <AttachmentChip key={i} name={a.name} />
+              <AttachmentChip key={i} name={a.name} onAccent={isUser} />
             ))}
           </div>
         )}
