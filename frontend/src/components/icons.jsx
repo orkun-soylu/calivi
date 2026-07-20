@@ -1,4 +1,4 @@
-// currentColor kullanan inline ikonlar — temalı metin rengini miras alır (light/dark'ta görünür).
+// Inline icons using currentColor — they inherit the themed text color (visible in light/dark).
 // Replaces the old hardcoded-white SVG assets (settings-white.svg / menu-dark.svg). Source: Lucide.
 
 export function SettingsIcon({ className = "w-5 h-5" }) {

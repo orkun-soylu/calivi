@@ -62,7 +62,7 @@ export default function UserManagement({ me, onMeUpdated, onAccountDeleted }) {
     }
   }
 
-  // Kendi profilini kaydet (email/username) — self endpoint; App'teki me'yi de günceller.
+  // Save your own profile (email/username) — self endpoint; also updates `me` in App.
   async function saveSelf() {
     setError("");
     try {
@@ -75,7 +75,7 @@ export default function UserManagement({ me, onMeUpdated, onAccountDeleted }) {
     }
   }
 
-  // Kendi hesabını sil (onaylı) → başarıda oturum düşer, App login ekranına atar.
+  // Delete your own account (confirmed) → on success the session drops and App sends you to login.
   async function deleteSelf() {
     if (!window.confirm(t("users.deleteSelfConfirm"))) return;
     setError("");
@@ -118,7 +118,7 @@ export default function UserManagement({ me, onMeUpdated, onAccountDeleted }) {
 
             {open && (
               <div className="px-3 pb-3 pt-1 space-y-2">
-                {/* email/username düzenleme: kendi satırın → self endpoint; admin başkası → admin endpoint */}
+                {/* editing email/username: your own row → self endpoint; an admin on someone else → admin endpoint */}
                 <div className="flex gap-2">
                   <input
                     value={email}
@@ -142,7 +142,7 @@ export default function UserManagement({ me, onMeUpdated, onAccountDeleted }) {
                   </button>
                 </div>
 
-                {/* Kendi hesabını sil (süper admin hariç). */}
+                {/* Delete your own account (except the super admin). */}
                 {isSelf && !isSuper && (
                   <div className="flex">
                     <button

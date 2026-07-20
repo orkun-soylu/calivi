@@ -57,8 +57,8 @@
 [data-accent="purple"] { --accent: 145  65 172; }
 [data-accent="slate"]  { --accent: 111 131 150; }
 
-/* JetBrains Mono Nerd Font (self-hosted). Regular ilk yüklenir; diğer ağırlıklar
-   sadece o glyph render edilince (lazy) iner. */
+/* JetBrains Mono Nerd Font (self-hosted). Regular loads first; the other weights
+   load lazily, only once a glyph in that weight is actually rendered. */
 @font-face {
   font-family: "JetBrains Mono";
   src: url("./fonts/JetBrainsMonoNerdFont-Regular.woff2") format("woff2");

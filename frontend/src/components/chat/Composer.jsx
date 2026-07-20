@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { AttachmentChip } from "./MessageActions.jsx";
 import { useT } from "../../i18n.js";
 
-/** Alt bar: ek/arama düğmeleri, auto-grow textarea, gönder/dur + ek önizlemeleri. */
+/** Bottom bar: attach/search buttons, auto-grow textarea, send/stop + attachment previews. */
 export default function Composer({
   input,
   onInputChange,
