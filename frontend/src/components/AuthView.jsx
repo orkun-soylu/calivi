@@ -33,7 +33,7 @@ export default function AuthView({ registrationEnabled, onAuthed }) {
       try {
         text = JSON.parse(detail).detail || detail;
       } catch {
-        /* düz metin */
+        /* plain text */
       }
       setError(text || t("auth.genericError"));
     } finally {

@@ -92,7 +92,7 @@ export default function MessageList({
           </div>
         )}
 
-        {/* Sabit yükseklik: düşünme metni uzadıkça kutu büyüyüp sayfayı zıplatmasın. */}
+        {/* Fixed height: as the thinking text grows the box must not expand and jump the page. */}
         {sending && thinking && !streaming && (
           <div className="flex justify-start">
             <div className="w-[70%] h-64 overflow-hidden rounded-2xl px-4 py-2 bg-neutral-900 text-neutral-500 text-sm italic whitespace-pre-wrap flex flex-col justify-end">

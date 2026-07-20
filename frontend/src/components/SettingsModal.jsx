@@ -43,7 +43,7 @@ export default function SettingsModal({ servers, me, onClose, onAdd, onUpdate, o
       setRegEnabled(!next); // geri al
     }
   }
-  const [editingId, setEditingId] = useState(null); // null → ekleme, id → düzenleme
+  const [editingId, setEditingId] = useState(null); // null → adding, id → editing
   const [type, setType] = useState("ollama");
   const [name, setName] = useState("");
   const [host, setHost] = useState("");
@@ -51,7 +51,7 @@ export default function SettingsModal({ servers, me, onClose, onAdd, onUpdate, o
   const [baseUrl, setBaseUrl] = useState("");
   const [apiKey, setApiKey] = useState("");
 
-  // Taşıma + boyutlandırma
+  // Dragging + resizing
   const [size, setSize] = useState({ w: 816, h: 560 });
   const [pos, setPos] = useState(() => ({
     x: Math.max(20, Math.round((window.innerWidth - 816) / 2)),
@@ -85,7 +85,7 @@ export default function SettingsModal({ servers, me, onClose, onAdd, onUpdate, o
   }, []);
 
   function startDrag(e) {
-    if (e.target.closest("button")) return; // sekme/kapat butonlarına tıklamada taşıma başlatma
+    if (e.target.closest("button")) return; // don't start dragging when clicking the tab/close buttons
     dragRef.current = { dx: e.clientX - pos.x, dy: e.clientY - pos.y };
   }
   function startResize(e) {
@@ -140,7 +140,7 @@ export default function SettingsModal({ servers, me, onClose, onAdd, onUpdate, o
         className="absolute bg-neutral-900 rounded-2xl shadow-2xl ring-1 ring-neutral-700/60 flex flex-col overflow-hidden"
         style={{ left: pos.x, top: pos.y, width: size.w, height: size.h }}
       >
-        {/* Başlık = taşıma tutamağı */}
+        {/* Title bar = drag handle */}
         <div
           onMouseDown={startDrag}
           className="flex items-center justify-between px-5 py-3 cursor-move select-none shrink-0"
@@ -163,7 +163,7 @@ export default function SettingsModal({ servers, me, onClose, onAdd, onUpdate, o
           </button>
         </div>
 
-        {/* İçerik */}
+        {/* Content */}
         <div className="flex-1 min-h-0 px-5 pb-5">
           {tab === "general" && (
             <div className="h-full overflow-y-auto themed-scroll">
@@ -375,7 +375,7 @@ export default function SettingsModal({ servers, me, onClose, onAdd, onUpdate, o
           )}
         </div>
 
-        {/* Boyutlandırma tutamağı (sağ-alt köşe) */}
+        {/* Resize handle (bottom-right corner) */}
         <div
           onMouseDown={startResize}
           className="absolute bottom-0 right-0 w-5 h-5 flex items-end justify-end pr-1 pb-0.5 cursor-nwse-resize text-neutral-600 hover:text-neutral-400 text-xs leading-none select-none"

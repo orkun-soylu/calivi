@@ -61,13 +61,13 @@ export default function App() {
     try {
       setActiveChat(await api.getChat(id));
     } catch {
-      // Kayıtlı sohbet silinmiş/bulunamadı → boş duruma dön.
+      // The saved chat was deleted / not found → fall back to the empty state.
       setActiveChatId(null);
       setActiveChat(null);
     }
   }, []);
 
-  // Oturumu başlat: 401 kancası (→ AuthView), auth config, mevcut oturum kontrolü.
+  // Bootstrap the session: 401 hook (→ AuthView), auth config, check for an existing session.
   useEffect(() => {
     setUnauthorizedHandler(() => setMe(null));
     (async () => {
@@ -75,7 +75,7 @@ export default function App() {
         const cfg = await api.getAuthConfig();
         setRegistrationEnabled(cfg.registration_enabled);
       } catch {
-        /* yoksay */
+        /* ignore */
       }
       try {
         setMe(await api.getMe());
@@ -87,7 +87,7 @@ export default function App() {
     })();
   }, []);
 
-  // Veri yükleme yalnız giriş yapılınca (aksi halde 401 döngüsü).
+  // Load data only once signed in (otherwise a 401 loop).
   useEffect(() => {
     if (!me) return;
     refreshChats();
@@ -112,7 +112,7 @@ export default function App() {
     try {
       await api.logout();
     } catch {
-      /* cookie yine de düşer */
+      /* the cookie is dropped regardless */
     }
     setMe(null);
     setActiveChatId(null);

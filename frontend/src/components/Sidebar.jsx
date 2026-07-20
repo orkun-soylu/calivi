@@ -24,7 +24,7 @@ export default function Sidebar({
   const [renameValue, setRenameValue] = useState("");
   const draggingRef = useRef(false);
 
-  // Sürükleyerek genişlik ayarı
+  // Drag to resize the width
   useEffect(() => {
     function onMove(e) {
       if (!draggingRef.current) return;
@@ -153,7 +153,7 @@ export default function Sidebar({
         </div>
       )}
 
-      {/* Genişlik ayar tutamağı (sağ kenar) */}
+      {/* Width resize handle (right edge) */}
       <div
         onMouseDown={() => (draggingRef.current = true)}
         className="absolute top-0 right-0 h-full w-1.5 cursor-col-resize hover:bg-neutral-700/70"
