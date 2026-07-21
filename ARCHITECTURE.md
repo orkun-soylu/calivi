@@ -351,6 +351,42 @@ the extracted text.) The two paths are separate: images go to vision models, doc
 - **The attach button** is visible on every model (for documents); images are only accepted on
   vision models.
 
+### Parsing runs in a killable subprocess
+
+`pypdf` and `python-docx` parse **untrusted** files and have a long history of crafted-file
+hangs. They run in `app/extract_worker.py` — a separate process, spawned per PDF/docx upload,
+bytes in on stdin and text out on stdout — under `PARSE_TIMEOUT` (30 s). When the budget runs
+out the child is **SIGKILLed**.
+
+> **Why not a worker thread, which is what this was.** `asyncio.wait_for` around
+> `asyncio.to_thread` ended the *request* and left the *thread* parsing forever, because Python
+> cannot kill a thread. `to_thread` draws on the loop's default executor — `min(32, cpu+4)`, i.e.
+> 8 threads on a 4-core host — so eight hung uploads took `/api/extract` down until the container
+> restarted. A larger pool would only have raised the number of hangs needed. The timeout
+> restored the request; nothing restored the capability.
+
+Details that matter, each with a test that fails without it:
+
+- **The kill is explicit.** asyncio's subprocess transport does kill a surviving child, but only
+  when it is finalised — after the response, at GC time. The kill test asserts the pid is gone
+  (and reaped, not a zombie) by the time the 400 is returned.
+- **The `finally` also covers client disconnect.** An aborted upload raises `CancelledError`, and
+  without the kill its parser would run to completion with nobody waiting for it.
+- **Concurrency is capped at `MAX_CONCURRENT_PARSES` (4).** The thread pool used to bound this at
+  8 by accident of its own sizing; a process per upload has no such ceiling, and N uploads would
+  be N interpreters each holding a parsed document. Waiting for a slot is deliberately untimed —
+  a parse cannot outlive the budget, so the queue always drains.
+- **Only the last stderr line reaches the client**, clipped to 300 characters: the parsers log
+  their own complaints on the way down (pypdf prints `invalid pdf header` itself), all of it
+  attacker-shaped. The worker writes its own message last.
+- **Text files never spawn anything.** Decoding bounded bytes cannot hang, so there is nothing to
+  kill; a process per pasted snippet would be pure overhead. That path still uses `to_thread`.
+- **The worker imports no app code** — no FastAPI, no database, no config. Startup is one
+  interpreter plus the parser import; pulling the app in would make that much worse.
+- **The cap lives in the worker** (`MAX_CHARS + 1` characters, already stripped), so a crafted
+  text bomb is discarded before it is piped between processes rather than after. The extra
+  character is what lets the parent still detect truncation.
+
 ### File picker dialog — File System Access API
 
 Complaint: the dialog always opened in the **last used folder**. A plain `<input type="file">`
@@ -772,7 +808,7 @@ ordering), `components/chat/MessageItem.test.jsx` (render conditions),
 Fake timers (`vi.useFakeTimers`) deadlock with RTL's async `act` wrapper; the two tests that verify
 delay behaviour deliberately use **real** timers (~3s).
 
-### Backend — pytest (91 tests)
+### Backend — pytest (167 tests)
 
 `backend/tests/` — pytest + `httpx.ASGITransport` (a real HTTP layer, no live server needed). They
 do not ship in the prod image: the `Dockerfile` installs only `requirements.txt`, and the test
@@ -790,7 +826,8 @@ python3 -m venv .venv-test && ./.venv-test/bin/pip install -r requirements-dev.t
 (ownership — every chat endpoint), `test_admin_gating.py` (admin-only endpoints + no api_key leak),
 `test_config_editor.py` (whitelist, malformed YAML → 400 **and the file is not corrupted**),
 `test_account_deletion.py` (FK cascade — no orphaned messages), `test_probe_cache.py`,
-`test_model_liveness.py`, `test_image_stripping.py`, `test_tools_registry.py` (the read-only
+`test_model_liveness.py`, `test_image_stripping.py`, `test_extract.py` (upload caps, and the
+parse subprocess: killed on timeout, capped in number), `test_tools_registry.py` (the read-only
 `mutating` gate), `test_tool_loop.py` (the agentic loop's `tool_result.ok` flag — the error-prefix
 contract above).
 
