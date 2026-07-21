@@ -8,6 +8,8 @@ from sqlalchemy.orm import Session
 from app import auth, models, schemas, llm, tools_config
 from app.database import get_db, SessionLocal
 from app.system_prompts import get_system_prompt
+from app import approvals
+from app.config import APPROVAL_HEARTBEAT, APPROVAL_TIMEOUT
 from app.tools import ERROR_PREFIX, mcp_client, registry
 
 router = APIRouter(prefix="/api/chats", tags=["chats"])
@@ -122,7 +124,7 @@ def _persist_chips(chat_id: int, chips: list[dict]) -> None:
 
 def build_stream_response(
     chat_id: int, target: dict, model: str, history: list[dict],
-    use_tools: bool = False, extra_headers: dict | None = None,
+    use_tools: bool = False, extra_headers: dict | None = None, user_id: int | None = None,
 ) -> StreamingResponse:
     """Injects the system prompt (and optional tools), returns the NDJSON stream and saves the
     assistant message at the end.
@@ -190,8 +192,37 @@ def build_stream_response(
                 for call in turn_calls:
                     args = call.get("arguments") or {}
                     yield json.dumps({"type": "tool_call", "name": call["name"], "args": args}) + "\n"
+
+                    # Human-in-the-loop: a tool marked `mutating` needs an explicit yes before
+                    # the registry will run it. The wait yields pings, because no bytes flow
+                    # down the stream while a person decides and proxies time out on idle
+                    # connections (Traefik's default is 180s).
+                    approved = False
+                    tool = registry.get(call["name"])
+                    if tool is not None and tool.mutating and user_id is not None:
+                        approval_id = approvals.create(chat_id, user_id, call["name"], args)
+                        try:
+                            yield json.dumps({
+                                "type": "approval_request", "id": approval_id,
+                                "name": call["name"], "args": args,
+                            }) + "\n"
+                            async for decision in approvals.wait(
+                                approval_id, APPROVAL_TIMEOUT, APPROVAL_HEARTBEAT
+                            ):
+                                if decision is None:
+                                    yield json.dumps({"type": "ping"}) + "\n"
+                                    continue
+                                approved = decision
+                        finally:
+                            # A closed tab raises CancelledError (a BaseException), so this has
+                            # to be in a finally or the pending entry leaks.
+                            approvals.discard(approval_id)
+                        yield json.dumps({
+                            "type": "approval_result", "name": call["name"], "approved": approved,
+                        }) + "\n"
+
                     try:
-                        result = await registry.execute(call["name"], args)
+                        result = await registry.execute(call["name"], args, approved=approved)
                         ok = not result.startswith(ERROR_PREFIX)
                     except Exception:
                         # A tool failure must not kill the stream: the model gets an error string
@@ -360,7 +391,7 @@ async def send_message(
     db.commit()
     history.append({"role": "user", "content": payload.content, "images": payload.images, "attachments": atts})
 
-    return build_stream_response(chat.id, target, model, history, use_tools=payload.use_tools)
+    return build_stream_response(chat.id, target, model, history, use_tools=payload.use_tools, user_id=user.id)
 
 
 @router.delete("/{chat_id}/messages/{message_id}", status_code=204)
@@ -405,7 +436,7 @@ async def edit_message(
     db.commit()
 
     history = _history_of(db, chat_id)
-    return build_stream_response(chat_id, target, model, history, use_tools=payload.use_tools)
+    return build_stream_response(chat_id, target, model, history, use_tools=payload.use_tools, user_id=user.id)
 
 
 @router.post("/{chat_id}/fork")
@@ -452,5 +483,28 @@ async def fork_chat(
     history = _history_of(db, new_chat.id)
     return build_stream_response(
         new_chat.id, target, model, history,
-        use_tools=payload.use_tools, extra_headers={"X-Calivi-Chat-Id": str(new_chat.id)},
+        use_tools=payload.use_tools, user_id=user.id,
+        extra_headers={"X-Calivi-Chat-Id": str(new_chat.id)},
     )
+
+
+@router.post("/{chat_id}/approvals/{approval_id}", status_code=204)
+def respond_to_approval(
+    chat_id: int,
+    approval_id: str,
+    payload: schemas.ApprovalDecision,
+    user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Records a decision on a pending tool call, unblocking the waiting stream.
+
+    Approving is granting a capability, so ownership is checked twice: the chat must belong to
+    the caller, and `approvals.resolve` independently verifies the approval was created for
+    this user and this chat. A 404 covers both "no such approval" and "not yours" — an
+    approval id is a capability and must not be probeable.
+    """
+    chat = db.get(models.Chat, chat_id)
+    if not chat or chat.user_id != user.id:
+        raise HTTPException(404, "Chat not found")
+    if not approvals.resolve(approval_id, chat_id, user.id, payload.approved):
+        raise HTTPException(404, "Approval not found")

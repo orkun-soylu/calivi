@@ -30,6 +30,11 @@ CREATE TABLE mcp_servers (
 )
 """
 
+# The shape one release later: disabled_tools exists, tool_modes does not.
+LEGACY_WITH_DISABLED_TOOLS = LEGACY_MCP_SERVERS.replace(
+    "    UNIQUE (name)", "    disabled_tools JSON,\n    UNIQUE (name)"
+)
+
 
 def _rebuild_legacy_table():
     with engine.connect() as conn:
@@ -83,3 +88,46 @@ def test_every_model_column_exists_in_the_table_after_migrating():
         actual = set(_columns(table_name))
         missing = {c.name for c in table.columns} - actual
         assert not missing, f"{table_name} is missing {missing} — add an ALTER TABLE to _migrate()"
+
+
+def test_disabled_tools_is_converted_into_tool_modes():
+    """The intermediate release stored a list of switched-off tools. Those choices must survive
+    the move to three-state modes — silently re-enabling a tool an admin turned off would be a
+    capability grant nobody asked for."""
+    with engine.connect() as conn:
+        conn.exec_driver_sql("DROP TABLE IF EXISTS mcp_servers")
+        conn.exec_driver_sql(LEGACY_WITH_DISABLED_TOOLS)
+        conn.exec_driver_sql(
+            "INSERT INTO mcp_servers (name, url, transport, secret_header, secret_prefix, "
+            "enabled, created_at, disabled_tools) VALUES "
+            "('s', 'u', 'http', 'Authorization', 'Bearer ', 1, '2026-01-01', '[\"a\", \"b\"]')"
+        )
+        conn.commit()
+
+    _migrate()
+
+    db = SessionLocal()
+    try:
+        assert db.query(models.McpServer).one().tool_modes == {"a": "off", "b": "off"}
+    finally:
+        db.close()
+
+
+def test_servers_without_disabled_tools_are_left_alone():
+    with engine.connect() as conn:
+        conn.exec_driver_sql("DROP TABLE IF EXISTS mcp_servers")
+        conn.exec_driver_sql(LEGACY_WITH_DISABLED_TOOLS)
+        conn.exec_driver_sql(
+            "INSERT INTO mcp_servers (name, url, transport, secret_header, secret_prefix, "
+            "enabled, created_at, disabled_tools) VALUES "
+            "('s', 'u', 'http', 'Authorization', 'Bearer ', 1, '2026-01-01', NULL)"
+        )
+        conn.commit()
+
+    _migrate()
+
+    db = SessionLocal()
+    try:
+        assert db.query(models.McpServer).one().tool_modes is None  # defaults apply
+    finally:
+        db.close()

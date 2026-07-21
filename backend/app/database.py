@@ -1,3 +1,5 @@
+import json
+
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
@@ -67,6 +69,19 @@ def _migrate():
         mcpcols = [row[1] for row in conn.exec_driver_sql("PRAGMA table_info(mcp_servers)").fetchall()]
         if mcpcols and "disabled_tools" not in mcpcols:
             conn.exec_driver_sql("ALTER TABLE mcp_servers ADD COLUMN disabled_tools JSON")
+        if mcpcols and "tool_modes" not in mcpcols:
+            conn.exec_driver_sql("ALTER TABLE mcp_servers ADD COLUMN tool_modes JSON")
+            # disabled_tools (one release old) becomes {name: "off"}. The old column is left in
+            # place — SQLite DROP COLUMN is not worth the risk for a harmless orphan.
+            for row in conn.exec_driver_sql(
+                "SELECT id, disabled_tools FROM mcp_servers WHERE disabled_tools IS NOT NULL"
+            ).fetchall():
+                names = json.loads(row[1] or "[]")
+                if names:
+                    conn.exec_driver_sql(
+                        "UPDATE mcp_servers SET tool_modes = ? WHERE id = ?",
+                        (json.dumps({n: "off" for n in names}), row[0]),
+                    )
 
         mcols = [row[1] for row in conn.exec_driver_sql("PRAGMA table_info(messages)").fetchall()]
         if "tokens_per_sec" not in mcols:

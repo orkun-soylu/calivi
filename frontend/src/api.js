@@ -82,6 +82,13 @@ export const api = {
 
   // MCP servers (admin only). `refresh=1` forces a live probe instead of the TTL cache —
   // an MCP probe opens a real session, so it is not something to do on every render.
+  // Decide on a pending tool call; unblocks the stream that is still open.
+  respondToApproval: (chatId, approvalId, approved) =>
+    request(`/chats/${chatId}/approvals/${approvalId}`, {
+      method: "POST",
+      body: JSON.stringify({ approved }),
+    }),
+
   listMcpServers: (refresh) => request(`/mcp${refresh ? "?refresh=1" : ""}`),
   addMcpServer: (data) => request("/mcp", { method: "POST", body: JSON.stringify(data) }),
   updateMcpServer: (id, data) => request(`/mcp/${id}`, { method: "PATCH", body: JSON.stringify(data) }),

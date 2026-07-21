@@ -111,17 +111,21 @@ async def test_same_tool_name_on_two_servers_does_not_clobber(monkeypatch):
 
 
 @pytest.mark.anyio
-async def test_non_read_only_tools_are_withheld(monkeypatch):
+async def test_mutating_tools_default_to_off(monkeypatch):
+    """Fail-safe default: an admin has to opt a state-changing tool in, so an upgrade that
+    discovers new mutating tools changes nothing."""
     server = make_server()
     tools = [fake_tool("query-docs", read_only=True), fake_tool("create-issue", read_only=False)]
     with patched_connect(monkeypatch, FakeSession(tools)):
         entry = await mcp_client.refresh(server)
 
     assert entry.status == "up"
-    assert [t["name"] for t in entry.tools] == ["mcp__ctx7__query-docs"]
-    assert entry.skipped == ["create-issue"]
-    # Withheld, not merely disabled: it must not be in the registry at all.
+    by_name = {t["raw_name"]: t for t in entry.tools}
+    assert by_name["query-docs"]["mode"] == "auto"
+    assert by_name["create-issue"]["mode"] == "off"
+    # Listed for Settings, but the model is not told it exists.
     assert registry.get("mcp__ctx7__create-issue") is None
+    assert registry.get("mcp__ctx7__query-docs") is not None
 
 
 @pytest.mark.anyio
@@ -134,8 +138,34 @@ async def test_missing_annotations_are_treated_as_mutating(monkeypatch):
     with patched_connect(monkeypatch, FakeSession([tool])):
         entry = await mcp_client.refresh(server)
 
-    assert entry.tools == []
-    assert entry.skipped == ["whatever"]
+    assert entry.tools[0]["mode"] == "off"
+    assert registry.get("mcp__ctx7__whatever") is None
+
+
+@pytest.mark.anyio
+async def test_approve_mode_registers_the_tool_as_mutating(monkeypatch):
+    """`approve` rides on the existing mutating gate — that is what makes the registry refuse
+    to run it without a decision, no matter who calls."""
+    server = make_server(tool_modes={"create-issue": "approve"})
+    with patched_connect(monkeypatch, FakeSession([fake_tool("create-issue", read_only=False)])):
+        await mcp_client.refresh(server)
+
+    tool = registry.get("mcp__ctx7__create-issue")
+    assert tool is not None
+    assert tool.mutating is True
+    # ...and it still cannot run without approval.
+    assert (await registry.execute(tool.name, {})).startswith(ERROR_PREFIX)
+    assert not (await registry.execute(tool.name, {}, approved=True)).startswith(ERROR_PREFIX)
+
+
+@pytest.mark.anyio
+async def test_auto_mode_can_force_a_mutating_tool_to_run_unattended(monkeypatch):
+    """An explicit admin choice, and it must be explicit — never a default."""
+    server = make_server(tool_modes={"create-issue": "auto"})
+    with patched_connect(monkeypatch, FakeSession([fake_tool("create-issue", read_only=False)])):
+        await mcp_client.refresh(server)
+
+    assert registry.get("mcp__ctx7__create-issue").mutating is False
 
 
 @pytest.mark.anyio
@@ -361,45 +391,54 @@ async def test_delete_unregisters_the_tools(admin, monkeypatch):
 
 
 @pytest.mark.anyio
-async def test_disabled_tool_is_listed_but_not_registered(monkeypatch):
+async def test_off_tool_is_listed_but_not_registered(monkeypatch):
     """Turning a tool off must hide it from the model, yet keep it visible in Settings so it
     can be turned back on — a tool that vanishes from the UI cannot be re-enabled."""
-    server = make_server(disabled_tools=["create-note"])
+    server = make_server(tool_modes={"create-note": "off"})
     tools = [fake_tool("query-docs"), fake_tool("create-note")]
     with patched_connect(monkeypatch, FakeSession(tools)):
         entry = await mcp_client.refresh(server)
 
-    by_name = {t["name"]: t for t in entry.tools}
-    assert by_name["mcp__ctx7__query-docs"]["enabled"] is True
-    assert by_name["mcp__ctx7__create-note"]["enabled"] is False
-    # Listed, but the model is never told it exists.
+    by_name = {t["raw_name"]: t for t in entry.tools}
+    assert by_name["query-docs"]["mode"] == "auto"
+    assert by_name["create-note"]["mode"] == "off"
     assert registry.get("mcp__ctx7__query-docs") is not None
     assert registry.get("mcp__ctx7__create-note") is None
 
 
 @pytest.mark.anyio
-async def test_re_enabling_a_tool_registers_it_again(monkeypatch, admin):
+async def test_switching_a_tool_back_on_registers_it_again(monkeypatch, admin):
     with patched_connect(monkeypatch, FakeSession([fake_tool("query-docs")])):
         created = (await admin.post(
             "/api/mcp", json={"name": "ctx7", "url": "https://example.test/mcp",
-                              "disabled_tools": ["query-docs"]}
+                              "tool_modes": {"query-docs": "off"}}
         )).json()
         assert registry.get("mcp__ctx7__query-docs") is None
 
-        resp = await admin.patch(f"/api/mcp/{created['id']}", json={"disabled_tools": []})
+        resp = await admin.patch(f"/api/mcp/{created['id']}", json={"tool_modes": {}})
 
     assert resp.status_code == 200, resp.text
     assert registry.get("mcp__ctx7__query-docs") is not None
 
 
 @pytest.mark.anyio
-async def test_disabled_tools_survive_a_round_trip(admin, monkeypatch):
+async def test_tool_modes_survive_a_round_trip(admin, monkeypatch):
     with patched_connect(monkeypatch, FakeSession([fake_tool("t")])):
         created = (await admin.post(
             "/api/mcp", json={"name": "ctx7", "url": "https://example.test/mcp",
-                              "disabled_tools": ["t"]}
+                              "tool_modes": {"t": "approve"}}
         )).json()
-    assert created["disabled_tools"] == ["t"]
+    assert created["tool_modes"] == {"t": "approve"}
+
+
+@pytest.mark.anyio
+async def test_an_unknown_mode_falls_back_to_the_safe_default(monkeypatch):
+    """A hand-edited or corrupted value must not become an accidental grant."""
+    server = make_server(tool_modes={"create-issue": "yes-please"})
+    with patched_connect(monkeypatch, FakeSession([fake_tool("create-issue", read_only=False)])):
+        entry = await mcp_client.refresh(server)
+    assert entry.tools[0]["mode"] == "off"
+    assert registry.get("mcp__ctx7__create-issue") is None
 
 
 @pytest.mark.anyio

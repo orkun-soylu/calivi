@@ -146,15 +146,12 @@ export default function McpServers() {
     }
   }
 
-  async function toggleTool(server, tool) {
+  async function setToolMode(server, tool, mode) {
     // `raw_name` comes from the backend precisely so the namespace format keeps a single
     // owner (mcp_client) and is never re-parsed here.
-    const raw = tool.raw_name;
-    const disabled = new Set(server.disabled_tools || []);
-    if (tool.enabled) disabled.add(raw);
-    else disabled.delete(raw);
+    const modes = { ...(server.tool_modes || {}), [tool.raw_name]: mode };
     try {
-      await api.updateMcpServer(server.id, { disabled_tools: [...disabled] });
+      await api.updateMcpServer(server.id, { tool_modes: modes });
       await load(false);
     } catch (e) {
       setError(errText(e));
@@ -226,27 +223,26 @@ export default function McpServers() {
           return (
             <div className="rounded-lg bg-neutral-800/40 px-3 py-2 space-y-1">
               {s.tools.map((tool) => (
-                <label
-                  key={tool.name}
-                  title={tool.description}
-                  className="flex items-center gap-2 text-xs text-neutral-400 cursor-pointer"
-                >
-                  <input
-                    type="checkbox"
-                    checked={tool.enabled}
-                    onChange={() => toggleTool(s, tool)}
-                    title={t("mcp.toolToggle")}
-                  />
-                  <span className={`truncate ${tool.enabled ? "" : "line-through opacity-60"}`}>
-                    🔧 {tool.name}
+                <div key={tool.name} className="flex items-center gap-2 text-xs text-neutral-400">
+                  <select
+                    value={tool.mode}
+                    onChange={(e) => setToolMode(s, tool, e.target.value)}
+                    title={t("mcp.toolMode")}
+                    className="bg-neutral-800 rounded px-1.5 py-0.5 text-xs shrink-0"
+                  >
+                    <option value="off">{t("mcp.modeOff")}</option>
+                    <option value="auto">{t("mcp.modeAuto")}</option>
+                    <option value="approve">{t("mcp.modeApprove")}</option>
+                  </select>
+                  <span
+                    title={tool.description}
+                    className={`truncate ${tool.mode === "off" ? "line-through opacity-60" : ""}`}
+                  >
+                    {tool.read_only ? "🔧" : "⚠️"} {tool.name}
                   </span>
-                </label>
-              ))}
-              {s.skipped_tools.length > 0 && (
-                <div className="text-xs text-neutral-500 pt-1">
-                  {t("mcp.skipped", { tools: s.skipped_tools.join(", ") })}
                 </div>
-              )}
+              ))}
+              <div className="text-xs text-neutral-500 pt-1">{t("mcp.modeHint")}</div>
               {s.error && <div className="text-xs text-red-400 break-words">{s.error}</div>}
             </div>
           );

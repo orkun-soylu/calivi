@@ -14,6 +14,7 @@ export function useChatStream() {
   const [thinking, setThinking] = useState("");
   const [sending, setSending] = useState(false);
   const [searchInfo, setSearchInfo] = useState(null); // last search/tool event of the active stream
+  const [approval, setApproval] = useState(null); // pending tool approval, or null
   const abortRef = useRef(null);
 
   function stop() {
@@ -38,6 +39,13 @@ export function useChatStream() {
     else if (piece.type === "tool_call") setSearchInfo({ status: "tool_running", name: piece.name });
     else if (piece.type === "tool_result")
       setSearchInfo({ status: piece.ok ? "tool_done" : "tool_failed", name: piece.name });
+    // A state-changing tool is waiting on a human. The stream stays open while the card is up.
+    else if (piece.type === "approval_request")
+      setApproval({ id: piece.id, name: piece.name, args: piece.args });
+    else if (piece.type === "approval_result") setApproval(null);
+    // Keep-alive emitted while waiting for a decision — no bytes would flow otherwise and
+    // proxies drop idle connections. Nothing to display.
+    else if (piece.type === "ping") return;
     // Upstream model error (e.g. HTTP 400): appended to the bubble as a visible marker.
     // The backend persists the same marker into the message content → stays consistent on reload.
     else if (piece.type === "error")
@@ -57,6 +65,7 @@ export function useChatStream() {
   function clear() {
     setStreaming("");
     setThinking("");
+    setApproval(null);
     setSearchInfo(null);
   }
 
@@ -85,5 +94,5 @@ export function useChatStream() {
     setTimeout(() => setStreaming(""), 2500);
   }
 
-  return { streaming, thinking, sending, searchInfo, run, stop, flashError };
+  return { streaming, thinking, sending, searchInfo, approval, run, stop, flashError };
 }

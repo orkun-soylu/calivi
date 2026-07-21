@@ -20,9 +20,11 @@ is the *server's own* claim; it is a filter, not a security boundary. The real g
 from the credential (a read-only token) and from server-side read-only modes such as GitHub's
 `/readonly` endpoint. Verified live against Context7 and Exa: both set `readOnlyHint=True`.
 
-**Per-tool switch.** An admin can also turn an individual tool off (`McpServer.disabled_tools`).
-Those stay in the probe result so Settings can list and re-enable them, but are never
-registered — a tool that vanished from the UI could not be switched back on.
+**Per-tool modes.** `McpServer.tool_modes` maps a tool to `off` / `auto` / `approve`. Unlisted
+tools fall back to `auto` when read-only and `off` when mutating, so an upgrade changes nothing
+until an admin opts in. `off` tools still come back in the probe result — Settings has to be
+able to list and re-enable them — but are never registered. `approve` tools ARE registered, with
+`mutating=True`, which is what makes the registry demand a human decision before running them.
 
 **Namespacing.** Registry names are flat and `register()` overwrites silently, so two servers
 exposing the same tool name would clobber each other — and `unregister_source()` for the loser
@@ -174,8 +176,7 @@ def _handler(server_id: int, tool_name: str):
 class Entry:
     status: str  # "up" | "down" | "disabled"
     error: str | None = None
-    tools: list[dict] = field(default_factory=list)  # registered (read-only)
-    skipped: list[str] = field(default_factory=list)  # advertised but withheld
+    tools: list[dict] = field(default_factory=list)  # every discovered tool, with its mode
     at: float = field(default_factory=time.monotonic)
 
 
@@ -196,9 +197,23 @@ def fresh(server_id: int) -> Entry | None:
     return entry if time.monotonic() - entry.at < ttl else None
 
 
+MODE_OFF, MODE_AUTO, MODE_APPROVE = "off", "auto", "approve"
+MODES = (MODE_OFF, MODE_AUTO, MODE_APPROVE)
+
+
 def _is_read_only(tool) -> bool:
     ann = getattr(tool, "annotations", None)
     return bool(ann and getattr(ann, "readOnlyHint", False))
+
+
+def default_mode(read_only: bool) -> str:
+    """`auto` for read-only, `off` for everything else — an admin must opt a mutating tool in."""
+    return MODE_AUTO if read_only else MODE_OFF
+
+
+def mode_for(server: models.McpServer, tool_name: str, read_only: bool) -> str:
+    mode = (server.tool_modes or {}).get(tool_name)
+    return mode if mode in MODES else default_mode(read_only)
 
 
 async def refresh(server: models.McpServer) -> Entry:
@@ -226,22 +241,17 @@ async def refresh(server: models.McpServer) -> Entry:
             return entry
 
         registry.unregister_source(source_of(server.id))
-        disabled = set(server.disabled_tools or [])
         registered: list[dict] = []
-        skipped: list[str] = []
         for tool in listed:
-            if not _is_read_only(tool):
-                # Phase 1: withheld entirely rather than registered as mutating. A tool the
-                # model can see but never run wastes context and invites retry loops.
-                skipped.append(tool.name)
-                continue
+            read_only = _is_read_only(tool)
+            mode = mode_for(server, tool.name, read_only)
             name = namespaced(server.name, tool.name)
             description = (tool.description or "").strip()
-            if tool.name in disabled:
-                # Reported so Settings can list and re-enable it, but never registered — the
-                # model is not told it exists.
-                registered.append({"name": name, "raw_name": tool.name, "description": description,
-                                   "read_only": True, "enabled": False})
+            registered.append({"name": name, "raw_name": tool.name, "description": description,
+                               "read_only": read_only, "mode": mode})
+            if mode == MODE_OFF:
+                # Listed so Settings can switch it on; never registered, so the model is not
+                # told it exists.
                 continue
             registry.register(
                 Tool(
@@ -250,13 +260,13 @@ async def refresh(server: models.McpServer) -> Entry:
                     parameters=tool.inputSchema or {"type": "object", "properties": {}},
                     handler=_handler(server.id, tool.name),
                     source=source_of(server.id),
-                    mutating=False,
+                    # `approve` rides on the existing mutating gate: the registry then refuses
+                    # to run it without an explicit decision, wherever the call comes from.
+                    mutating=(mode == MODE_APPROVE),
                 )
             )
-            registered.append({"name": name, "raw_name": tool.name, "description": description,
-                               "read_only": True, "enabled": True})
 
-        entry = Entry(status="up", tools=registered, skipped=skipped)
+        entry = Entry(status="up", tools=registered)
         _cache[server.id] = entry
         return entry
 

@@ -95,7 +95,7 @@ class McpServerCreate(BaseModel):
     secret_prefix: str = "Bearer "
     headers: dict[str, str] | None = None
     enabled: bool = True
-    disabled_tools: list[str] | None = None
+    tool_modes: dict[str, str] | None = None
 
 
 class McpServerUpdate(BaseModel):
@@ -109,7 +109,7 @@ class McpServerUpdate(BaseModel):
     secret_prefix: str | None = None
     headers: dict[str, str] | None = None
     enabled: bool | None = None
-    disabled_tools: list[str] | None = None
+    tool_modes: dict[str, str] | None = None
 
 
 class McpToolOut(BaseModel):
@@ -117,7 +117,7 @@ class McpToolOut(BaseModel):
     raw_name: str = ""  # the server's own name — sent so the UI never re-parses the namespace
     description: str = ""
     read_only: bool = False
-    enabled: bool = True  # False → discovered but not registered (admin turned it off)
+    mode: str = "auto"  # "off" | "auto" | "approve"
 
 
 class McpServerOut(BaseModel):
@@ -132,11 +132,14 @@ class McpServerOut(BaseModel):
     secret_prefix: str = "Bearer "
     headers: dict[str, str] = {}
     enabled: bool = True
-    disabled_tools: list[str] = []
+    tool_modes: dict[str, str] = {}
     status: str = "unknown"  # "up" | "down" | "disabled"
     error: str | None = None  # why it is down — shown as a tooltip in Settings
-    tools: list[McpToolOut] = []  # read-only tools actually registered
-    skipped_tools: list[str] = []  # advertised but withheld (not read-only) — Phase 2
+    tools: list[McpToolOut] = []  # every discovered tool, with its mode
+
+
+class ApprovalDecision(BaseModel):
+    approved: bool
 
 
 class ChatCreate(BaseModel):

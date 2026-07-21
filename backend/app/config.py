@@ -38,3 +38,10 @@ MCP_CALL_TIMEOUT = 60.0  # a single tools/call (browser automation can be slow)
 # Providers cap tool-name length (OpenAI: 64). Namespacing inflates every MCP tool name, so
 # it is enforced rather than hoped for.
 MCP_MAX_TOOL_NAME = 64
+
+# Tool approval (human-in-the-loop) — see approvals.py.
+# A timeout is a DENIAL: silence must never be read as consent.
+APPROVAL_TIMEOUT = 300.0
+# Sent while waiting so the connection is not judged idle. Traefik's default idle timeout is
+# 180s and no bytes flow down the stream while a person is deciding.
+APPROVAL_HEARTBEAT = 20.0
