@@ -9,7 +9,7 @@
 <meta property="og:type" content="website" />
 <meta property="og:url" content="https://calivi.com/" />
 <meta property="og:title" content="Calivi — you pick which model runs where" />
-<meta property="og:description" content="A self-hosted chat UI for your own Ollama and OpenAI-compatible servers. Manual model selection, streaming, vision, documents, tool-calling web search. MIT." />
+<meta property="og:description" content="A self-hosted chat UI for your own Ollama and OpenAI-compatible servers. Manual model selection, streaming, vision, documents, and tools — bundled web search plus remote MCP servers. MIT." />
 <meta name="twitter:card" content="summary" />
 <meta name="theme-color" content="#f6f7f9" media="(prefers-color-scheme: light)" />
 <meta name="theme-color" content="#15171c" media="(prefers-color-scheme: dark)" />
@@ -216,6 +216,56 @@
   .scrub { font-family: var(--font-mono); font-size: 0.72rem; color: var(--muted); text-align: center; margin-top: 14px; }
 
   /* ---- features ---- */
+
+  /* Settings window — a mockup, like .app above. Placeholder data on purpose: the real
+     screens carry LAN addresses, account names and personal system prompts. */
+  .stg { font-family: var(--font-mono); border: 1px solid var(--line); border-radius: var(--radius);
+         overflow: hidden; background: var(--surface); box-shadow: var(--shadow); margin-top: 30px; }
+  .stg-tabs { display: flex; flex-wrap: wrap; gap: 2px; padding: 10px 12px; background: var(--surface-2);
+              border-bottom: 1px solid var(--line-soft); }
+  .stg-tab { font: inherit; font-size: 12px; color: var(--muted); background: none; border: 0;
+             padding: 6px 11px; border-radius: 8px; cursor: pointer; white-space: nowrap; }
+  .stg-tab[aria-selected="true"] { background: var(--surface); color: var(--ink); }
+  .stg-body { min-height: 330px; padding: 18px 20px; }
+  .stg-pane { display: none; }
+  .stg-pane[data-on] { display: block; animation: stgin .35s ease both; }
+  @keyframes stgin { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+  .stg-hint { font-size: 11.5px; color: var(--muted); margin: 0 0 14px; line-height: 1.55; }
+  .stg-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 11px 0;
+             border-bottom: 1px solid var(--line-soft); }
+  .stg-row:last-child { border-bottom: 0; }
+  .stg-row .t { font-size: 12.5px; color: var(--ink); }
+  .stg-row .d { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .stg-pill { display: inline-flex; gap: 2px; background: var(--surface-2); border-radius: 8px; padding: 3px; }
+  .stg-pill span { font-size: 11.5px; padding: 4px 10px; border-radius: 6px; color: var(--muted); }
+  .stg-pill span.on { background: var(--surface); color: var(--ink); }
+  .stg-dots { display: flex; gap: 6px; }
+  .stg-dots i { width: 15px; height: 15px; border-radius: 50%; display: block; }
+  .stg-dots i.sel { outline: 2px solid var(--ink); outline-offset: 2px; }
+  .stg-sw { width: 38px; height: 21px; border-radius: 999px; background: var(--accent); position: relative; }
+  .stg-sw::after { content: ""; position: absolute; top: 3px; right: 3px; width: 15px; height: 15px;
+                   border-radius: 50%; background: #fff; }
+  .stg-sel { font-size: 11.5px; color: var(--ink); background: var(--surface-2); border: 1px solid var(--line);
+             border-radius: 8px; padding: 5px 10px; }
+
+  .stg-item { display: flex; align-items: center; gap: 9px; background: var(--surface-2); border-radius: 8px;
+              padding: 9px 11px; font-size: 12px; color: var(--ink); margin-bottom: 6px; }
+  .stg-item .u { width: 8px; height: 8px; border-radius: 50%; background: var(--green); flex: none; }
+  .stg-item .u.dn { background: #d0453c; }
+  .stg-item .m { color: var(--muted); }
+  .stg-item .r { margin-left: auto; font-size: 10.5px; color: var(--muted); }
+  .stg-item .r.adm { color: #fff; background: var(--accent); border-radius: 5px; padding: 2px 7px; }
+  .stg-code { background: var(--code-bg); color: var(--code-ink); border-radius: 9px; padding: 13px 15px;
+              font-size: 11.5px; line-height: 1.65; overflow-x: auto; white-space: pre; margin: 0; }
+  .stg-code .c { color: #7d8697; }
+  .stg-tool { display: flex; align-items: center; gap: 9px; font-size: 11.5px; color: var(--muted); padding: 4px 0; }
+  .stg-tool .mode { font-size: 10.5px; border: 1px solid var(--line); border-radius: 6px; padding: 2px 7px; color: var(--ink); }
+  .stg-about h4 { margin: 0 0 10px; font-size: 15px; color: var(--ink); font-family: var(--font-sans); }
+  .stg-about p { margin: 0 0 12px; font-size: 12.5px; color: var(--muted); line-height: 1.7; max-width: 62ch; }
+  .stg-about .foot { font-size: 11.5px; color: var(--muted); }
+  @media (max-width: 720px) { .stg-tabs { gap: 0; } .stg-tab { padding: 6px 8px; font-size: 11px; } }
+
   .features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; margin-top: 32px; }
   .feat { background: var(--surface); padding: 24px 22px; }
   .feat .fl { font-family: var(--font-mono); font-size: 0.7rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); }
@@ -268,6 +318,7 @@
   <div class="wrap bar-inner">
     <a href="#top" class="wordmark"><span class="dot"></span>calivi</a>
     <div class="bar-spacer"></div>
+    <a class="navlink hide-sm" href="#tools">Tools</a>
     <a class="navlink hide-sm" href="#features">Features</a>
     <a class="navlink hide-sm" href="#start">Get&nbsp;started</a>
     <a class="navlink" href="https://github.com/orkun-soylu/calivi">GitHub</a>
@@ -429,8 +480,8 @@ stamp=$(<span class="k">date</span> +<span class="s">"%Y-%m-%d_%H-%M-%S"</span>)
             <button class="cbtn" title="Attach a document" aria-label="Attach">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-8.49 8.49a5.5 5.5 0 0 1-7.78-7.78l8.49-8.49a3.5 3.5 0 0 1 4.95 4.95l-8.49 8.49a1.5 1.5 0 0 1-2.12-2.12l7.78-7.78"></path></svg>
             </button>
-            <button class="cbtn on" title="Web search: on" aria-label="Web search">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path></svg>
+            <button class="cbtn on" title="Tools: on" aria-label="Tools">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 0 5.3 5.3l-8.4 8.4a2.8 2.8 0 0 1-4-4l8.4-8.4a4 4 0 0 0-1.3-1.3z"></path><path d="M14.7 6.3l3-3a4 4 0 0 1 3 6l-1.7 1.7"></path></svg>
             </button>
             <div class="field">Type a message…</div>
             <button class="cbtn send" title="Send" aria-label="Send">
@@ -441,6 +492,102 @@ stamp=$(<span class="k">date</span> +<span class="s">"%Y-%m-%d_%H-%M-%S"</span>)
       </div>
     </div>
     <p class="scrub">// mockup with placeholder data — not a real conversation</p>
+  </div>
+</section>
+
+<section id="tools">
+  <div class="wrap">
+    <span class="eyebrow">Tools &amp; MCP</span>
+    <h2>Give the model instruments — and keep the keys.</h2>
+    <p class="sec-lede">One toggle offers the tool layer; the model decides what to call. Bundled web search
+      comes built in, and any remote <b>MCP</b> server plugs in beside it. Read-only tools run freely,
+      state-changing ones ask you first.</p>
+
+    <div class="stg">
+      <div class="stg-tabs" role="tablist" aria-label="Settings tabs">
+        <button class="stg-tab" role="tab" aria-selected="true"  data-i="0">General</button>
+        <button class="stg-tab" role="tab" aria-selected="false" data-i="1">Servers</button>
+        <button class="stg-tab" role="tab" aria-selected="false" data-i="2">MCP</button>
+        <button class="stg-tab" role="tab" aria-selected="false" data-i="3">System Prompts</button>
+        <button class="stg-tab" role="tab" aria-selected="false" data-i="4">Tools</button>
+        <button class="stg-tab" role="tab" aria-selected="false" data-i="5">Users</button>
+        <button class="stg-tab" role="tab" aria-selected="false" data-i="6">About</button>
+      </div>
+      <div class="stg-body">
+
+        <div class="stg-pane" data-p="0" data-on role="tabpanel">
+          <div class="stg-row"><div><div class="t">Theme</div><div class="d">Light / dark appearance. Defaults to your system preference.</div></div>
+            <div class="stg-pill"><span class="on">Light</span><span>Dark</span></div></div>
+          <div class="stg-row"><div><div class="t">Accent color</div><div class="d">Color of buttons, links and selected items.</div></div>
+            <div class="stg-dots"><i class="sel" style="background:#3584e4"></i><i style="background:#1f9a94"></i><i style="background:#3a944a"></i><i style="background:#d9a107"></i><i style="background:#e06a1b"></i><i style="background:#d0453c"></i><i style="background:#d16ba5"></i><i style="background:#8e5bd0"></i><i style="background:#6b7b8c"></i></div></div>
+          <div class="stg-row"><div><div class="t">Interface language</div><div class="d">Nine languages, switched live.</div></div>
+            <div class="stg-sel">English</div></div>
+          <div class="stg-row"><div><div class="t">Registration open</div><div class="d">When off, new user sign-up is blocked (existing users unaffected).</div></div>
+            <div class="stg-sw"></div></div>
+        </div>
+
+        <div class="stg-pane" data-p="1" role="tabpanel">
+          <div class="stg-item"><i class="u"></i>local-gpu <span class="m">— 192.168.1.50:11434 · local ollama</span></div>
+          <div class="stg-item"><i class="u"></i>workstation <span class="m">— 192.168.1.51:11434 · local ollama</span></div>
+          <div class="stg-item"><i class="u"></i>openrouter <span class="m">— https://openrouter.ai/api/v1 · openai api</span></div>
+          <div class="stg-item"><i class="u dn"></i>lab-box <span class="m">— 192.168.1.52:11434 · local ollama</span></div>
+          <p class="stg-hint" style="margin:12px 0 0">A green light means the server answered and its model list arrived. Red servers are hidden from the chat picker.</p>
+        </div>
+
+        <div class="stg-pane" data-p="2" role="tabpanel">
+          <p class="stg-hint">Read-only tools from remote MCP servers. Streamable HTTP and the older HTTP+SSE transport.</p>
+          <div class="stg-item"><i class="u"></i>context7 <span class="m">— https://mcp.context7.com/mcp</span><span class="r">2 tools</span></div>
+          <div class="stg-item"><i class="u"></i>exa <span class="m">— https://mcp.exa.ai/mcp</span><span class="r">2 tools</span></div>
+          <div class="stg-item"><i class="u"></i>github <span class="m">— https://api.githubcopilot.com/mcp/readonly</span><span class="r">14 tools</span></div>
+          <div style="margin-top:12px">
+            <div class="stg-tool"><span class="mode">Automatic</span> 🔧 mcp__context7__query-docs</div>
+            <div class="stg-tool"><span class="mode">Ask first</span> ⚠️ mcp__github__create_issue</div>
+            <div class="stg-tool"><span class="mode">Off</span> ⚠️ mcp__github__delete_file</div>
+          </div>
+        </div>
+
+        <div class="stg-pane" data-p="3" role="tabpanel">
+          <p class="stg-hint">Per-model system (initial) prompts. Key = exact model name, 'default' = fallback.</p>
+          <pre class="stg-code"><span class="c"># hot-reloaded — edit and the next message uses it</span>
+default: |
+  You are a careful, concise assistant. Answer the
+  question that was asked. Say when you are unsure.
+
+"qwen3:32b": |
+  A reasoning model. Take multi-step problems slowly
+  and show the steps that matter.</pre>
+        </div>
+
+        <div class="stg-pane" data-p="4" role="tabpanel">
+          <p class="stg-hint">Tool layer settings. <b>enabled</b>: master switch. <b>max_iterations</b>: agentic loop cap.
+            MCP tools are switched on and off individually in the MCP tab.</p>
+          <pre class="stg-code"><span class="c"># read on every request — no restart</span>
+enabled: true
+max_iterations: 8
+tools:
+  web_search:
+    enabled: true
+    num_results: 5</pre>
+        </div>
+
+        <div class="stg-pane" data-p="5" role="tabpanel">
+          <div class="stg-item"><span class="m">#0001</span> alice <span class="m">(you)</span><span class="r adm">super admin</span></div>
+          <div class="stg-item"><span class="m">#0002</span> bob<span class="r">user</span></div>
+          <div class="stg-item"><span class="m">#0003</span> carol<span class="r">user</span></div>
+          <p class="stg-hint" style="margin:12px 0 0">Everyone sees only their own chats. The first account is the super admin and cannot be demoted or deleted.</p>
+        </div>
+
+        <div class="stg-pane stg-about" data-p="6" role="tabpanel">
+          <h4>Calivi</h4>
+          <p>A self-hosted, multi-user chat app that connects to Ollama and OpenAI-compatible servers from one
+            interface. Server and model selection is manual. Images and documents, a tool layer with web search
+            and MCP servers, and approval before anything changes state.</p>
+          <p class="foot">FastAPI + React · self-hosted · github.com/orkun-soylu/calivi</p>
+        </div>
+
+      </div>
+    </div>
+    <p class="scrub">// mockup with placeholder data — advances every 3s, click a tab to stop</p>
   </div>
 </section>
 
@@ -471,8 +618,8 @@ stamp=$(<span class="k">date</span> +<span class="s">"%Y-%m-%d_%H-%M-%S"</span>)
       </div>
       <div class="feat">
         <span class="fl">Tools</span>
-        <h3>Web search, inline</h3>
-        <p>A bundled SearXNG the model calls on its own initiative. You see which tool ran, right in the conversation.</p>
+        <h3>Web search and MCP</h3>
+        <p>A bundled SearXNG, plus any remote <b>MCP</b> server — Context7, GitHub, Exa. The model calls them on its own initiative, and you see which tool ran, right in the conversation.</p>
       </div>
       <div class="feat">
         <span class="fl">Access</span>
@@ -537,6 +684,38 @@ stamp=$(<span class="k">date</span> +<span class="s">"%Y-%m-%d_%H-%M-%S"</span>)
     btn.addEventListener("click", function () {
       root.dataset.theme = current() === "dark" ? "light" : "dark";
     });
+
+    // Settings mockup: walk the tabs so the whole surface is visible without interaction.
+    var tabs = [].slice.call(document.querySelectorAll(".stg-tab"));
+    var panes = [].slice.call(document.querySelectorAll(".stg-pane"));
+    if (tabs.length && panes.length) {
+      // Auto-advance is motion; honour the same preference the page already respects.
+      var reduced = matchMedia("(prefers-reduced-motion: reduce)");
+      var at = 0, timer = null;
+      function show(i) {
+        at = i;
+        tabs.forEach(function (t, n) { t.setAttribute("aria-selected", n === i ? "true" : "false"); });
+        panes.forEach(function (pn, n) {
+          if (n === i) pn.setAttribute("data-on", "");
+          else pn.removeAttribute("data-on");
+        });
+      }
+      function stop() { if (timer) { clearInterval(timer); timer = null; } }
+      function start() { stop(); timer = setInterval(function () { show((at + 1) % tabs.length); }, 3000); }
+
+      tabs.forEach(function (t, n) {
+        // Clicking takes over: a reader who is looking at something should not be moved off it.
+        t.addEventListener("click", function () { stop(); show(n); });
+      });
+      var box = document.querySelector(".stg");
+      box.addEventListener("mouseenter", stop);
+      box.addEventListener("mouseleave", function () { if (!reduced.matches) start(); });
+
+      // React if the preference changes rather than only reading it once.
+      function apply() { reduced.matches ? stop() : start(); }
+      reduced.addEventListener ? reduced.addEventListener("change", apply) : reduced.addListener(apply);
+      apply();
+    }
   })();
 </script>
 
