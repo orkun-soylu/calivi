@@ -13,6 +13,14 @@
 <meta name="twitter:card" content="summary" />
 <meta name="theme-color" content="#121317" />
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%233584e4'/%3E%3Ccircle cx='16' cy='16' r='6' fill='white'/%3E%3C/svg%3E" />
+<script>
+  /* Before first paint, on purpose: run from the end of the body this would render dark and
+     then snap to light, which is worse than not remembering at all. */
+  try {
+    var t = localStorage.getItem("calivi_theme");
+    if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
+  } catch (e) {}
+</script>
 <style>
   /* Dark is the default, regardless of the system setting — the toggle in the header opts
      into light. `color-scheme` comes along so the browser's own surfaces (scrollbars, form
@@ -714,7 +722,11 @@ tools:
     // it would compute "light" and set "dark", which is what was already on screen.
     function current() { return root.dataset.theme || "dark"; }
     btn.addEventListener("click", function () {
-      root.dataset.theme = current() === "dark" ? "light" : "dark";
+      var next = current() === "dark" ? "light" : "dark";
+      root.dataset.theme = next;
+      // Wrapped: storage throws in private mode and on a file:// origin in some browsers, and
+      // losing the preference is not worth losing the toggle over.
+      try { localStorage.setItem("calivi_theme", next); } catch (e) {}
     });
 
     // Settings mockup: walk the tabs so the whole surface is visible without interaction.
