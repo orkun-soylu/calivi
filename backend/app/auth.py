@@ -23,6 +23,11 @@ def _load_secret() -> str:
     """SECRET_KEY: use the env var if set, otherwise /data/secret_key (generated and persisted).
 
     This keeps cookies valid across restarts and keeps the secret out of git.
+
+    The fallback is convenient but writes the key **into the data volume**, next to
+    calivi.db — so a copy of that volume (a backup) carries both the data and the key that
+    signs sessions, and holding it is enough to forge a session for any user. Prefer
+    CALIVI_SECRET_KEY from the environment; see the note in README.md.
     """
     env = os.environ.get("CALIVI_SECRET_KEY")
     if env:

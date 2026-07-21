@@ -26,3 +26,15 @@ LOGIN_WINDOW_SECONDS = float(os.environ.get("LOGIN_WINDOW_SECONDS", "900"))  # 1
 # "down" is shorter so a server you just powered on shows up as "up" quickly.
 PROBE_TTL_UP = 60.0
 PROBE_TTL_DOWN = 15.0
+
+# MCP (see tools/mcp_client.py).
+# The probe is not a ping: it opens a session (initialize → negotiate → tools/list), so it
+# is far more expensive than the Ollama one and the TTLs are correspondingly longer —
+# otherwise every Settings page refresh would re-handshake every server.
+MCP_PROBE_TTL_UP = 300.0
+MCP_PROBE_TTL_DOWN = 60.0
+MCP_CONNECT_TIMEOUT = 10.0  # handshake + tools/list
+MCP_CALL_TIMEOUT = 60.0  # a single tools/call (browser automation can be slow)
+# Providers cap tool-name length (OpenAI: 64). Namespacing inflates every MCP tool name, so
+# it is enforced rather than hoped for.
+MCP_MAX_TOOL_NAME = 64

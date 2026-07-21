@@ -1,11 +1,19 @@
 fastapi==0.115.6
+# Pinned explicitly, not left to fastapi's transitive resolution: `mcp` declares an open
+# `starlette>=0.27`, so an unconstrained rebuild resolves starlette to 1.x and silently breaks
+# fastapi 0.115.6 (which requires <0.42). Bump these two together, never one alone.
+starlette==0.41.3
 uvicorn[standard]==0.34.0
 sqlalchemy==2.0.36
 httpx==0.28.1
-pydantic==2.10.4
+# 2.11 is the floor imposed by `mcp`; it was 2.10.4 before the MCP work.
+pydantic==2.11.10
 pyyaml==6.0.2
 pypdf==5.1.0
 python-docx==1.1.2
 python-multipart==0.0.20
 bcrypt==4.2.1
 PyJWT==2.10.1
+# MCP client (Streamable HTTP + the older HTTP+SSE transport). Pulls pyjwt[crypto], so
+# `cryptography` is now available without adding a dependency of its own.
+mcp==1.28.1

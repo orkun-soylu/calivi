@@ -80,6 +80,13 @@ export const api = {
   updateServer: (id, data) => request(`/servers/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   deleteServer: (id) => request(`/servers/${id}`, { method: "DELETE" }),
 
+  // MCP servers (admin only). `refresh=1` forces a live probe instead of the TTL cache —
+  // an MCP probe opens a real session, so it is not something to do on every render.
+  listMcpServers: (refresh) => request(`/mcp${refresh ? "?refresh=1" : ""}`),
+  addMcpServer: (data) => request("/mcp", { method: "POST", body: JSON.stringify(data) }),
+  updateMcpServer: (id, data) => request(`/mcp/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  deleteMcpServer: (id) => request(`/mcp/${id}`, { method: "DELETE" }),
+
   getConfig: (name) => request(`/config/${name}`),
   getConfigDefault: (name) => request(`/config/${name}/default`),
   saveConfig: (name, content) => request(`/config/${name}`, { method: "PUT", body: JSON.stringify({ content }) }),
