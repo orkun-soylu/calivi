@@ -222,3 +222,65 @@ def test_display_label_round_trips_with_namespaced():
 
 def test_display_label_ignores_non_mcp_names():
     assert mcp_client.display_label("web_search") is None
+
+
+# ── Inspectable tool output ───────────────────────────────────────────────────
+
+
+async def test_mcp_chip_carries_the_output_as_display_only_detail(monkeypatch, chat_id):
+    """The failure this exists for: a retrieval silently omits something, the model fills the
+    gap from memory and still credits "the documentation". Storing what the tool returned lets
+    the operator check — but under `detail`, which the context injection never reads."""
+    name = mcp_client.namespaced("context7", "query-docs")
+    _register(name, result="THE DOCS SAID THIS")
+    try:
+        await _run(
+            monkeypatch,
+            chat_id,
+            [[{"type": "tool_calls", "calls": [{"id": "c1", "name": name, "arguments": {}}]}],
+             [{"type": "content", "text": "answer"}]],
+        )
+    finally:
+        registry._tools.pop(name, None)
+
+    chip = _messages(chat_id)[0].attachments[0]
+    assert chip["detail"] == "THE DOCS SAID THIS"
+    assert "text" not in chip  # still not context
+
+    # The whole point of the split: visible in the UI, absent from every later prompt.
+    injected = _inject_attachments([{"role": "user", "content": "q", "attachments": [chip]}])
+    assert injected[0]["content"] == "q"
+    assert "THE DOCS SAID THIS" not in injected[0]["content"]
+
+
+async def test_detail_is_clipped_so_one_huge_result_cannot_bloat_the_row(monkeypatch, chat_id):
+    name = mcp_client.namespaced("context7", "query-docs")
+    _register(name, result="x" * 60_000)
+    try:
+        await _run(
+            monkeypatch,
+            chat_id,
+            [[{"type": "tool_calls", "calls": [{"id": "c1", "name": name, "arguments": {}}]}],
+             [{"type": "content", "text": "answer"}]],
+        )
+    finally:
+        registry._tools.pop(name, None)
+
+    detail = _messages(chat_id)[0].attachments[0]["detail"]
+    assert len(detail) < 60_000
+    assert "truncated" in detail
+
+
+async def test_web_search_keeps_both_text_and_detail(monkeypatch, chat_id):
+    """Existing behaviour is unchanged: the search result still reaches later turns via `text`.
+    `detail` is added alongside so the same chip is also inspectable."""
+    await _run(
+        monkeypatch,
+        chat_id,
+        [[{"type": "tool_calls",
+           "calls": [{"id": "c1", "name": "web_search", "arguments": {"query": "bitcoin"}}]}],
+         [{"type": "content", "text": "answer"}]],
+    )
+
+    chip = _messages(chat_id)[0].attachments[0]
+    assert chip["text"] and chip["detail"] == chip["text"]

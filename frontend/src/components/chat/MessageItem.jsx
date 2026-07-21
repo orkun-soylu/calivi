@@ -8,7 +8,7 @@ import { formatTs, tokensPerSecLabel } from "../../lib/format.js";
  * that field can be empty, and in that case the copy/delete buttons were not shown either —
  * the behaviour is preserved.
  */
-export default function MessageItem({ m, onEdit, onDelete, onImageClick }) {
+export default function MessageItem({ m, onEdit, onDelete, onImageClick, onInspect }) {
   const isUser = m.role === "user";
   return (
     <div className={`group flex ${isUser ? "justify-end" : "justify-start"}`}>
@@ -43,7 +43,8 @@ export default function MessageItem({ m, onEdit, onDelete, onImageClick }) {
         {m.attachments?.length > 0 && (
           <div className="flex gap-2 flex-wrap mb-2">
             {m.attachments.map((a, i) => (
-              <AttachmentChip key={i} name={a.name} onAccent={isUser} />
+              <AttachmentChip key={i} name={a.name} onAccent={isUser}
+                onInspect={a.detail ? () => onInspect({ name: a.name, detail: a.detail }) : undefined} />
             ))}
           </div>
         )}

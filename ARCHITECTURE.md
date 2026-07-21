@@ -476,6 +476,28 @@ tool is still called `web_search` — that is a tool name, and it is accurate.
      worth, and the answer that used it is already in the history. `_inject_attachments` therefore
      skips text-less chips.
    - A **failed** tool leaves no chip — a chip asserts "this ran and informed the answer".
+   - Every chip also carries **`detail`**: what the tool actually returned, clipped at 20 000
+     characters. It is **display-only** — clicking the chip opens `ToolOutputModal`, which
+     renders it as plain text in a `<pre>`, never markdown and never HTML, because it is
+     external content. `_inject_attachments` keys on `text` and never on `detail`, so this costs
+     storage and not one token of context. Mutation-checked in both directions.
+
+> **Why an inspection panel and not a fix.** Asked about Pydantic's validator modes, the model
+> sent one broad query to Context7, got an excerpt in which the word `wrap` **does not appear at
+> all**, and reported that the mode does not exist — while closing with "this is from the current
+> documentation". A re-worded query (`field_validator supported modes`) returns the exact sentence
+> it needed, so the material was there and the retrieval simply missed it.
+>
+> A system-layer instruction telling the model to re-query when something looks uncovered was
+> written and **measured over five runs per arm**. It was worse: the false claim went from 0/5 to
+> **2/5**, one run exhausted the iteration cap and produced nothing, and average tool calls rose
+> from 4.6 to 5.4. The likely reason is that telling a model to "say plainly when something is not
+> covered" encourages exactly the confident claim of absence that was the bug. It was not shipped;
+> the branch is `fix/tool-retrieval-guidance` if anyone wants the transcript before trying again.
+>
+> The same measurement showed the failure is **intermittent** — 0/5 without the guard — so it is
+> variance, not a systematic defect. Which is the argument for this panel: the model cannot be
+> made reliable here, but the operator can be given what it saw.
    > Originally only `web_search` left a chip. After MCP shipped, a reloaded chat gave no sign
    > that an MCP server had been consulted at all — which made a live test unreadable (a web
    > search was mistaken for a Context7 lookup).

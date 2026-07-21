@@ -81,6 +81,9 @@ const translations = {
     "tools.running": "🔧 {name} çalışıyor…",
     "tools.done": "🔧 {name} ✓",
     "tools.failed": "🔧 {name} ✗",
+    "tools.inspect": "Aracın döndürdüğü ham çıktıyı gör",
+    "tools.rawOutput": "ham çıktı",
+    "tools.rawHint": "Aracın döndürdüğü metnin aynısı. Cevabı buna karşı denetleyebilirsin — eksik kalan bir şeyi model ezberinden doldurmuş olabilir.",
 
     "settings.tab.general": "Genel",
     "settings.tab.servers": "Sunucular",
@@ -241,6 +244,9 @@ const translations = {
     "tools.running": "🔧 {name} running…",
     "tools.done": "🔧 {name} ✓",
     "tools.failed": "🔧 {name} ✗",
+    "tools.inspect": "See the tool's raw output",
+    "tools.rawOutput": "raw output",
+    "tools.rawHint": "Exactly what the tool returned. Check the answer against it — anything missing here may have been filled in from memory.",
 
     "settings.tab.general": "General",
     "settings.tab.servers": "Servers",
@@ -401,6 +407,9 @@ const translations = {
     "tools.running": "🔧 {name} läuft…",
     "tools.done": "🔧 {name} ✓",
     "tools.failed": "🔧 {name} ✗",
+    "tools.inspect": "Rohe Tool-Ausgabe ansehen",
+    "tools.rawOutput": "Rohausgabe",
+    "tools.rawHint": "Genau das, was das Tool zurückgegeben hat. Prüfen Sie die Antwort daran — was hier fehlt, wurde womöglich aus dem Gedächtnis ergänzt.",
 
     "settings.tab.general": "Allgemein",
     "settings.tab.servers": "Server",
@@ -512,6 +521,13 @@ const translations = {
     "search.empty": "🔍 Sin resultados: {query}",
     "search.skip": "🔍 No se necesita búsqueda",
 
+    "tools.running": "🔧 {name} en curso…",
+    "tools.done": "🔧 {name} ✓",
+    "tools.failed": "🔧 {name} ✗",
+    "tools.inspect": "Ver la salida sin procesar de la herramienta",
+    "tools.rawOutput": "salida sin procesar",
+    "tools.rawHint": "Exactamente lo que devolvió la herramienta. Contrasta la respuesta con esto: lo que falte aquí puede haberse rellenado de memoria.",
+
     "settings.tab.general": "General",
     "settings.tab.servers": "Servidores",
     "settings.tab.mcp": "MCP",
@@ -621,6 +637,13 @@ const translations = {
     "search.done": "🔍 Cercato: {query} · {count} risultati",
     "search.empty": "🔍 Nessun risultato: {query}",
     "search.skip": "🔍 Nessuna ricerca necessaria",
+
+    "tools.running": "🔧 {name} in corso…",
+    "tools.done": "🔧 {name} ✓",
+    "tools.failed": "🔧 {name} ✗",
+    "tools.inspect": "Vedi l'output grezzo dello strumento",
+    "tools.rawOutput": "output grezzo",
+    "tools.rawHint": "Esattamente ciò che lo strumento ha restituito. Confronta la risposta con questo: ciò che manca qui potrebbe essere stato colmato a memoria.",
 
     "settings.tab.general": "Generale",
     "settings.tab.servers": "Server",
@@ -732,6 +755,13 @@ const translations = {
     "search.empty": "🔍 Nenhum resultado: {query}",
     "search.skip": "🔍 Busca não necessária",
 
+    "tools.running": "🔧 {name} em execução…",
+    "tools.done": "🔧 {name} ✓",
+    "tools.failed": "🔧 {name} ✗",
+    "tools.inspect": "Ver a saída bruta da ferramenta",
+    "tools.rawOutput": "saída bruta",
+    "tools.rawHint": "Exatamente o que a ferramenta retornou. Confira a resposta com isto — o que faltar aqui pode ter sido preenchido de memória.",
+
     "settings.tab.general": "Geral",
     "settings.tab.servers": "Servidores",
     "settings.tab.mcp": "MCP",
@@ -841,6 +871,13 @@ const translations = {
     "search.done": "🔍 Найдено: {query} · {count} результатов",
     "search.empty": "🔍 Ничего не найдено: {query}",
     "search.skip": "🔍 Поиск не требуется",
+
+    "tools.running": "🔧 {name} выполняется…",
+    "tools.done": "🔧 {name} ✓",
+    "tools.failed": "🔧 {name} ✗",
+    "tools.inspect": "Посмотреть необработанный вывод инструмента",
+    "tools.rawOutput": "необработанный вывод",
+    "tools.rawHint": "Ровно то, что вернул инструмент. Сверьте ответ с этим: чего здесь нет, могло быть добавлено по памяти.",
 
     "settings.tab.general": "Общие",
     "settings.tab.servers": "Серверы",
@@ -952,6 +989,13 @@ const translations = {
     "search.empty": "🔍 結果なし: {query}",
     "search.skip": "🔍 検索は不要です",
 
+    "tools.running": "🔧 {name} 実行中…",
+    "tools.done": "🔧 {name} ✓",
+    "tools.failed": "🔧 {name} ✗",
+    "tools.inspect": "ツールの生の出力を見る",
+    "tools.rawOutput": "生の出力",
+    "tools.rawHint": "ツールが返した内容そのものです。回答をこれと照らし合わせてください — ここにないものは記憶から補われた可能性があります。",
+
     "settings.tab.general": "一般",
     "settings.tab.servers": "サーバー",
     "settings.tab.mcp": "MCP",
@@ -1061,6 +1105,13 @@ const translations = {
     "search.done": "🔍 已搜索：{query} · {count} 条结果",
     "search.empty": "🔍 无结果：{query}",
     "search.skip": "🔍 无需搜索",
+
+    "tools.running": "🔧 {name} 运行中…",
+    "tools.done": "🔧 {name} ✓",
+    "tools.failed": "🔧 {name} ✗",
+    "tools.inspect": "查看工具的原始输出",
+    "tools.rawOutput": "原始输出",
+    "tools.rawHint": "工具返回的原始内容。请据此核对回答 — 这里没有的内容可能是凭记忆补充的。",
 
     "settings.tab.general": "常规",
     "settings.tab.servers": "服务器",
