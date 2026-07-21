@@ -1,6 +1,9 @@
 """Registration, sessions, super-admin rules and blocking behaviour."""
 from conftest import login, register
 
+from app import auth as auth_core
+from app.routers import auth as auth_router
+
 
 async def test_first_signup_becomes_super_admin(client):
     me = await register(client, "first")
@@ -29,6 +32,26 @@ async def test_login_with_email_or_username(client):
     assert (await client.post(
         "/api/auth/login", json={"identifier": "someone@test.local", "password": "password123"}
     )).status_code == 200
+
+
+async def test_unknown_user_login_still_runs_bcrypt(client, monkeypatch):
+    """Timing-oracle regression: the unknown-account path must pay the same bcrypt cost
+    as the real one (against _DUMMY_HASH), or response time reveals valid usernames."""
+    calls = []
+    original = auth_core.verify_password
+
+    def spy(password, password_hash):
+        calls.append(password_hash)
+        return original(password, password_hash)
+
+    monkeypatch.setattr(auth_core, "verify_password", spy)
+    await register(client, "someone")
+
+    await login(client, "someone", "wrong")          # real user, wrong password
+    await login(client, "no-such-user", "wrong")     # unknown user
+    assert len(calls) == 2                            # bcrypt ran BOTH times
+    assert calls[0] != calls[1]                       # real hash vs the dummy
+    assert calls[1] == auth_router._DUMMY_HASH
 
 
 async def test_logout_ends_the_session(client):

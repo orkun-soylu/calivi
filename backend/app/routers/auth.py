@@ -1,3 +1,5 @@
+import secrets
+
 from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.orm import Session
 
@@ -10,6 +12,10 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 # Login attempt counter per account (module level — lives for the process lifetime).
 login_limiter = SlidingWindowLimiter(LOGIN_MAX_ATTEMPTS, LOGIN_WINDOW_SECONDS)
+
+# Throwaway hash for the unknown-account login path (see login()). Computed once at
+# import — the value itself is never checked, only the bcrypt runtime matters.
+_DUMMY_HASH = auth.hash_password(secrets.token_hex(32))
 
 
 def _get_settings(db: Session) -> models.Setting:
@@ -81,7 +87,11 @@ def login(payload: schemas.LoginIn, response: Response, db: Session = Depends(ge
             headers={"Retry-After": str(retry)},
         )
 
-    if not user or not auth.verify_password(payload.password, user.password_hash):
+    # bcrypt runs ALWAYS — against a dummy hash when the account does not exist. The old
+    # short-circuit made unknown-user logins ~100x faster (measured: 2.6 ms vs 288.8 ms),
+    # a timing oracle for enumerating valid usernames even though both paths are limited alike.
+    password_ok = auth.verify_password(payload.password, user.password_hash if user else _DUMMY_HASH)
+    if not user or not password_ok:
         # Non-existent users are counted too: otherwise an attacker could enumerate usernames.
         login_limiter.record_failure(key)
         raise HTTPException(401, "Incorrect username/email or password")
