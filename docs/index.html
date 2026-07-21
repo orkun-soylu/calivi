@@ -293,7 +293,7 @@
   /* min-width:0 is what lets a flex item shrink below its content; without it the long
      GitHub URL pushed the tool-count badge outside the window on a phone. */
   .stg-item .m { color: var(--muted); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .stg-item .r { margin-left: auto; padding-left: 8px; flex: none; font-size: 10.5px; color: var(--muted); }
+  .stg-item .r { margin-left: auto; flex: none; font-size: 10.5px; color: var(--muted); background: var(--surface); border-radius: 5px; padding: 2px 7px; }
   .stg-item .r.adm { color: #fff; background: var(--accent); border-radius: 5px; padding: 2px 7px; }
   .stg-code { background: var(--code-bg); color: var(--code-ink); border-radius: 9px; padding: 13px 15px;
               font-size: 11.5px; line-height: 1.65; overflow-x: auto; white-space: pre; margin: 0; }
@@ -319,6 +319,16 @@
              padding: 9px; text-align: center; font-size: 12px; }
   .stg-chip { font-size: 10.5px; background: var(--surface-2); border: 1px solid var(--line);
               border-radius: 6px; padding: 3px 8px; color: var(--ink); }
+  /* An expanded user row. .stg-item is a centred flex row, so the open variant switches to
+     block and carries its own header line; the inner fields drop to --surface so they read as
+     inset against the card's --surface-2. */
+  .stg-item.open { display: block; }
+  .stg-item.open .top { display: flex; align-items: center; gap: 9px; }
+  .stg-item.open .stg-in { background: var(--surface); }
+  .stg-mini { font-size: 11px; color: var(--ink); background: var(--surface); border: 1px solid var(--line);
+              border-radius: 8px; padding: 7px 12px; white-space: nowrap; }
+  .stg-danger { margin-left: auto; font-size: 11.5px; color: #e0645c; }
+
   .stg-check { display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--ink); }
   .stg-check i { width: 13px; height: 13px; border-radius: 3px; background: var(--accent); display: block; flex: none; }
 
@@ -668,7 +678,19 @@ tools:
 
         <div class="stg-pane" data-p="5" role="tabpanel">
           <div class="stg-item"><span class="m">#0001</span> alice <span class="m">(you)</span><span class="r adm">super admin</span></div>
-          <div class="stg-item"><span class="m">#0002</span> bob<span class="r">user</span></div>
+          <div class="stg-item open">
+            <div class="top"><span class="m">#0002</span> bob<span class="r">user</span></div>
+            <div class="stg-fr" style="margin-top:10px">
+              <div class="stg-in">bob@example.com</div>
+              <div class="stg-in" style="flex:none; width:170px">bob</div>
+              <div class="stg-btn" style="margin:0; padding:8px 18px">Save</div>
+            </div>
+            <div class="stg-fr" style="margin-top:9px; align-items:center">
+              <span class="stg-mini">Make admin</span>
+              <span class="stg-mini">Block</span>
+              <span class="stg-danger">Delete</span>
+            </div>
+          </div>
           <div class="stg-item"><span class="m">#0003</span> carol<span class="r">user</span></div>
           <p class="stg-hint" style="margin:12px 0 0">Everyone sees only their own chats. The first account is the super admin and cannot be demoted or deleted.</p>
         </div>
