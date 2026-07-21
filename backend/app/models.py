@@ -77,11 +77,12 @@ class McpServer(Base):
     # Extra non-secret headers, e.g. {"X-MCP-Readonly": "true", "X-MCP-Toolsets": "repos"}.
     headers: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
-    # Tool names (as the server advertises them, un-namespaced) the admin switched off. They
-    # stay discoverable in Settings but are never registered, so the model never sees them.
-    # Kept here rather than in config/tools.yml: round-tripping that file through a YAML
-    # dump would destroy the comments that document it.
-    disabled_tools: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    # {tool name as the server advertises it: "off" | "auto" | "approve"}. Tools not listed
+    # fall back to a default derived from readOnlyHint: read-only → "auto", mutating → "off"
+    # (fail-safe — an admin has to opt in, so an upgrade changes nothing).
+    # Kept here rather than in config/tools.yml: round-tripping that file through a YAML dump
+    # would destroy the comments that document it.
+    tool_modes: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 

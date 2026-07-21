@@ -571,12 +571,15 @@ the secret is never returned by the API (`has_secret: bool`).
 > the remaining cost is a migration and a key-rotation story. Tracked as Phase 2, alongside the
 > approval UI that would unlock mutating tools.
 
-**Per-tool switch.** `McpServer.disabled_tools` holds the server's own (un-namespaced) tool
-names that an admin turned off. They still come back in the probe result — so Settings can list
-and re-enable them — but are never registered, so the model is not told they exist. Kept in the
-DB rather than in `config/tools.yml`, because round-tripping that file through a YAML dump would
-destroy the comments documenting it. `McpToolOut.raw_name` is sent to the UI precisely so the
-namespace format is never re-parsed in JavaScript; `mcp_client` stays its only owner.
+**Per-tool modes.** `McpServer.tool_modes` maps a tool (by the server's own un-namespaced name)
+to `off` / `auto` / `approve`. Unlisted tools fall back to a default derived from `readOnlyHint`:
+read-only → `auto`, mutating → **`off`**, so discovering a new write tool never grants anything.
+`off` tools still come back in the probe result — Settings has to be able to list and re-enable
+them — but are never registered. `approve` tools *are* registered, with `mutating=True`, which is
+what makes the registry demand a decision. Kept in the DB rather than `config/tools.yml`, because
+round-tripping that file through a YAML dump would destroy the comments documenting it.
+`McpToolOut.raw_name` is sent to the UI precisely so the namespace format is never re-parsed in
+JavaScript; `mcp_client` stays its only owner.
 
 **Admin-only, and the blast radius is everyone.** Unlike `/api/servers` (listable by any user for
 the chat picker), the whole MCP router requires admin: adding a server grants every user of the
@@ -584,6 +587,54 @@ instance whatever that server can do. Note also that **tool descriptions now com
 server** and land in the system layer. Tool *results* go through `_wrap_untrusted` like any other
 external content, but descriptions do not — they are read as instructions by construction. This is
 the one place where the trusted-deployment assumption in the security section genuinely stretches.
+
+## Tool approval — human in the loop
+
+Phase 2. `mutating=True` tools now run, but only after a person says yes.
+
+**The hard part was the stream, not the UI.** The agentic loop lives inside a
+`StreamingResponse`, so approval means pausing the generator mid-flight and waiting for a
+decision that arrives on a *different* request. `approvals.py` is that rendezvous: the loop
+creates a pending entry keyed by an unguessable id and awaits its `asyncio.Event`;
+`POST /api/chats/{chat_id}/approvals/{id}` sets it.
+
+```
+loop: … tool_call ──► approval_request ──► (ping, ping, …) ──► approval_result ──► tool_result
+                            │                                        ▲
+                            └── browser shows the card ── POST ──────┘
+```
+
+**In-process, deliberately.** A pending approval lives in memory, so a closed tab or a restart
+loses it and the message is retried. The durable alternative — persist the half-finished tool
+turn, resume in a new request — would require **persisting tool turns as messages**, which the
+data model deliberately avoids (see the tool-layer section). A decision made in seconds does not
+justify changing the data model.
+
+**Four rules that are load-bearing, each mutation-tested:**
+
+1. **The guard stays in the registry.** `execute(name, args, approved=False)` — `approved`
+   defaults to False, and a `mutating` tool is refused without it. The loop asks; the registry
+   still refuses. Moving the check into the caller would put a security boundary where a later
+   refactor can skip it.
+2. **A timeout is a denial.** `APPROVAL_TIMEOUT` (300s) expiring yields `False`. Silence must
+   never be read as consent — the opposite default turns walking away from the keyboard into a
+   blanket grant.
+3. **Pings, or the connection dies.** No bytes flow while a human decides, and Traefik's default
+   idle timeout is **180s**. `approvals.wait` is a generator that yields `None` every
+   `APPROVAL_HEARTBEAT` (20s) so the loop can emit `{"type":"ping"}`; the frontend ignores it.
+4. **Cleanup in a `finally`.** A closed tab raises `CancelledError`, a `BaseException` that skips
+   `except Exception` — without `approvals.discard` in a `finally` the process accumulates
+   pending entries forever.
+
+**Ownership is checked twice.** The endpoint verifies the chat belongs to the caller, and
+`approvals.resolve` independently verifies the approval was created for this user *and* this
+chat. Both failures return 404: an approval id is a capability and must not be probeable.
+
+> **⚠️ The approval card is the prime target for prompt injection.** The arguments it shows are
+> **model-generated and untrusted**; an injected model will try to make a dangerous call look
+> harmless. `ApprovalCard.jsx` renders raw JSON in a `<pre>` — never markdown, never HTML, never
+> a summary. Summarising here *is* the vulnerability: the operator has to see exactly what will
+> run. This is the one place in the UI where the "render it nicely" instinct must be resisted.
 
 ## Brute-force protection
 
@@ -730,8 +781,9 @@ and caching a transient failure permanently again breaks 1. The tests carry weig
 
 - A reroute comparison mode (for now reroute = truncate+regen; fork preserves the history)
 - **Tool layer Phase 2** (the registry is MCP-ready; this builds on it):
-  - Approval / human-in-the-loop UI + capability scoping → **state-changing tools**. The
-    `mutating=True` gate is already in the registry (currently rejecting).
+  - ~~Approval / human-in-the-loop UI + capability scoping~~ — **done**, see *Tool approval*.
+    Remaining in this area: **Playwright** (a browser container plus a "drive a browser anywhere
+    on the LAN" capability grant, which deserves its own risk discussion).
   - ~~**MCP source adapter**~~ — **done**, see *MCP source — remote tools*. The prediction held:
     the registry, the loop and the wire format did not change. Remaining: **stdio** (via a bridge
     container, not in-process `npx`) and **encrypting stored MCP secrets** (blocked on

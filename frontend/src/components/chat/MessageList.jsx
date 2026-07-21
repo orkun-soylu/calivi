@@ -3,6 +3,7 @@ import Markdown from "../Markdown.jsx";
 import MessageItem from "./MessageItem.jsx";
 import MessageEditor from "./MessageEditor.jsx";
 import { AttachmentChip } from "./MessageActions.jsx";
+import ApprovalCard from "./ApprovalCard.jsx";
 import { searchLabel } from "../../lib/format.js";
 import { useT } from "../../i18n.js";
 
@@ -16,10 +17,11 @@ export default function MessageList({
   onImageClick,
   onStartEdit,
   onDeleteMessage,
+  onDecide,
 }) {
   const t = useT();
   const bottomRef = useRef(null);
-  const { streaming, thinking, sending, searchInfo } = stream;
+  const { streaming, thinking, sending, searchInfo, approval } = stream;
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -83,6 +85,8 @@ export default function MessageList({
             </div>
           </div>
         )}
+
+        {sending && approval && <ApprovalCard approval={approval} onDecide={onDecide} />}
 
         {sending && searchInfo && (
           <div className="flex justify-start">

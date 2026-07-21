@@ -128,6 +128,13 @@ export default function ChatView({ chat, servers, onMessageSent, onForked, onOpe
     setEditContent("");
   }
 
+  // Answers a pending tool approval. The stream is still open and resumes on its own once the
+  // backend records the decision, so there is nothing to do with the response here.
+  async function handleApprovalDecision(approvalId, approved) {
+    if (!chat) return;
+    await api.respondToApproval(chat.id, approvalId, approved);
+  }
+
   async function handleDeleteMessage(id) {
     if (stream.sending) return;
     if (editingId === id) cancelEdit();
@@ -197,6 +204,7 @@ export default function ChatView({ chat, servers, onMessageSent, onForked, onOpe
         onImageClick={setLightbox}
         onStartEdit={startEdit}
         onDeleteMessage={handleDeleteMessage}
+        onDecide={handleApprovalDecision}
       />
 
       <Composer

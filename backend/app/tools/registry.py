@@ -7,8 +7,9 @@ source-agnostic and MCP-ready:
   2. sources register tools DYNAMICALLY (register / unregister_source),
   3. schemas are JSON Schema (native tool-calling and MCP speak the same format).
 
-Phase 1 is read-only: `mutating=True` tools are never executed (there is no approval /
-human-in-the-loop layer yet). State-changing tools and the MCP source are Phase 2.
+`mutating=True` tools only run when the caller passes `approved=True`, which the agentic loop
+does after a human says yes (see `approvals.py`). The check lives here rather than in the loop
+so a caller bug cannot skip it.
 """
 from dataclasses import dataclass
 from typing import Awaitable, Callable
@@ -58,15 +59,20 @@ class ToolRegistry:
             for t in tools
         ]
 
-    async def execute(self, name: str, args: dict) -> str:
-        """Runs the tool and returns a plain-text result. Unknown/mutating tool → an error
-        string rather than an exception, so the model can recover and the loop survives."""
+    async def execute(self, name: str, args: dict, approved: bool = False) -> str:
+        """Runs the tool and returns a plain-text result. Unknown/unapproved-mutating tool → an
+        error string rather than an exception, so the model can recover and the loop survives.
+
+        `approved` defaults to False on purpose. The loop obtains a human decision before
+        setting it, but the check stays **here**: loosening it because "the caller handles
+        approval now" would move a security boundary into the caller, where a later refactor
+        can silently skip it. The loop asks; the registry still refuses.
+        """
         tool = self._tools.get(name)
         if tool is None:
             return f"{ERROR_PREFIX} no tool named '{name}'."
-        if tool.mutating:
-            # Phase 1 read-only gate: state-changing tools are rejected until approval lands.
-            return f"{ERROR_PREFIX} tool '{name}' is disabled (only read-only tools are active)."
+        if tool.mutating and not approved:
+            return f"{ERROR_PREFIX} tool '{name}' changes state and was not approved."
         return await tool.handler(args or {})
 
 
