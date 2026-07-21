@@ -57,32 +57,38 @@
 [data-accent="purple"] { --accent: 145  65 172; }
 [data-accent="slate"]  { --accent: 111 131 150; }
 
-/* JetBrains Mono Nerd Font (self-hosted). Regular loads first; the other weights
-   load lazily, only once a glyph in that weight is actually rendered. */
+/* JetBrains Mono (self-hosted, v2.304, OFL — see fonts/OFL.txt). Regular loads first; the
+   other weights load lazily, only once a glyph in that weight is actually rendered.
+
+   Plain, NOT the Nerd Font patch. The patched build carries thousands of icon glyphs and is
+   ~988 KB per weight against ~92 KB here — 3.6 MB of the payload for glyphs nothing renders:
+   the UI's icons are inline SVG (components/icons.jsx) and its status marks are emoji. The
+   two are metrically identical (advance 0.6em in every weight, measured), so this changes
+   the download and nothing else. */
 @font-face {
   font-family: "JetBrains Mono";
-  src: url("./fonts/JetBrainsMonoNerdFont-Regular.woff2") format("woff2");
+  src: url("./fonts/JetBrainsMono-Regular.woff2") format("woff2");
   font-weight: 400;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
   font-family: "JetBrains Mono";
-  src: url("./fonts/JetBrainsMonoNerdFont-Medium.woff2") format("woff2");
+  src: url("./fonts/JetBrainsMono-Medium.woff2") format("woff2");
   font-weight: 500;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
   font-family: "JetBrains Mono";
-  src: url("./fonts/JetBrainsMonoNerdFont-Bold.woff2") format("woff2");
+  src: url("./fonts/JetBrainsMono-Bold.woff2") format("woff2");
   font-weight: 700;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
   font-family: "JetBrains Mono";
-  src: url("./fonts/JetBrainsMonoNerdFont-Italic.woff2") format("woff2");
+  src: url("./fonts/JetBrainsMono-Italic.woff2") format("woff2");
   font-weight: 400;
   font-style: italic;
   font-display: swap;
