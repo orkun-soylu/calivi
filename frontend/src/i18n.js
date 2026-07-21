@@ -111,7 +111,7 @@ const translations = {
     "settings.prompts.hint": "Model bazlı sistem (başlangıç) istemleri. Anahtar = tam model adı, 'default' = fallback.",
     "settings.tools.hint": "Araç katmanı ayarları — config/tools.yml. enabled: ana anahtar. max_iterations: agentic döngü üst sınırı. tools.web_search.enabled / num_results: web arama aracı. MCP araçları MCP sekmesinden tek tek açılıp kapatılır. 🔧 toggle açıkken model bu araçları kendi kararıyla çağırır.",
 
-    "about.desc": "Ollama ve OpenAI-uyumlu sunuculara tek arayüzden bağlanan, tek kullanıcılı, LAN-only sohbet uygulaması. Sunucu/model seçimi manuel; sohbetleri yeniden adlandırıp sabitleyebilir, mesajları düzenleyip çatallayabilirsiniz.",
+    "about.desc": "Ollama ve OpenAI-uyumlu sunuculara tek arayüzden bağlanan, kendi sunucunda çalışan, çok kullanıcılı sohbet uygulaması. Sunucu ve model seçimi manuel. Görsel ve doküman ekleyebilir, web araması ile MCP sunucularından gelen araçları modele sunabilir, durum değiştiren araçlar için onay isteyebilirsin.",
     "about.footer": "FastAPI + React · self-hosted · github.com/orkun-soylu/calivi",
 
     "servers.editHint": "Düzenlemek için tıkla",
@@ -271,7 +271,7 @@ const translations = {
     "settings.prompts.hint": "Per-model system (initial) prompts. Key = exact model name, 'default' = fallback.",
     "settings.tools.hint": "Tool layer settings — config/tools.yml. enabled: master switch. max_iterations: agentic loop cap. tools.web_search.enabled / num_results: the web search tool. MCP tools are switched on and off individually in the MCP tab. When the 🔧 toggle is on, the model calls these tools at its own discretion.",
 
-    "about.desc": "A single-user, LAN-only chat app that connects to Ollama and OpenAI-compatible servers from one interface. Server/model selection is manual; you can rename and pin chats, and edit and fork messages.",
+    "about.desc": "A self-hosted, multi-user chat app that connects to Ollama and OpenAI-compatible servers from one interface. Server and model selection is manual. Attach images and documents, offer the model tools from web search and MCP servers, and approve anything that changes state.",
     "about.footer": "FastAPI + React · self-hosted · github.com/orkun-soylu/calivi",
 
     "servers.editHint": "Click to edit",
@@ -416,7 +416,7 @@ const translations = {
     "settings.prompts.hint": "System-Prompts (Start) pro Modell. Schlüssel = genauer Modellname, 'default' = Fallback.",
     "settings.tools.hint": "Einstellungen der Tool-Schicht — config/tools.yml. enabled: Hauptschalter. max_iterations: Obergrenze der Agentenschleife. tools.web_search.enabled / num_results: Websuche-Tool. MCP-Tools werden im MCP-Tab einzeln ein- und ausgeschaltet. Bei aktiviertem 🔧 ruft das Modell diese Tools nach eigenem Ermessen auf.",
 
-    "about.desc": "Eine Einzelnutzer-Chat-App (nur LAN), die sich über eine Oberfläche mit Ollama- und OpenAI-kompatiblen Servern verbindet. Server-/Modellauswahl ist manuell; Chats lassen sich umbenennen und anheften, Nachrichten bearbeiten und verzweigen.",
+    "about.desc": "Eine selbst gehostete Chat-App für mehrere Nutzer, die sich über eine Oberfläche mit Ollama- und OpenAI-kompatiblen Servern verbindet. Server- und Modellauswahl ist manuell. Bilder und Dokumente anhängen, dem Modell Tools aus Websuche und MCP-Servern anbieten und alles genehmigen, was Zustand verändert.",
     "about.footer": "FastAPI + React · self-hosted · github.com/orkun-soylu/calivi",
 
     "servers.editHint": "Zum Bearbeiten klicken",
@@ -526,7 +526,7 @@ const translations = {
     "settings.prompts.hint": "Prompts de sistema (iniciales) por modelo. Clave = nombre exacto del modelo, 'default' = alternativa.",
     "settings.tools.hint": "Ajustes de la capa de herramientas — config/tools.yml. enabled: interruptor principal. max_iterations: límite del bucle agéntico. tools.web_search.enabled / num_results: herramienta de búsqueda web. Las herramientas MCP se activan y desactivan una a una en la pestaña MCP. Con 🔧 activado, el modelo las llama a su criterio.",
 
-    "about.desc": "Una app de chat de un solo usuario, solo LAN, que se conecta a servidores Ollama y compatibles con OpenAI desde una sola interfaz. La selección de servidor/modelo es manual; puedes renombrar y fijar chats, y editar y bifurcar mensajes.",
+    "about.desc": "Una aplicación de chat autoalojada y multiusuario que conecta con servidores Ollama y compatibles con OpenAI desde una sola interfaz. La selección de servidor y modelo es manual. Adjunta imágenes y documentos, ofrece al modelo herramientas de búsqueda web y de servidores MCP, y aprueba todo lo que modifique el estado.",
     "about.footer": "FastAPI + React · self-hosted · github.com/orkun-soylu/calivi",
 
     "servers.editHint": "Haz clic para editar",
@@ -636,7 +636,7 @@ const translations = {
     "settings.prompts.hint": "Prompt di sistema (iniziali) per modello. Chiave = nome esatto del modello, 'default' = fallback.",
     "settings.tools.hint": "Impostazioni del livello strumenti — config/tools.yml. enabled: interruttore principale. max_iterations: limite del ciclo agentico. tools.web_search.enabled / num_results: strumento di ricerca web. Gli strumenti MCP si attivano e disattivano singolarmente nella scheda MCP. Con 🔧 attivo, il modello li chiama a sua discrezione.",
 
-    "about.desc": "Un'app di chat per un solo utente, solo LAN, che si collega a server Ollama e compatibili con OpenAI da un'unica interfaccia. La selezione di server/modello è manuale; puoi rinominare e fissare le chat, e modificare e biforcare i messaggi.",
+    "about.desc": "Un'app di chat self-hosted e multiutente che si collega a server Ollama e compatibili con OpenAI da un'unica interfaccia. La scelta di server e modello è manuale. Allega immagini e documenti, offri al modello strumenti da ricerca web e server MCP e approva tutto ciò che modifica lo stato.",
     "about.footer": "FastAPI + React · self-hosted · github.com/orkun-soylu/calivi",
 
     "servers.editHint": "Clicca per modificare",
@@ -746,7 +746,7 @@ const translations = {
     "settings.prompts.hint": "Prompts de sistema (iniciais) por modelo. Chave = nome exato do modelo, 'default' = alternativa.",
     "settings.tools.hint": "Configurações da camada de ferramentas — config/tools.yml. enabled: interruptor principal. max_iterations: limite do laço agêntico. tools.web_search.enabled / num_results: ferramenta de busca na web. As ferramentas MCP são ligadas e desligadas individualmente na aba MCP. Com 🔧 ativado, o modelo as chama a seu critério.",
 
-    "about.desc": "Um app de chat de usuário único, apenas LAN, que se conecta a servidores Ollama e compatíveis com OpenAI a partir de uma única interface. A seleção de servidor/modelo é manual; você pode renomear e fixar conversas, e editar e bifurcar mensagens.",
+    "about.desc": "Um app de chat auto-hospedado e multiusuário que se conecta a servidores Ollama e compatíveis com OpenAI a partir de uma única interface. A escolha de servidor e modelo é manual. Anexe imagens e documentos, ofereça ao modelo ferramentas de busca na web e de servidores MCP, e aprove tudo o que altere o estado.",
     "about.footer": "FastAPI + React · self-hosted · github.com/orkun-soylu/calivi",
 
     "servers.editHint": "Clique para editar",
@@ -856,7 +856,7 @@ const translations = {
     "settings.prompts.hint": "Системные (начальные) промпты по модели. Ключ = точное имя модели, 'default' = запасной вариант.",
     "settings.tools.hint": "Настройки слоя инструментов — config/tools.yml. enabled: главный переключатель. max_iterations: предел агентного цикла. tools.web_search.enabled / num_results: инструмент веб-поиска. Инструменты MCP включаются и выключаются по отдельности на вкладке MCP. При включённом 🔧 модель вызывает их по своему усмотрению.",
 
-    "about.desc": "Однопользовательское чат-приложение только для локальной сети, подключающееся к серверам Ollama и совместимым с OpenAI из одного интерфейса. Выбор сервера/модели — вручную; чаты можно переименовывать и закреплять, сообщения — редактировать и ответвлять.",
+    "about.desc": "Самостоятельно размещаемое многопользовательское приложение для чата, которое подключается к серверам Ollama и совместимым с OpenAI из одного интерфейса. Выбор сервера и модели — вручную. Прикрепляйте изображения и документы, предлагайте модели инструменты веб-поиска и MCP-серверов и подтверждайте всё, что изменяет состояние.",
     "about.footer": "FastAPI + React · self-hosted · github.com/orkun-soylu/calivi",
 
     "servers.editHint": "Нажмите, чтобы изменить",
@@ -966,7 +966,7 @@ const translations = {
     "settings.prompts.hint": "モデルごとのシステム（初期）プロンプト。キー = 正確なモデル名、'default' = フォールバック。",
     "settings.tools.hint": "ツール層の設定 — config/tools.yml。enabled: マスタースイッチ。max_iterations: エージェントループの上限。tools.web_search.enabled / num_results: ウェブ検索ツール。MCP ツールは MCP タブで個別にオン・オフします。🔧 がオンのとき、モデルが判断してこれらを呼び出します。",
 
-    "about.desc": "1 つのインターフェースから Ollama および OpenAI 互換サーバーに接続する、シングルユーザー・LAN 専用のチャットアプリ。サーバー/モデルの選択は手動で、チャットの名前変更・ピン留め、メッセージの編集・分岐ができます。",
+    "about.desc": "Ollama および OpenAI 互換サーバーに一つの画面から接続する、セルフホスト型のマルチユーザー チャットアプリ。サーバーとモデルの選択は手動です。画像や文書を添付し、ウェブ検索や MCP サーバーのツールをモデルに提供し、状態を変更する操作は承認してから実行します。",
     "about.footer": "FastAPI + React · self-hosted · github.com/orkun-soylu/calivi",
 
     "servers.editHint": "クリックして編集",
@@ -1076,7 +1076,7 @@ const translations = {
     "settings.prompts.hint": "按模型的系统（初始）提示词。键 = 精确的模型名称，'default' = 回退默认。",
     "settings.tools.hint": "工具层设置 — config/tools.yml。enabled: 总开关。max_iterations: 智能体循环上限。tools.web_search.enabled / num_results: 网络搜索工具。MCP 工具在 MCP 选项卡中逐个开关。🔧 开启时，模型会自行决定调用这些工具。",
 
-    "about.desc": "一款单用户、仅局域网的聊天应用，可在一个界面中连接 Ollama 和兼容 OpenAI 的服务器。服务器/模型为手动选择；可以重命名和置顶对话，编辑和分支消息。",
+    "about.desc": "一款自托管的多用户聊天应用，通过统一界面连接 Ollama 和兼容 OpenAI 的服务器。服务器与模型均由你手动选择。可附加图片和文档，向模型提供网页搜索与 MCP 服务器的工具，并在任何改变状态的操作前进行确认。",
     "about.footer": "FastAPI + React · self-hosted · github.com/orkun-soylu/calivi",
 
     "servers.editHint": "点击以编辑",
