@@ -54,9 +54,6 @@ class SlidingWindowLimiter:
         if len(self._events) > _SWEEP_THRESHOLD:
             self._sweep(now)
 
-    def record_failure(self, key: str) -> None:
-        self.record(key)
-
     def reset(self, key: str) -> None:
         """Called on a successful login so a legitimate user is not punished for earlier typos."""
         self._events.pop(key, None)

@@ -3,8 +3,6 @@ staying free (parsing runs in a worker thread)."""
 import io
 import time
 
-from conftest import register  # noqa: F401  (kept for symmetry with the other suites)
-
 from app.routers import extract as extract_router
 
 

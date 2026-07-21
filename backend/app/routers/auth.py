@@ -119,7 +119,7 @@ def login(payload: schemas.LoginIn, response: Response, db: Session = Depends(ge
     password_ok = auth.verify_password(payload.password, user.password_hash if user else _DUMMY_HASH)
     if not user or not password_ok:
         # Non-existent users are counted too: otherwise an attacker could enumerate usernames.
-        login_limiter.record_failure(key)
+        login_limiter.record(key)
         raise HTTPException(401, "Incorrect username/email or password")
     if user.blocked:
         # The password was CORRECT — not brute force, so do not count it (no penalty for a legitimate user).

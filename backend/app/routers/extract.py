@@ -22,6 +22,13 @@ MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 # they run in a worker thread (CPU-bound; must not block the event loop) under a hard time
 # budget. The budget cannot kill the thread (Python has no way to), it frees the request
 # and the loop; the durable fix for the hangs is keeping pypdf current (requirements.txt).
+#
+# So the timeout restores the REQUEST, not the capability: a hung parse keeps its worker for
+# good. `asyncio.to_thread` draws on the loop's default executor — min(32, cpu+4), i.e. 8
+# threads on a 4-core host — so enough concurrent hangs take /api/extract down until the
+# process restarts. Contained rather than fatal: this is the only to_thread caller, and
+# FastAPI's sync endpoints use anyio's separate limiter. Making it survivable needs a
+# killable subprocess, not a bigger pool.
 PARSE_TIMEOUT = 30.0
 TEXT_EXTS = (
     ".txt", ".md", ".markdown", ".csv", ".json", ".yml", ".yaml", ".log",
