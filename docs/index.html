@@ -248,7 +248,10 @@
   .stg-tab { font: inherit; font-size: 12px; color: var(--muted); background: none; border: 0;
              padding: 6px 11px; border-radius: 8px; cursor: pointer; white-space: nowrap; }
   .stg-tab[aria-selected="true"] { background: var(--surface); color: var(--ink); }
-  .stg-body { min-height: 330px; padding: 18px 20px; }
+  /* Sized to the tallest pane (MCP, ~540px). Left to fit content the section would jump by
+     350px every 3 seconds as the tabs rotate, dragging the rest of the page with it. The real
+     Settings window is fixed-size too, so short tabs ending in whitespace is faithful. */
+  .stg-body { min-height: 545px; padding: 18px 20px; }
   .stg-pane { display: none; }
   .stg-pane[data-on] { display: block; animation: stgin .35s ease both; }
   @keyframes stgin { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
@@ -279,8 +282,10 @@
               padding: 9px 11px; font-size: 12px; color: var(--ink); margin-bottom: 6px; }
   .stg-item .u { width: 8px; height: 8px; border-radius: 50%; background: var(--green); flex: none; }
   .stg-item .u.dn { background: #d0453c; }
-  .stg-item .m { color: var(--muted); }
-  .stg-item .r { margin-left: auto; font-size: 10.5px; color: var(--muted); }
+  /* min-width:0 is what lets a flex item shrink below its content; without it the long
+     GitHub URL pushed the tool-count badge outside the window on a phone. */
+  .stg-item .m { color: var(--muted); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .stg-item .r { margin-left: auto; padding-left: 8px; flex: none; font-size: 10.5px; color: var(--muted); }
   .stg-item .r.adm { color: #fff; background: var(--accent); border-radius: 5px; padding: 2px 7px; }
   .stg-code { background: var(--code-bg); color: var(--code-ink); border-radius: 9px; padding: 13px 15px;
               font-size: 11.5px; line-height: 1.65; overflow-x: auto; white-space: pre; margin: 0; }
@@ -290,6 +295,25 @@
   .stg-about h4 { margin: 0 0 10px; font-size: 15px; color: var(--ink); font-family: var(--font-sans); }
   .stg-about p { margin: 0 0 12px; font-size: 12.5px; color: var(--muted); line-height: 1.7; max-width: 62ch; }
   .stg-about .foot { font-size: 11.5px; color: var(--muted); }
+  /* "New server" / "New MCP server" forms. Without them the tabs read as lists and the way
+     you actually add a server is invisible — which is the point of showing Settings at all. */
+  .stg-form { margin-top: 15px; }
+  .stg-form .lbl { font-size: 11px; color: var(--muted); margin-bottom: 8px; }
+  .stg-fields { display: flex; flex-direction: column; gap: 7px; }
+  .stg-fr { display: flex; gap: 7px; }
+  .stg-in { flex: 1; min-width: 0; font-size: 11.5px; color: var(--muted); background: var(--surface-2);
+            border: 1px solid var(--line); border-radius: 8px; padding: 8px 11px;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .stg-in.k { flex: none; color: var(--ink); display: flex; align-items: center; gap: 8px; }
+  .stg-in .car { color: var(--muted); margin-left: auto; }
+  .stg-in.ta { white-space: normal; min-height: 44px; }
+  .stg-btn { margin-top: 3px; background: var(--accent); color: #fff; border-radius: 8px;
+             padding: 9px; text-align: center; font-size: 12px; }
+  .stg-chip { font-size: 10.5px; background: var(--surface-2); border: 1px solid var(--line);
+              border-radius: 6px; padding: 3px 8px; color: var(--ink); }
+  .stg-check { display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--ink); }
+  .stg-check i { width: 13px; height: 13px; border-radius: 3px; background: var(--accent); display: block; flex: none; }
+
   @media (max-width: 720px) { .stg-tabs { gap: 0; } .stg-tab { padding: 6px 8px; font-size: 11px; } }
 
   .features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; margin-top: 32px; }
@@ -564,17 +588,49 @@ stamp=$(<span class="k">date</span> +<span class="s">"%Y-%m-%d_%H-%M-%S"</span>)
           <div class="stg-item"><i class="u"></i>openrouter <span class="m">— https://openrouter.ai/api/v1 · openai api</span></div>
           <div class="stg-item"><i class="u dn"></i>lab-box <span class="m">— 192.168.1.52:11434 · local ollama</span></div>
           <p class="stg-hint" style="margin:12px 0 0">A green light means the server answered and its model list arrived. Red servers are hidden from the chat picker.</p>
+          <div class="stg-form">
+            <div class="lbl">New server</div>
+            <div class="stg-fields">
+              <div class="stg-fr">
+                <div class="stg-in k" style="width:190px">OpenAI-compatible <span class="car">&#8964;</span></div>
+                <div class="stg-in">Name (e.g. local-gpu)</div>
+              </div>
+              <div class="stg-in">Base URL (https://api.openai.com/v1)</div>
+              <div class="stg-in">API Key (optional)</div>
+              <div class="stg-btn">+ Add Server</div>
+            </div>
+          </div>
         </div>
 
         <div class="stg-pane" data-p="2" role="tabpanel">
           <p class="stg-hint">Read-only tools from remote MCP servers. Streamable HTTP and the older HTTP+SSE transport.</p>
           <div class="stg-item"><i class="u"></i>context7 <span class="m">— https://mcp.context7.com/mcp</span><span class="r">2 tools</span></div>
-          <div class="stg-item"><i class="u"></i>exa <span class="m">— https://mcp.exa.ai/mcp</span><span class="r">2 tools</span></div>
           <div class="stg-item"><i class="u"></i>github <span class="m">— https://api.githubcopilot.com/mcp/readonly</span><span class="r">14 tools</span></div>
-          <div style="margin-top:12px">
+          <div style="margin-top:10px">
             <div class="stg-tool"><span class="mode">Automatic</span> 🔧 mcp__context7__query-docs</div>
             <div class="stg-tool"><span class="mode">Ask first</span> ⚠️ mcp__github__create_issue</div>
-            <div class="stg-tool"><span class="mode">Off</span> ⚠️ mcp__github__delete_file</div>
+          </div>
+          <div class="stg-form">
+            <div class="lbl">New MCP server</div>
+            <div class="stg-fr" style="margin-bottom:8px; align-items:center">
+              <span class="lbl" style="margin:0">Preset:</span>
+              <span class="stg-chip">context7</span><span class="stg-chip">github</span><span class="stg-chip">exa</span>
+            </div>
+            <div class="stg-fields">
+              <div class="stg-fr">
+                <div class="stg-in k" style="width:104px">HTTP <span class="car">&#8964;</span></div>
+                <div class="stg-in">Name (e.g. context7)</div>
+              </div>
+              <div class="stg-in">https://mcp.example.com/mcp</div>
+              <div class="stg-fr">
+                <div class="stg-in k" style="width:132px">Authorization</div>
+                <div class="stg-in k" style="width:82px">Bearer</div>
+                <div class="stg-in">Token (optional)</div>
+              </div>
+              <div class="stg-in ta">Extra headers as JSON, e.g. {"X-MCP-Readonly": "true"}</div>
+              <div class="stg-check"><i></i> Enabled</div>
+              <div class="stg-btn">+ Add MCP Server</div>
+            </div>
           </div>
         </div>
 
