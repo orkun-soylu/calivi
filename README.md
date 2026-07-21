@@ -138,7 +138,8 @@ CALIVI_SECRET_KEY=...   # session signing key — see the note below
 
 Other variables the backend understands (`backend/app/config.py`): `DB_PATH`,
 `SYSTEM_PROMPTS_PATH`, `TOOLS_CONFIG_PATH`, `SEARXNG_URL`, `CORS_ORIGINS`,
-`LOGIN_MAX_ATTEMPTS`, `LOGIN_WINDOW_SECONDS`.
+`LOGIN_MAX_ATTEMPTS`, `LOGIN_WINDOW_SECONDS`, `REGISTER_MAX_SUCCESS`,
+`REGISTER_WINDOW_SECONDS`.
 
 > ### ⚠️ Putting it behind HTTPS: set `COOKIE_SECURE=true`
 > This Compose file serves plain HTTP, so the default is `false`. If you put Calivi

@@ -44,13 +44,18 @@ class SlidingWindowLimiter:
         # A new attempt becomes available once the oldest one falls out of the window.
         return max(1, int(self.window - (now - events[0])) + 1)
 
-    def record_failure(self, key: str) -> None:
+    def record(self, key: str) -> None:
+        """Counts one event against the key. 'Failure' is just the login use-case — the
+        registration limiter counts *creations* through the same machinery."""
         now = time.monotonic()
         events = self._live(key, now)
         events.append(now)
         self._events[key] = events
         if len(self._events) > _SWEEP_THRESHOLD:
             self._sweep(now)
+
+    def record_failure(self, key: str) -> None:
+        self.record(key)
 
     def reset(self, key: str) -> None:
         """Called on a successful login so a legitimate user is not punished for earlier typos."""

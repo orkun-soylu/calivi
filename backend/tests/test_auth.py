@@ -99,3 +99,57 @@ async def test_deleted_id_is_never_reused(admin, user_client):
     await admin.delete("/api/users/2")
     newer = await register(user_client, "next")
     assert newer["id"] == 3
+
+
+async def test_duplicate_register_race_is_409_not_500(client):
+    """Two concurrent same-email sign-ups both pass the pre-checks; the loser hits the
+    UNIQUE constraint. That IntegrityError must map to 409 — it used to surface as a 500.
+    A true race is not deterministic in-process, so the DB error the race produces is
+    injected at commit time."""
+    from sqlalchemy.exc import IntegrityError
+
+    from app.database import SessionLocal, get_db
+    from app.main import app
+
+    def flaky_get_db():
+        db = SessionLocal()
+
+        def boom():
+            raise IntegrityError("INSERT INTO users ...", {}, Exception("UNIQUE constraint failed: users.email"))
+
+        db.commit = boom  # instance attribute shadows the method — the race's losing commit
+        try:
+            yield db
+        finally:
+            db.close()
+
+    app.dependency_overrides[get_db] = flaky_get_db
+    try:
+        resp = await client.post(
+            "/api/auth/register",
+            json={"email": "dupe@test.local", "username": "dupe", "password": "password123"},
+        )
+        assert resp.status_code == 409
+    finally:
+        app.dependency_overrides.clear()
+
+
+async def test_registration_limit_counts_creations_not_attempts(client, user_client, monkeypatch):
+    """Open registration must not mean unlimited accounts: creations are limited globally;
+    failed attempts (duplicates) must NOT eat the quota."""
+    monkeypatch.setattr(auth_router.register_limiter, "max_attempts", 2)
+    await register(client, "one")  # success 1
+
+    dup = await client.post(
+        "/api/auth/register",
+        json={"email": "one@test.local", "username": "one", "password": "whatever"},
+    )
+    assert dup.status_code == 409  # an attempt — must not count
+
+    await register(user_client, "two")  # success 2 — still allowed
+
+    resp = await user_client.post(
+        "/api/auth/register",
+        json={"email": "three@test.local", "username": "three", "password": "password123"},
+    )
+    assert resp.status_code == 429 and "Retry-After" in resp.headers

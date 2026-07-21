@@ -43,6 +43,7 @@ def fresh_db():
     servers_router._locks.clear()
     ollama_client._vision_cache.clear()  # never expires — a leak would keep a stale vision verdict
     auth_router.login_limiter.clear()
+    auth_router.register_limiter.clear()
     approvals.clear()
     mcp_client._cache.clear()
     mcp_client._locks.clear()
