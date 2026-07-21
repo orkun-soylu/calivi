@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import ServerModelPicker from "./ServerModelPicker.jsx";
 import MessageList from "./chat/MessageList.jsx";
+import ToolOutputModal from "./chat/ToolOutputModal.jsx";
 import Composer from "./chat/Composer.jsx";
 import { SettingsIcon } from "./icons.jsx";
 import { useChatStream } from "../hooks/useChatStream.js";
@@ -16,6 +17,7 @@ export default function ChatView({ chat, servers, onMessageSent, onForked, onOpe
   const t = useT();
   const { serverId, model, setTarget, upServers, selectedServer } = useServerModel(servers);
   const stream = useChatStream();
+  const [inspecting, setInspecting] = useState(null); // tool output being read
 
   const [input, setInput] = useState("");
   const [images, setImages] = useState([]); // attached images (data-URI), until sent
@@ -205,6 +207,7 @@ export default function ChatView({ chat, servers, onMessageSent, onForked, onOpe
         onStartEdit={startEdit}
         onDeleteMessage={handleDeleteMessage}
         onDecide={handleApprovalDecision}
+        onInspect={setInspecting}
       />
 
       <Composer
@@ -223,6 +226,8 @@ export default function ChatView({ chat, servers, onMessageSent, onForked, onOpe
         useTools={useTools}
         onToggleUseTools={() => setUseTools((v) => !v)}
       />
+
+      <ToolOutputModal tool={inspecting} onClose={() => setInspecting(null)} />
 
       {lightbox && (
         <div

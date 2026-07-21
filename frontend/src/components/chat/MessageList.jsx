@@ -18,6 +18,7 @@ export default function MessageList({
   onStartEdit,
   onDeleteMessage,
   onDecide,
+  onInspect,
 }) {
   const t = useT();
   const bottomRef = useRef(null);
@@ -50,6 +51,7 @@ export default function MessageList({
               onEdit={() => onStartEdit(m)}
               onDelete={() => onDeleteMessage(m.id)}
               onImageClick={onImageClick}
+              onInspect={onInspect}
             />
           )
         )}

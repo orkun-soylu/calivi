@@ -88,6 +88,15 @@ def resolve_target(db: Session, server_id: int | None, model: str | None) -> tup
     }, model
 
 
+MAX_DETAIL_CHARS = 20_000  # a Context7 dump is ~4 KB; this is headroom, not a target
+
+
+def _clip(text: str) -> str:
+    if len(text) <= MAX_DETAIL_CHARS:
+        return text
+    return text[:MAX_DETAIL_CHARS] + f"\n\n… truncated ({len(text) - MAX_DETAIL_CHARS} more characters)"
+
+
 def _chip_for(name: str, args: dict, result: str) -> dict:
     """The chip recording that a tool ran, persisted onto the last user message.
 
@@ -97,11 +106,17 @@ def _chip_for(name: str, args: dict, result: str) -> dict:
     subsequent turn of the chat (`_inject_attachments`), so a documentation dump would be
     re-sent for the rest of the conversation, while the answer that used it is already in
     the history.
+
+    **`detail` is display-only.** It carries what the tool actually returned so the operator can
+    open it and check the answer against it — the failure this exists for is a retrieval that
+    silently omits something, where the model then fills the gap from memory and still credits
+    "the documentation". `_inject_attachments` keys on `text`, never `detail`, so this costs
+    storage and nothing else: not one token of context.
     """
     if name == "web_search":
-        return {"name": f"🔍 {args.get('query', '')}".strip(), "text": result}
+        return {"name": f"🔍 {args.get('query', '')}".strip(), "text": result, "detail": result}
     label = mcp_client.display_label(name)
-    return {"name": f"🔧 {label or name}"}
+    return {"name": f"🔧 {label or name}", "detail": _clip(result)}
 
 
 def _persist_chips(chat_id: int, chips: list[dict]) -> None:
@@ -298,7 +313,9 @@ def _inject_attachments(messages: list[dict]) -> list[dict]:
     """Prepends attachment text to the relevant message's content as context."""
     out = []
     for m in messages:
-        # Chips without text (MCP provenance markers) are labels, not context — skip them.
+        # Keyed on `text` on purpose: a chip may also carry `detail`, which is what the tool
+        # returned, kept for the UI to display. Injecting that would re-send a documentation
+        # dump on every later turn — the exact cost this split avoids.
         atts = [a for a in (m.get("attachments") or []) if a.get("text")]
         if atts:
             prefix = "".join(_wrap_untrusted(f"Ek: {a['name']}", a["text"]) + "\n\n" for a in atts)
