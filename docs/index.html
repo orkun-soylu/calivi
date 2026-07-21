@@ -135,9 +135,34 @@
   .rt-node.on { stroke: var(--accent); }
   .rt-wire { stroke: var(--line); stroke-width: 1.6; fill: none; }
   .rt-wire.on { stroke: var(--accent); }
-  .rt-pulse { fill: var(--accent); }
-  @media (prefers-reduced-motion: no-preference) { .rt-pulse { animation: flow 2.6s ease-in-out infinite; } }
-  @keyframes flow { 0% { offset-distance: 0%; opacity: 0; } 12% { opacity: 1; } 78% { opacity: 1; } 100% { offset-distance: 100%; opacity: 0; } }
+  /* Hidden by default so that under reduced motion three stacked dots do not sit on the
+     origin; the still frame is carried by the .on wire/node instead. */
+  .rt-pulse { fill: var(--accent); opacity: 0; }
+  @media (prefers-reduced-motion: no-preference) {
+    /* One 7.8s cycle, three 2.6s legs: the message goes to a different target each time,
+       because picking the target is the whole point of the diagram. */
+    /* linear here, ease-in-out on the 0% keyframe: the travel is one interval (only 0% and
+       33.3% declare offset-distance), so the easing lands on the movement itself rather than
+       being stretched across the two idle legs. */
+    .rt-pulse { animation: flow 7.8s linear infinite; }
+    .rt-wire.leg1, .rt-wire.leg2, .rt-wire.leg3,
+    .rt-node.leg1, .rt-node.leg2, .rt-node.leg3 { animation: legOn 7.8s linear infinite; }
+    /* Same specificity as the shorthand above and declared after it — the shorthand resets
+       animation-delay to 0, so a lower-specificity selector would silently lose. */
+    .rt-wire.leg2, .rt-node.leg2, .rt-pulse.leg2 { animation-delay: 2.6s; }
+    .rt-wire.leg3, .rt-node.leg3, .rt-pulse.leg3 { animation-delay: 5.2s; }
+  }
+  @keyframes flow {
+    0% { offset-distance: 0%; opacity: 0; animation-timing-function: ease-in-out; }
+    4% { opacity: 1; }
+    26% { opacity: 1; }
+    33.3% { offset-distance: 100%; opacity: 0; }
+    100% { offset-distance: 100%; opacity: 0; }
+  }
+  @keyframes legOn {
+    0%, 33.3% { stroke: var(--accent); }
+    33.4%, 100% { stroke: var(--line); }
+  }
 
   /* ---- section scaffolding ---- */
   section { padding: 56px 0; }
@@ -241,7 +266,7 @@
   .stg-pill span { font-size: 11.5px; padding: 4px 10px; border-radius: 6px; color: var(--muted); }
   .stg-pill span.on { background: var(--surface); color: var(--ink); }
   .stg-dots { display: flex; gap: 6px; }
-  .stg-dots i { width: 15px; height: 15px; border-radius: 50%; display: block; }
+  .stg-dots i { flex: none; width: 15px; height: 15px; border-radius: 50%; display: block; }
   .stg-dots i.sel { outline: 2px solid var(--ink); outline-offset: 2px; }
   .stg-sw { width: 38px; height: 21px; border-radius: 999px; background: var(--accent); position: relative; }
   .stg-sw::after { content: ""; position: absolute; top: 3px; right: 3px; width: 15px; height: 15px;
@@ -354,9 +379,9 @@
     <div class="router" aria-hidden="true">
       <div class="router-cap"><span class="eyebrow">Message routing</span><span class="eyebrow" style="color:var(--accent)">you decide</span></div>
       <svg viewBox="0 0 360 232" role="img">
-        <path class="rt-wire on" d="M96 116 H164 Q180 116 180 100 V60 Q180 44 196 44 H262"></path>
-        <path class="rt-wire" d="M96 116 H262"></path>
-        <path class="rt-wire" d="M96 116 H164 Q180 116 180 132 V172 Q180 188 196 188 H262"></path>
+        <path class="rt-wire leg1 on" d="M96 116 H164 Q180 116 180 100 V60 Q180 44 196 44 H262"></path>
+        <path class="rt-wire leg2" d="M96 116 H262"></path>
+        <path class="rt-wire leg3" d="M96 116 H164 Q180 116 180 132 V172 Q180 188 196 188 H262"></path>
 
         <g>
           <rect class="rt-node" x="10" y="94" width="86" height="44" rx="9"></rect>
@@ -368,22 +393,24 @@
         <text class="rt-sub" x="180" y="214" text-anchor="middle">picker</text>
 
         <g>
-          <rect class="rt-node on" x="262" y="24" width="90" height="40" rx="9"></rect>
+          <rect class="rt-node leg1 on" x="262" y="24" width="90" height="40" rx="9"></rect>
           <text class="rt-label" x="307" y="41" text-anchor="middle">local-gpu</text>
           <text class="rt-sub" x="307" y="55" text-anchor="middle">ollama</text>
         </g>
         <g>
-          <rect class="rt-node" x="262" y="96" width="90" height="40" rx="9"></rect>
+          <rect class="rt-node leg2" x="262" y="96" width="90" height="40" rx="9"></rect>
           <text class="rt-label" x="307" y="113" text-anchor="middle">openrouter</text>
           <text class="rt-sub" x="307" y="127" text-anchor="middle">openai api</text>
         </g>
         <g>
-          <rect class="rt-node" x="262" y="168" width="90" height="40" rx="9"></rect>
+          <rect class="rt-node leg3" x="262" y="168" width="90" height="40" rx="9"></rect>
           <text class="rt-label" x="307" y="185" text-anchor="middle">cloud</text>
           <text class="rt-sub" x="307" y="199" text-anchor="middle">ollama cloud</text>
         </g>
 
-        <circle class="rt-pulse" r="4" style="offset-path: path('M96 116 H164 Q180 116 180 100 V60 Q180 44 196 44 H262');"></circle>
+        <circle class="rt-pulse leg1" r="4" style="offset-path: path('M96 116 H164 Q180 116 180 100 V60 Q180 44 196 44 H262');"></circle>
+        <circle class="rt-pulse leg2" r="4" style="offset-path: path('M96 116 H262');"></circle>
+        <circle class="rt-pulse leg3" r="4" style="offset-path: path('M96 116 H164 Q180 116 180 132 V172 Q180 188 196 188 H262');"></circle>
       </svg>
     </div>
   </div>
