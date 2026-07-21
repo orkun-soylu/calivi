@@ -69,8 +69,8 @@ const translations = {
     "chat.forkNewTitle": "Geçmişi koruyarak yeni bir sohbet oluştur",
     "chat.attachDoc": "Doküman ekle",
     "chat.visionUnsupported": "Seçili model görsel desteklemiyor — görsel eklenmedi",
-    "chat.webSearchOn": "Web arama açık — modelin yanıtı web sonuçlarıyla zenginleşir (kapatmak için tıkla)",
-    "chat.webSearchOff": "Web arama kapalı (açmak için tıkla)",
+    "chat.toolsOn": "Araçlar açık — model web araması ve MCP araçlarını kendi kararıyla çağırabilir (kapatmak için tıkla)",
+    "chat.toolsOff": "Araçlar kapalı (açmak için tıkla)",
 
     "search.generating": "🔍 Arama sorgusu hazırlanıyor…",
     "search.searching": "🔍 Aranıyor: {query}",
@@ -86,7 +86,7 @@ const translations = {
     "settings.tab.servers": "Sunucular",
     "settings.tab.mcp": "MCP",
     "settings.tab.prompts": "Sistem İstemleri",
-    "settings.tab.search": "Web Arama",
+    "settings.tab.tools": "Araçlar",
     "settings.tab.about": "Hakkında",
     "settings.resize": "Boyutlandır",
 
@@ -109,7 +109,7 @@ const translations = {
     "accent.slate": "Arduvaz",
 
     "settings.prompts.hint": "Model bazlı sistem (başlangıç) istemleri. Anahtar = tam model adı, 'default' = fallback.",
-    "settings.search.hint": "Araç (🔧) ayarları — config/tools.yml. enabled: araç altyapısı ana anahtarı. max_iterations: agentic döngü üst sınırı. tools.web_search.enabled / num_results: web arama aracı ayarları. 🔍 toggle açıkken model bu araçları kendi kararıyla çağırır.",
+    "settings.tools.hint": "Araç katmanı ayarları — config/tools.yml. enabled: ana anahtar. max_iterations: agentic döngü üst sınırı. tools.web_search.enabled / num_results: web arama aracı. MCP araçları MCP sekmesinden tek tek açılıp kapatılır. 🔧 toggle açıkken model bu araçları kendi kararıyla çağırır.",
 
     "about.desc": "Ollama ve OpenAI-uyumlu sunuculara tek arayüzden bağlanan, tek kullanıcılı, LAN-only sohbet uygulaması. Sunucu/model seçimi manuel; sohbetleri yeniden adlandırıp sabitleyebilir, mesajları düzenleyip çatallayabilirsiniz.",
     "about.footer": "FastAPI + React · self-hosted · github.com/orkun-soylu/calivi",
@@ -151,6 +151,7 @@ const translations = {
     "mcp.headersInvalid": "Ek başlıklar geçerli JSON olmalı.",
     "mcp.enabled": "Etkin",
     "mcp.addBtn": "+ MCP Sunucusu Ekle",
+    "mcp.toolToggle": "Modele sunulsun",
 
     "status.up": "Erişilebilir — model listesi geliyor",
     "status.down": "Erişilemiyor",
@@ -220,8 +221,8 @@ const translations = {
     "chat.forkNewTitle": "Create a new chat preserving history",
     "chat.attachDoc": "Add document",
     "chat.visionUnsupported": "The selected model doesn't support images — image not added",
-    "chat.webSearchOn": "Web search on — the model's answer is enriched with web results (click to turn off)",
-    "chat.webSearchOff": "Web search off (click to turn on)",
+    "chat.toolsOn": "Tools on — the model may call web search and MCP tools at its own discretion (click to turn off)",
+    "chat.toolsOff": "Tools off (click to turn on)",
 
     "search.generating": "🔍 Preparing search query…",
     "search.searching": "🔍 Searching: {query}",
@@ -237,7 +238,7 @@ const translations = {
     "settings.tab.servers": "Servers",
     "settings.tab.mcp": "MCP",
     "settings.tab.prompts": "System Prompts",
-    "settings.tab.search": "Web Search",
+    "settings.tab.tools": "Tools",
     "settings.tab.about": "About",
     "settings.resize": "Resize",
 
@@ -260,7 +261,7 @@ const translations = {
     "accent.slate": "Slate",
 
     "settings.prompts.hint": "Per-model system (initial) prompts. Key = exact model name, 'default' = fallback.",
-    "settings.search.hint": "Tool (🔧) settings — config/tools.yml. enabled: master switch for the tool infrastructure. max_iterations: agentic loop cap. tools.web_search.enabled / num_results: web search tool settings. When the 🔍 toggle is on, the model calls these tools at its own discretion.",
+    "settings.tools.hint": "Tool layer settings — config/tools.yml. enabled: master switch. max_iterations: agentic loop cap. tools.web_search.enabled / num_results: the web search tool. MCP tools are switched on and off individually in the MCP tab. When the 🔧 toggle is on, the model calls these tools at its own discretion.",
 
     "about.desc": "A single-user, LAN-only chat app that connects to Ollama and OpenAI-compatible servers from one interface. Server/model selection is manual; you can rename and pin chats, and edit and fork messages.",
     "about.footer": "FastAPI + React · self-hosted · github.com/orkun-soylu/calivi",
@@ -302,6 +303,7 @@ const translations = {
     "mcp.headersInvalid": "Extra headers must be valid JSON.",
     "mcp.enabled": "Enabled",
     "mcp.addBtn": "+ Add MCP Server",
+    "mcp.toolToggle": "Offer to the model",
 
     "status.up": "Reachable — loading model list",
     "status.down": "Unreachable",
@@ -371,8 +373,8 @@ const translations = {
     "chat.forkNewTitle": "Neuen Chat erstellen und Verlauf behalten",
     "chat.attachDoc": "Dokument hinzufügen",
     "chat.visionUnsupported": "Das gewählte Modell unterstützt keine Bilder — Bild nicht hinzugefügt",
-    "chat.webSearchOn": "Websuche an — die Antwort wird mit Webergebnissen angereichert (zum Ausschalten klicken)",
-    "chat.webSearchOff": "Websuche aus (zum Einschalten klicken)",
+    "chat.toolsOn": "Tools an — das Modell darf Websuche und MCP-Tools nach eigenem Ermessen aufrufen (zum Ausschalten klicken)",
+    "chat.toolsOff": "Tools aus (zum Einschalten klicken)",
 
     "search.generating": "🔍 Suchanfrage wird vorbereitet…",
     "search.searching": "🔍 Suche: {query}",
@@ -388,7 +390,7 @@ const translations = {
     "settings.tab.servers": "Server",
     "settings.tab.mcp": "MCP",
     "settings.tab.prompts": "System-Prompts",
-    "settings.tab.search": "Websuche",
+    "settings.tab.tools": "Tools",
     "settings.tab.about": "Über",
     "settings.resize": "Größe ändern",
 
@@ -396,7 +398,7 @@ const translations = {
     "settings.general.languageDesc": "Sprache der Calivi-Oberfläche.",
 
     "settings.prompts.hint": "System-Prompts (Start) pro Modell. Schlüssel = genauer Modellname, 'default' = Fallback.",
-    "settings.search.hint": "Websuche-Einstellungen (🔍). query_prompt: Anweisung des Modells zum Erzeugen einer Suchanfrage (NONE, falls nicht nötig). num_results: Anzahl der in den Kontext eingefügten Ergebnisse.",
+    "settings.tools.hint": "Einstellungen der Tool-Schicht — config/tools.yml. enabled: Hauptschalter. max_iterations: Obergrenze der Agentenschleife. tools.web_search.enabled / num_results: Websuche-Tool. MCP-Tools werden im MCP-Tab einzeln ein- und ausgeschaltet. Bei aktiviertem 🔧 ruft das Modell diese Tools nach eigenem Ermessen auf.",
 
     "about.desc": "Eine Einzelnutzer-Chat-App (nur LAN), die sich über eine Oberfläche mit Ollama- und OpenAI-kompatiblen Servern verbindet. Server-/Modellauswahl ist manuell; Chats lassen sich umbenennen und anheften, Nachrichten bearbeiten und verzweigen.",
     "about.footer": "FastAPI + React · self-hosted · github.com/orkun-soylu/calivi",
@@ -438,6 +440,7 @@ const translations = {
     "mcp.headersInvalid": "Zusätzliche Header müssen gültiges JSON sein.",
     "mcp.enabled": "Aktiviert",
     "mcp.addBtn": "+ MCP-Server hinzufügen",
+    "mcp.toolToggle": "Dem Modell anbieten",
 
     "status.up": "Erreichbar — Modellliste wird geladen",
     "status.down": "Nicht erreichbar",
@@ -476,8 +479,8 @@ const translations = {
     "chat.forkNewTitle": "Crear un nuevo chat conservando el historial",
     "chat.attachDoc": "Añadir documento",
     "chat.visionUnsupported": "El modelo seleccionado no admite imágenes — imagen no añadida",
-    "chat.webSearchOn": "Búsqueda web activada — la respuesta se enriquece con resultados web (haz clic para desactivar)",
-    "chat.webSearchOff": "Búsqueda web desactivada (haz clic para activar)",
+    "chat.toolsOn": "Herramientas activadas — el modelo puede llamar a la búsqueda web y a las herramientas MCP a su criterio (haz clic para desactivar)",
+    "chat.toolsOff": "Herramientas desactivadas (haz clic para activar)",
 
     "search.generating": "🔍 Preparando la consulta de búsqueda…",
     "search.searching": "🔍 Buscando: {query}",
@@ -489,7 +492,7 @@ const translations = {
     "settings.tab.servers": "Servidores",
     "settings.tab.mcp": "MCP",
     "settings.tab.prompts": "Prompts del sistema",
-    "settings.tab.search": "Búsqueda web",
+    "settings.tab.tools": "Herramientas",
     "settings.tab.about": "Acerca de",
     "settings.resize": "Redimensionar",
 
@@ -497,7 +500,7 @@ const translations = {
     "settings.general.languageDesc": "Idioma de la interfaz de Calivi.",
 
     "settings.prompts.hint": "Prompts de sistema (iniciales) por modelo. Clave = nombre exacto del modelo, 'default' = alternativa.",
-    "settings.search.hint": "Ajustes de búsqueda web (🔍). query_prompt: instrucción del modelo para generar una consulta de búsqueda (NONE si no es necesaria). num_results: número de resultados añadidos al contexto.",
+    "settings.tools.hint": "Ajustes de la capa de herramientas — config/tools.yml. enabled: interruptor principal. max_iterations: límite del bucle agéntico. tools.web_search.enabled / num_results: herramienta de búsqueda web. Las herramientas MCP se activan y desactivan una a una en la pestaña MCP. Con 🔧 activado, el modelo las llama a su criterio.",
 
     "about.desc": "Una app de chat de un solo usuario, solo LAN, que se conecta a servidores Ollama y compatibles con OpenAI desde una sola interfaz. La selección de servidor/modelo es manual; puedes renombrar y fijar chats, y editar y bifurcar mensajes.",
     "about.footer": "FastAPI + React · self-hosted · github.com/orkun-soylu/calivi",
@@ -539,6 +542,7 @@ const translations = {
     "mcp.headersInvalid": "Las cabeceras adicionales deben ser JSON válido.",
     "mcp.enabled": "Activado",
     "mcp.addBtn": "+ Añadir servidor MCP",
+    "mcp.toolToggle": "Ofrecer al modelo",
 
     "status.up": "Accesible — cargando lista de modelos",
     "status.down": "No accesible",
@@ -577,8 +581,8 @@ const translations = {
     "chat.forkNewTitle": "Crea una nuova chat conservando la cronologia",
     "chat.attachDoc": "Aggiungi documento",
     "chat.visionUnsupported": "Il modello selezionato non supporta le immagini — immagine non aggiunta",
-    "chat.webSearchOn": "Ricerca web attiva — la risposta è arricchita con risultati web (clicca per disattivare)",
-    "chat.webSearchOff": "Ricerca web disattivata (clicca per attivare)",
+    "chat.toolsOn": "Strumenti attivi — il modello può chiamare la ricerca web e gli strumenti MCP a sua discrezione (clicca per disattivare)",
+    "chat.toolsOff": "Strumenti disattivati (clicca per attivare)",
 
     "search.generating": "🔍 Preparazione della query di ricerca…",
     "search.searching": "🔍 Ricerca: {query}",
@@ -590,7 +594,7 @@ const translations = {
     "settings.tab.servers": "Server",
     "settings.tab.mcp": "MCP",
     "settings.tab.prompts": "Prompt di sistema",
-    "settings.tab.search": "Ricerca web",
+    "settings.tab.tools": "Strumenti",
     "settings.tab.about": "Informazioni",
     "settings.resize": "Ridimensiona",
 
@@ -598,7 +602,7 @@ const translations = {
     "settings.general.languageDesc": "Lingua dell'interfaccia di Calivi.",
 
     "settings.prompts.hint": "Prompt di sistema (iniziali) per modello. Chiave = nome esatto del modello, 'default' = fallback.",
-    "settings.search.hint": "Impostazioni ricerca web (🔍). query_prompt: istruzione del modello per generare una query di ricerca (NONE se non necessaria). num_results: numero di risultati inseriti nel contesto.",
+    "settings.tools.hint": "Impostazioni del livello strumenti — config/tools.yml. enabled: interruttore principale. max_iterations: limite del ciclo agentico. tools.web_search.enabled / num_results: strumento di ricerca web. Gli strumenti MCP si attivano e disattivano singolarmente nella scheda MCP. Con 🔧 attivo, il modello li chiama a sua discrezione.",
 
     "about.desc": "Un'app di chat per un solo utente, solo LAN, che si collega a server Ollama e compatibili con OpenAI da un'unica interfaccia. La selezione di server/modello è manuale; puoi rinominare e fissare le chat, e modificare e biforcare i messaggi.",
     "about.footer": "FastAPI + React · self-hosted · github.com/orkun-soylu/calivi",
@@ -640,6 +644,7 @@ const translations = {
     "mcp.headersInvalid": "Gli header aggiuntivi devono essere JSON valido.",
     "mcp.enabled": "Attivo",
     "mcp.addBtn": "+ Aggiungi server MCP",
+    "mcp.toolToggle": "Offri al modello",
 
     "status.up": "Raggiungibile — caricamento elenco modelli",
     "status.down": "Non raggiungibile",
@@ -678,8 +683,8 @@ const translations = {
     "chat.forkNewTitle": "Criar uma nova conversa preservando o histórico",
     "chat.attachDoc": "Adicionar documento",
     "chat.visionUnsupported": "O modelo selecionado não suporta imagens — imagem não adicionada",
-    "chat.webSearchOn": "Busca na web ativada — a resposta é enriquecida com resultados da web (clique para desativar)",
-    "chat.webSearchOff": "Busca na web desativada (clique para ativar)",
+    "chat.toolsOn": "Ferramentas ativadas — o modelo pode chamar a busca na web e as ferramentas MCP a seu critério (clique para desativar)",
+    "chat.toolsOff": "Ferramentas desativadas (clique para ativar)",
 
     "search.generating": "🔍 Preparando a consulta de busca…",
     "search.searching": "🔍 Buscando: {query}",
@@ -691,7 +696,7 @@ const translations = {
     "settings.tab.servers": "Servidores",
     "settings.tab.mcp": "MCP",
     "settings.tab.prompts": "Prompts do sistema",
-    "settings.tab.search": "Busca na web",
+    "settings.tab.tools": "Ferramentas",
     "settings.tab.about": "Sobre",
     "settings.resize": "Redimensionar",
 
@@ -699,7 +704,7 @@ const translations = {
     "settings.general.languageDesc": "Idioma da interface do Calivi.",
 
     "settings.prompts.hint": "Prompts de sistema (iniciais) por modelo. Chave = nome exato do modelo, 'default' = alternativa.",
-    "settings.search.hint": "Configurações de busca na web (🔍). query_prompt: instrução do modelo para gerar uma consulta de busca (NONE se não for necessária). num_results: número de resultados inseridos no contexto.",
+    "settings.tools.hint": "Configurações da camada de ferramentas — config/tools.yml. enabled: interruptor principal. max_iterations: limite do laço agêntico. tools.web_search.enabled / num_results: ferramenta de busca na web. As ferramentas MCP são ligadas e desligadas individualmente na aba MCP. Com 🔧 ativado, o modelo as chama a seu critério.",
 
     "about.desc": "Um app de chat de usuário único, apenas LAN, que se conecta a servidores Ollama e compatíveis com OpenAI a partir de uma única interface. A seleção de servidor/modelo é manual; você pode renomear e fixar conversas, e editar e bifurcar mensagens.",
     "about.footer": "FastAPI + React · self-hosted · github.com/orkun-soylu/calivi",
@@ -741,6 +746,7 @@ const translations = {
     "mcp.headersInvalid": "Os cabeçalhos extras devem ser JSON válido.",
     "mcp.enabled": "Ativado",
     "mcp.addBtn": "+ Adicionar servidor MCP",
+    "mcp.toolToggle": "Oferecer ao modelo",
 
     "status.up": "Acessível — carregando lista de modelos",
     "status.down": "Inacessível",
@@ -779,8 +785,8 @@ const translations = {
     "chat.forkNewTitle": "Создать новый чат, сохранив историю",
     "chat.attachDoc": "Добавить документ",
     "chat.visionUnsupported": "Выбранная модель не поддерживает изображения — изображение не добавлено",
-    "chat.webSearchOn": "Веб-поиск включён — ответ дополняется результатами из сети (нажмите, чтобы выключить)",
-    "chat.webSearchOff": "Веб-поиск выключен (нажмите, чтобы включить)",
+    "chat.toolsOn": "Инструменты включены — модель может по своему усмотрению вызывать веб-поиск и инструменты MCP (нажмите, чтобы выключить)",
+    "chat.toolsOff": "Инструменты выключены (нажмите, чтобы включить)",
 
     "search.generating": "🔍 Подготовка поискового запроса…",
     "search.searching": "🔍 Поиск: {query}",
@@ -792,7 +798,7 @@ const translations = {
     "settings.tab.servers": "Серверы",
     "settings.tab.mcp": "MCP",
     "settings.tab.prompts": "Системные промпты",
-    "settings.tab.search": "Веб-поиск",
+    "settings.tab.tools": "Инструменты",
     "settings.tab.about": "О программе",
     "settings.resize": "Изменить размер",
 
@@ -800,7 +806,7 @@ const translations = {
     "settings.general.languageDesc": "Язык интерфейса Calivi.",
 
     "settings.prompts.hint": "Системные (начальные) промпты по модели. Ключ = точное имя модели, 'default' = запасной вариант.",
-    "settings.search.hint": "Настройки веб-поиска (🔍). query_prompt: инструкция модели для генерации поискового запроса (NONE, если не нужен). num_results: число результатов, добавляемых в контекст.",
+    "settings.tools.hint": "Настройки слоя инструментов — config/tools.yml. enabled: главный переключатель. max_iterations: предел агентного цикла. tools.web_search.enabled / num_results: инструмент веб-поиска. Инструменты MCP включаются и выключаются по отдельности на вкладке MCP. При включённом 🔧 модель вызывает их по своему усмотрению.",
 
     "about.desc": "Однопользовательское чат-приложение только для локальной сети, подключающееся к серверам Ollama и совместимым с OpenAI из одного интерфейса. Выбор сервера/модели — вручную; чаты можно переименовывать и закреплять, сообщения — редактировать и ответвлять.",
     "about.footer": "FastAPI + React · self-hosted · github.com/orkun-soylu/calivi",
@@ -842,6 +848,7 @@ const translations = {
     "mcp.headersInvalid": "Дополнительные заголовки должны быть корректным JSON.",
     "mcp.enabled": "Включён",
     "mcp.addBtn": "+ Добавить MCP-сервер",
+    "mcp.toolToggle": "Предлагать модели",
 
     "status.up": "Доступен — загрузка списка моделей",
     "status.down": "Недоступен",
@@ -880,8 +887,8 @@ const translations = {
     "chat.forkNewTitle": "履歴を保持して新しいチャットを作成",
     "chat.attachDoc": "文書を追加",
     "chat.visionUnsupported": "選択中のモデルは画像に対応していません — 画像は追加されませんでした",
-    "chat.webSearchOn": "ウェブ検索オン — 回答がウェブの結果で強化されます（クリックでオフ）",
-    "chat.webSearchOff": "ウェブ検索オフ（クリックでオン）",
+    "chat.toolsOn": "ツールオン — モデルが判断してウェブ検索や MCP ツールを呼び出せます（クリックでオフ）",
+    "chat.toolsOff": "ツールオフ（クリックでオン）",
 
     "search.generating": "🔍 検索クエリを準備中…",
     "search.searching": "🔍 検索中: {query}",
@@ -893,7 +900,7 @@ const translations = {
     "settings.tab.servers": "サーバー",
     "settings.tab.mcp": "MCP",
     "settings.tab.prompts": "システムプロンプト",
-    "settings.tab.search": "ウェブ検索",
+    "settings.tab.tools": "ツール",
     "settings.tab.about": "情報",
     "settings.resize": "サイズ変更",
 
@@ -901,7 +908,7 @@ const translations = {
     "settings.general.languageDesc": "Calivi のインターフェース言語。",
 
     "settings.prompts.hint": "モデルごとのシステム（初期）プロンプト。キー = 正確なモデル名、'default' = フォールバック。",
-    "settings.search.hint": "ウェブ検索（🔍）の設定。query_prompt: 検索クエリを生成するモデルへの指示（不要な場合は NONE）。num_results: コンテキストに追加する結果の数。",
+    "settings.tools.hint": "ツール層の設定 — config/tools.yml。enabled: マスタースイッチ。max_iterations: エージェントループの上限。tools.web_search.enabled / num_results: ウェブ検索ツール。MCP ツールは MCP タブで個別にオン・オフします。🔧 がオンのとき、モデルが判断してこれらを呼び出します。",
 
     "about.desc": "1 つのインターフェースから Ollama および OpenAI 互換サーバーに接続する、シングルユーザー・LAN 専用のチャットアプリ。サーバー/モデルの選択は手動で、チャットの名前変更・ピン留め、メッセージの編集・分岐ができます。",
     "about.footer": "FastAPI + React · self-hosted · github.com/orkun-soylu/calivi",
@@ -943,6 +950,7 @@ const translations = {
     "mcp.headersInvalid": "追加ヘッダーは正しい JSON である必要があります。",
     "mcp.enabled": "有効",
     "mcp.addBtn": "+ MCP サーバーを追加",
+    "mcp.toolToggle": "モデルに提供",
 
     "status.up": "接続可能 — モデル一覧を読み込み中",
     "status.down": "接続できません",
@@ -981,8 +989,8 @@ const translations = {
     "chat.forkNewTitle": "保留历史记录并创建新对话",
     "chat.attachDoc": "添加文档",
     "chat.visionUnsupported": "所选模型不支持图片 — 图片未添加",
-    "chat.webSearchOn": "网络搜索已开启 — 回答将结合网络结果（点击关闭）",
-    "chat.webSearchOff": "网络搜索已关闭（点击开启）",
+    "chat.toolsOn": "工具已开启 — 模型可自行决定调用网络搜索和 MCP 工具（点击关闭）",
+    "chat.toolsOff": "工具已关闭（点击开启）",
 
     "search.generating": "🔍 正在准备搜索查询…",
     "search.searching": "🔍 正在搜索：{query}",
@@ -994,7 +1002,7 @@ const translations = {
     "settings.tab.servers": "服务器",
     "settings.tab.mcp": "MCP",
     "settings.tab.prompts": "系统提示词",
-    "settings.tab.search": "网络搜索",
+    "settings.tab.tools": "工具",
     "settings.tab.about": "关于",
     "settings.resize": "调整大小",
 
@@ -1002,7 +1010,7 @@ const translations = {
     "settings.general.languageDesc": "Calivi 界面的语言。",
 
     "settings.prompts.hint": "按模型的系统（初始）提示词。键 = 精确的模型名称，'default' = 回退默认。",
-    "settings.search.hint": "网络搜索（🔍）设置。query_prompt：模型生成搜索查询的指令（不需要时输出 NONE）。num_results：注入上下文的结果数量。",
+    "settings.tools.hint": "工具层设置 — config/tools.yml。enabled: 总开关。max_iterations: 智能体循环上限。tools.web_search.enabled / num_results: 网络搜索工具。MCP 工具在 MCP 选项卡中逐个开关。🔧 开启时，模型会自行决定调用这些工具。",
 
     "about.desc": "一款单用户、仅局域网的聊天应用，可在一个界面中连接 Ollama 和兼容 OpenAI 的服务器。服务器/模型为手动选择；可以重命名和置顶对话，编辑和分支消息。",
     "about.footer": "FastAPI + React · self-hosted · github.com/orkun-soylu/calivi",
@@ -1044,6 +1052,7 @@ const translations = {
     "mcp.headersInvalid": "额外请求头必须是有效的 JSON。",
     "mcp.enabled": "已启用",
     "mcp.addBtn": "+ 添加 MCP 服务器",
+    "mcp.toolToggle": "提供给模型",
 
     "status.up": "可访问 — 正在加载模型列表",
     "status.down": "无法访问",

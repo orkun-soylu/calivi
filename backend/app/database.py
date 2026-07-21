@@ -60,6 +60,14 @@ def _migrate():
         if "api_key" not in scols:
             conn.exec_driver_sql("ALTER TABLE servers ADD COLUMN api_key VARCHAR(500)")
 
+        # `create_all` creates missing TABLES, never missing COLUMNS — a column added to a table
+        # that already exists in a deployed DB needs an ALTER here or the app dies on the first
+        # query (it did, in production: "no such column: mcp_servers.disabled_tools" → 502).
+        # PRAGMA returns nothing for a table that does not exist yet, hence the truthiness check.
+        mcpcols = [row[1] for row in conn.exec_driver_sql("PRAGMA table_info(mcp_servers)").fetchall()]
+        if mcpcols and "disabled_tools" not in mcpcols:
+            conn.exec_driver_sql("ALTER TABLE mcp_servers ADD COLUMN disabled_tools JSON")
+
         mcols = [row[1] for row in conn.exec_driver_sql("PRAGMA table_info(messages)").fetchall()]
         if "tokens_per_sec" not in mcols:
             conn.exec_driver_sql("ALTER TABLE messages ADD COLUMN tokens_per_sec FLOAT")

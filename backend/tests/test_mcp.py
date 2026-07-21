@@ -355,3 +355,59 @@ async def test_delete_unregisters_the_tools(admin, monkeypatch):
     assert resp.status_code == 204
     # Without this the deleted server's tools stay callable until the next restart.
     assert registry.get("mcp__ctx7__query-docs") is None
+
+
+# ── Per-tool enable/disable ───────────────────────────────────────────────────
+
+
+@pytest.mark.anyio
+async def test_disabled_tool_is_listed_but_not_registered(monkeypatch):
+    """Turning a tool off must hide it from the model, yet keep it visible in Settings so it
+    can be turned back on — a tool that vanishes from the UI cannot be re-enabled."""
+    server = make_server(disabled_tools=["create-note"])
+    tools = [fake_tool("query-docs"), fake_tool("create-note")]
+    with patched_connect(monkeypatch, FakeSession(tools)):
+        entry = await mcp_client.refresh(server)
+
+    by_name = {t["name"]: t for t in entry.tools}
+    assert by_name["mcp__ctx7__query-docs"]["enabled"] is True
+    assert by_name["mcp__ctx7__create-note"]["enabled"] is False
+    # Listed, but the model is never told it exists.
+    assert registry.get("mcp__ctx7__query-docs") is not None
+    assert registry.get("mcp__ctx7__create-note") is None
+
+
+@pytest.mark.anyio
+async def test_re_enabling_a_tool_registers_it_again(monkeypatch, admin):
+    with patched_connect(monkeypatch, FakeSession([fake_tool("query-docs")])):
+        created = (await admin.post(
+            "/api/mcp", json={"name": "ctx7", "url": "https://example.test/mcp",
+                              "disabled_tools": ["query-docs"]}
+        )).json()
+        assert registry.get("mcp__ctx7__query-docs") is None
+
+        resp = await admin.patch(f"/api/mcp/{created['id']}", json={"disabled_tools": []})
+
+    assert resp.status_code == 200, resp.text
+    assert registry.get("mcp__ctx7__query-docs") is not None
+
+
+@pytest.mark.anyio
+async def test_disabled_tools_survive_a_round_trip(admin, monkeypatch):
+    with patched_connect(monkeypatch, FakeSession([fake_tool("t")])):
+        created = (await admin.post(
+            "/api/mcp", json={"name": "ctx7", "url": "https://example.test/mcp",
+                              "disabled_tools": ["t"]}
+        )).json()
+    assert created["disabled_tools"] == ["t"]
+
+
+@pytest.mark.anyio
+async def test_tool_out_carries_the_raw_name(monkeypatch):
+    """The UI toggles tools by their server-side name. Sending it avoids a second parser for
+    the namespace format in JavaScript — mcp_client stays its only owner."""
+    server = make_server()
+    with patched_connect(monkeypatch, FakeSession([fake_tool("query-docs")])):
+        entry = await mcp_client.refresh(server)
+    assert entry.tools[0]["raw_name"] == "query-docs"
+    assert entry.tools[0]["name"] == "mcp__ctx7__query-docs"

@@ -95,6 +95,7 @@ class McpServerCreate(BaseModel):
     secret_prefix: str = "Bearer "
     headers: dict[str, str] | None = None
     enabled: bool = True
+    disabled_tools: list[str] | None = None
 
 
 class McpServerUpdate(BaseModel):
@@ -108,12 +109,15 @@ class McpServerUpdate(BaseModel):
     secret_prefix: str | None = None
     headers: dict[str, str] | None = None
     enabled: bool | None = None
+    disabled_tools: list[str] | None = None
 
 
 class McpToolOut(BaseModel):
     name: str  # the namespaced registry name
+    raw_name: str = ""  # the server's own name — sent so the UI never re-parses the namespace
     description: str = ""
     read_only: bool = False
+    enabled: bool = True  # False → discovered but not registered (admin turned it off)
 
 
 class McpServerOut(BaseModel):
@@ -128,6 +132,7 @@ class McpServerOut(BaseModel):
     secret_prefix: str = "Bearer "
     headers: dict[str, str] = {}
     enabled: bool = True
+    disabled_tools: list[str] = []
     status: str = "unknown"  # "up" | "down" | "disabled"
     error: str | None = None  # why it is down — shown as a tooltip in Settings
     tools: list[McpToolOut] = []  # read-only tools actually registered
@@ -177,7 +182,7 @@ class SendMessageIn(BaseModel):
     attachments: list[AttachmentIn] = []  # document attachments (extracted text)
     server_id: int | None = None  # None → chosen by the caller
     model: str | None = None  # None → chosen by the caller (on server_id if given)
-    web_search: bool = False  # when on, tools are offered to the model (it may call web_search itself)
+    use_tools: bool = False  # when on, the tool layer is offered to the model (it decides what to call)
 
 
 class EditMessageIn(BaseModel):
@@ -185,7 +190,7 @@ class EditMessageIn(BaseModel):
     images: list[str] | None = None  # None → existing images are kept
     server_id: int | None = None
     model: str | None = None
-    web_search: bool = False
+    use_tools: bool = False
 
 
 class ForkIn(BaseModel):
@@ -195,4 +200,4 @@ class ForkIn(BaseModel):
     attachments: list[AttachmentIn] = []
     server_id: int | None = None
     model: str | None = None
-    web_search: bool = False
+    use_tools: bool = False

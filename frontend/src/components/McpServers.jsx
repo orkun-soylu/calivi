@@ -146,6 +146,21 @@ export default function McpServers() {
     }
   }
 
+  async function toggleTool(server, tool) {
+    // `raw_name` comes from the backend precisely so the namespace format keeps a single
+    // owner (mcp_client) and is never re-parsed here.
+    const raw = tool.raw_name;
+    const disabled = new Set(server.disabled_tools || []);
+    if (tool.enabled) disabled.add(raw);
+    else disabled.delete(raw);
+    try {
+      await api.updateMcpServer(server.id, { disabled_tools: [...disabled] });
+      await load(false);
+    } catch (e) {
+      setError(errText(e));
+    }
+  }
+
   async function handleDelete(id) {
     if (editingId === id) resetForm();
     try {
@@ -211,9 +226,21 @@ export default function McpServers() {
           return (
             <div className="rounded-lg bg-neutral-800/40 px-3 py-2 space-y-1">
               {s.tools.map((tool) => (
-                <div key={tool.name} className="text-xs text-neutral-400 truncate" title={tool.description}>
-                  🔧 {tool.name}
-                </div>
+                <label
+                  key={tool.name}
+                  title={tool.description}
+                  className="flex items-center gap-2 text-xs text-neutral-400 cursor-pointer"
+                >
+                  <input
+                    type="checkbox"
+                    checked={tool.enabled}
+                    onChange={() => toggleTool(s, tool)}
+                    title={t("mcp.toolToggle")}
+                  />
+                  <span className={`truncate ${tool.enabled ? "" : "line-through opacity-60"}`}>
+                    🔧 {tool.name}
+                  </span>
+                </label>
               ))}
               {s.skipped_tools.length > 0 && (
                 <div className="text-xs text-neutral-500 pt-1">

@@ -29,6 +29,7 @@ async def _build_out(server: models.McpServer, refresh: bool = False) -> schemas
         secret_prefix=server.secret_prefix,
         headers=server.headers or {},
         enabled=server.enabled,
+        disabled_tools=server.disabled_tools or [],
         status=entry.status,
         error=entry.error,
         tools=[schemas.McpToolOut(**t) for t in entry.tools],

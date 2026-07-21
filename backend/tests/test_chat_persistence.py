@@ -45,10 +45,10 @@ def _scripted_llm(script):
     return stream_chat
 
 
-async def _run(monkeypatch, chat_id, script, web_search=True):
+async def _run(monkeypatch, chat_id, script, use_tools=True):
     monkeypatch.setattr(llm, "stream_chat", _scripted_llm(script))
     resp = build_stream_response(
-        chat_id, TARGET, "m", [{"role": "user", "content": "hi"}], web_search=web_search
+        chat_id, TARGET, "m", [{"role": "user", "content": "hi"}], use_tools=use_tools
     )
     events = []
     async for chunk in resp.body_iterator:
@@ -114,7 +114,7 @@ async def test_upstream_error_still_saves_a_visible_marker(monkeypatch, chat_id)
         yield  # pragma: no cover
 
     monkeypatch.setattr(llm, "stream_chat", boom)
-    resp = build_stream_response(chat_id, TARGET, "m", [{"role": "user", "content": "hi"}], web_search=False)
+    resp = build_stream_response(chat_id, TARGET, "m", [{"role": "user", "content": "hi"}], use_tools=False)
     async for _ in resp.body_iterator:
         pass
 

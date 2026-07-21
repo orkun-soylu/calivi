@@ -13,12 +13,16 @@ reconnection logic. Instead every probe and every tool call opens its own short-
 It costs one handshake per call and buys away that entire class of bug — the right trade at
 this scale, and it makes "the server went away" a non-event rather than a state to recover.
 
-**Read-only gate (Phase 1).** A tool is registered as executable only when the server marks it
-`readOnlyHint`. Anything else is registered with `mutating=True`, which the registry refuses to
-run, so a mutating tool can never execute by accident. Note this hint is the *server's own*
-claim; it is a filter, not a security boundary. The real guarantee comes from the credential
-(a read-only token) and from server-side read-only modes such as GitHub's `/readonly` endpoint.
-Verified live against Context7 and Exa: both set `readOnlyHint=True` on every tool.
+**Read-only gate (Phase 1).** A tool is registered only when the server marks it
+`readOnlyHint`. Anything else is **withheld entirely** rather than registered as `mutating` — a
+tool the model can see but never run only wastes context and invites retry loops. Note the hint
+is the *server's own* claim; it is a filter, not a security boundary. The real guarantee comes
+from the credential (a read-only token) and from server-side read-only modes such as GitHub's
+`/readonly` endpoint. Verified live against Context7 and Exa: both set `readOnlyHint=True`.
+
+**Per-tool switch.** An admin can also turn an individual tool off (`McpServer.disabled_tools`).
+Those stay in the probe result so Settings can list and re-enable them, but are never
+registered — a tool that vanished from the UI could not be switched back on.
 
 **Namespacing.** Registry names are flat and `register()` overwrites silently, so two servers
 exposing the same tool name would clobber each other — and `unregister_source()` for the loser
@@ -222,6 +226,7 @@ async def refresh(server: models.McpServer) -> Entry:
             return entry
 
         registry.unregister_source(source_of(server.id))
+        disabled = set(server.disabled_tools or [])
         registered: list[dict] = []
         skipped: list[str] = []
         for tool in listed:
@@ -231,19 +236,25 @@ async def refresh(server: models.McpServer) -> Entry:
                 skipped.append(tool.name)
                 continue
             name = namespaced(server.name, tool.name)
+            description = (tool.description or "").strip()
+            if tool.name in disabled:
+                # Reported so Settings can list and re-enable it, but never registered — the
+                # model is not told it exists.
+                registered.append({"name": name, "raw_name": tool.name, "description": description,
+                                   "read_only": True, "enabled": False})
+                continue
             registry.register(
                 Tool(
                     name=name,
-                    description=(tool.description or "").strip(),
+                    description=description,
                     parameters=tool.inputSchema or {"type": "object", "properties": {}},
                     handler=_handler(server.id, tool.name),
                     source=source_of(server.id),
                     mutating=False,
                 )
             )
-            registered.append(
-                {"name": name, "description": (tool.description or "").strip(), "read_only": True}
-            )
+            registered.append({"name": name, "raw_name": tool.name, "description": description,
+                               "read_only": True, "enabled": True})
 
         entry = Entry(status="up", tools=registered, skipped=skipped)
         _cache[server.id] = entry

@@ -213,6 +213,15 @@ On a schema change, `database.py::_migrate` adds the missing column to the exist
 `ALTER TABLE` (the data in the named volume `calivi-data` is preserved). `PATCH /api/chats/{id}`
 updates title and/or pinned.
 
+> **⚠️ Adding a model column without an `ALTER TABLE` is invisible to the whole test suite.**
+> `Base.metadata.create_all()` creates missing **tables**, never missing **columns**, and the test
+> database is rebuilt from the models on every run — so a new column is always present there. A
+> deployed database, whose table predates the column, is not. `McpServer.disabled_tools` shipped
+> this way and took the instance to **502** on the first query
+> (`no such column: mcp_servers.disabled_tools`). `tests/test_migrations.py` now recreates the
+> *legacy* table shape and runs `_migrate()` against it, including a generic check that every
+> mapped column exists in its table — so the next omission fails a test instead of a deployment.
+
 **SQLite FK cascade (bugfix):** SQLite's `PRAGMA foreign_keys` is OFF by default → `ondelete=CASCADE`
 never fired; when deleting a user (`delete_user`/`delete_me`) removed their chats with a bulk
 delete, **the message contents were orphaned in the DB** (a privacy problem for self-service
@@ -422,12 +431,25 @@ registry; it has no idea where the tools come from. Three MCP-ready decisions: (
 - `tools_config.py` + `config/tools.yml` (hot-reload): `enabled` (master switch), `max_iterations`
   (loop cap, default 5), `tools.web_search.{enabled,num_results}`.
 
-**The meaning of the 🔍 toggle CHANGED:** it used to be a "deterministic pre-pass search" (the
-model generated a query → a search ran every time). It now means **"offer the tools to the
-model"** — the model calls them *at its own discretion* (it will not search on a greeting). The
-old pre-pass (`_generate_search_query`/`_apply_search`) was **removed** (still in git history). The
-`web_search` boolean field (schema) was kept and its semantics changed, so the
-frontend/localStorage/`api.js` **did not change**.
+**The toggle's meaning changed twice, and the name finally caught up.**
+
+| Era | What it actually did | What it was called |
+|---|---|---|
+| Original | Deterministic pre-pass search — a query was generated and a search ran *every time* | 🔍 "Web search" |
+| Tool layer | "Offer the tools to the model", which then calls them at its own discretion | 🔍 "Web search" |
+| MCP | Gates the **whole tool layer**, including Context7/GitHub/Exa | 🔧 "Tools" |
+
+The old pre-pass (`_generate_search_query`/`_apply_search`) was removed when the tool layer
+landed (still in git history). At that point the `web_search` boolean was deliberately **kept**
+with changed semantics, so the frontend did not have to change — a reasonable call then, but
+after MCP it meant `web_search=True` silently enabled GitHub tools, and the Settings tab named
+"Web Search" was editing the whole tool layer's config. Enabling Context7 required turning on
+"web search", which is simply false.
+
+So the flag is now **`use_tools`** end to end (schema, `api.js`, `localStorage`), the composer
+button is a wrench, and the Settings tab is "Tools". `modelPrefs.loadUseTools()` reads the old
+`calivi_web_search` key once so an upgrade does not silently switch the toggle off. The built-in
+tool is still called `web_search` — that is a tool name, and it is accurate.
 
 **The agentic loop (`routers/chats.py::build_stream_response.generate()`):**
 1. `web_search` on + `tools_config.is_enabled()` → `tools_spec = registry.specs(<enabled tools>)`.
@@ -548,6 +570,13 @@ the secret is never returned by the API (`has_secret: bool`).
 > key together. `cryptography` is already available (it arrives with `mcp` via `pyjwt[crypto]`), so
 > the remaining cost is a migration and a key-rotation story. Tracked as Phase 2, alongside the
 > approval UI that would unlock mutating tools.
+
+**Per-tool switch.** `McpServer.disabled_tools` holds the server's own (un-namespaced) tool
+names that an admin turned off. They still come back in the probe result — so Settings can list
+and re-enable them — but are never registered, so the model is not told they exist. Kept in the
+DB rather than in `config/tools.yml`, because round-tripping that file through a YAML dump would
+destroy the comments documenting it. `McpToolOut.raw_name` is sent to the UI precisely so the
+namespace format is never re-parsed in JavaScript; `mcp_client` stays its only owner.
 
 **Admin-only, and the blast radius is everyone.** Unlike `/api/servers` (listable by any user for
 the chat picker), the whole MCP router requires admin: adding a server grants every user of the
