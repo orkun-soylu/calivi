@@ -340,6 +340,17 @@
   .feat h3 { font-size: 1.06rem; margin: 12px 0 7px; letter-spacing: -0.01em; }
   .feat p { margin: 0; color: var(--muted); font-size: 0.92rem; }
 
+  /* ---- raw tool output (mockup of the real inspection panel) ---- */
+  .raw { font-family: var(--font-mono); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; background: var(--surface); box-shadow: var(--shadow); margin-top: 32px; }
+  .raw-chip { display: flex; align-items: center; gap: 7px; padding: 12px 14px; font-size: 11.5px; color: var(--muted); border-bottom: 1px solid var(--line-soft); background: var(--surface-2); }
+  .raw-chip .ok { color: var(--green); }
+  .raw-chip .open { margin-left: auto; color: var(--accent); }
+  .raw-hint { padding: 11px 14px; font-size: 11.5px; color: var(--muted); border-bottom: 1px solid var(--line-soft); }
+  .raw-body { margin: 0; padding: 14px; background: var(--code-bg); color: var(--code-ink); font-size: 11.5px; line-height: 1.62; overflow-x: auto; }
+  .raw-body .c { color: #7d8595; }
+  .raw-body .k { color: var(--accent-bright); }
+  .raw-cut { padding: 10px 14px; font-size: 11px; color: var(--muted); border-top: 1px solid var(--line-soft); }
+
   /* ---- install ---- */
   .install-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; align-items: center; margin-top: 30px; }
   .term { background: var(--code-bg); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); }
@@ -353,7 +364,7 @@
   .step .n { flex: none; width: 26px; height: 26px; border-radius: 7px; background: var(--surface-2); border: 1px solid var(--line); display: grid; place-items: center; font-family: var(--font-mono); font-size: 12px; color: var(--accent); font-weight: 600; }
   .step h4 { margin: 2px 0 3px; font-size: 0.98rem; }
   .step p { margin: 0; color: var(--muted); font-size: 0.9rem; }
-  .step code { font-family: var(--font-mono); font-size: 0.85em; background: var(--surface-2); padding: 1px 5px; border-radius: 4px; color: var(--ink); }
+  .step code, .feat code, .raw-cut code { font-family: var(--font-mono); font-size: 0.85em; background: var(--surface-2); padding: 1px 5px; border-radius: 4px; color: var(--ink); }
 
   /* ---- footer ---- */
   footer { border-top: 1px solid var(--line-soft); padding: 34px 0 46px; margin-top: 20px; }
@@ -367,6 +378,8 @@
   @media (max-width: 900px) {
     .hero-grid { grid-template-columns: 1fr; gap: 34px; }
     .features { grid-template-columns: 1fr 1fr; }
+    /* Three cards in two columns would leave a bare half-cell — #features has six, #receipts has three. */
+    #receipts .feat:last-child { grid-column: 1 / -1; }
     .install-grid { grid-template-columns: 1fr; gap: 26px; }
     .app-body { grid-template-columns: 1fr; }
     .side { flex-direction: row; align-items: center; gap: 8px; overflow-x: auto; }
@@ -387,6 +400,7 @@
     <a href="#top" class="wordmark"><span class="dot"></span>calivi</a>
     <div class="bar-spacer"></div>
     <a class="navlink hide-sm" href="#tools">Tools</a>
+    <a class="navlink hide-sm" href="#receipts">Transparency</a>
     <a class="navlink hide-sm" href="#features">Features</a>
     <a class="navlink hide-sm" href="#start">Get&nbsp;started</a>
     <a class="navlink" href="https://github.com/orkun-soylu/calivi">GitHub</a>
@@ -706,6 +720,61 @@ tools:
       </div>
     </div>
     <p class="scrub">// mockup with placeholder data — advances every 3s, click a tab to stop</p>
+  </div>
+</section>
+
+<section id="receipts">
+  <div class="wrap">
+    <span class="eyebrow">Transparency</span>
+    <h2>Tools don't make a model honest.<br />They make it checkable.</h2>
+    <p class="sec-lede">A documentation or search tool returns the passages that matched one query — never a
+      complete reference. A model can read a partial excerpt and confidently report that the part it did not
+      receive does not exist. Calivi does not claim to fix that. It shows you what the model actually got.</p>
+
+    <div class="features">
+      <div class="feat">
+        <div class="fl">What we measured</div>
+        <h3>A confident wrong answer</h3>
+        <p>Asked about Pydantic v2 validator modes, a model sent one broad query to Context7, got back an
+          excerpt in which the word <code>wrap</code> never appears, and reported that the mode does not
+          exist — while closing with “this is from the current documentation”. A re-worded query returns
+          the exact sentence it needed. The documentation was fine; one retrieval was treated as exhaustive.</p>
+      </div>
+      <div class="feat">
+        <div class="fl">The fix that failed</div>
+        <h3>Measured, then dropped</h3>
+        <p>We wrote a system-layer instruction telling the model to re-query when something looked
+          uncovered, and measured it over five runs per arm. It was <b>worse</b>: the false claim went from
+          0/5 to 2/5, and one run exhausted the iteration cap without producing an answer. Telling a model
+          to “say plainly when something is not covered” appears to invite the confident claim of absence
+          that was the bug. It was not shipped.</p>
+      </div>
+      <div class="feat">
+        <div class="fl">What shipped instead</div>
+        <h3>The receipts, kept</h3>
+        <p>The failure is intermittent — 0/5 without the guard — so it is variance, not a defect a prompt
+          can remove. The model cannot be made reliable here, but the operator can be given what it saw:
+          every tool call is clickable and opens the raw output, stored with the message so it survives a
+          reload.</p>
+      </div>
+    </div>
+
+    <div class="raw">
+      <div class="raw-chip">🔧 context7: query-docs <span class="ok">✓</span><span class="open">raw output ▾</span></div>
+      <div class="raw-hint">Exactly what the tool returned. Check the answer against it — anything missing here
+        may have been filled in from memory.</div>
+      <pre class="raw-body"><span class="c">### model_validator with mode='after' for cross-field validation</span>
+
+Source: https://github.com/pydantic/pydantic/blob/main/pydantic/functional_validators.py
+
+<span class="k">@model_validator</span>(mode=<span class="c">'after'</span>)
+<span class="k">def</span> verify_square(self) -&gt; Self:
+    <span class="k">if</span> self.width != self.height:
+        <span class="k">raise</span> ValueError(<span class="c">'width and height do not match'</span>)
+    <span class="k">return</span> self</pre>
+      <div class="raw-cut">// four more excerpts — none of them mentioning <code>wrap</code></div>
+    </div>
+    <p class="scrub">// the panel is real; the excerpt is trimmed for the page</p>
   </div>
 </section>
 
