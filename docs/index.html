@@ -276,10 +276,11 @@
   .stg-pill span.on { background: var(--surface); color: var(--ink); }
   .stg-dots { display: flex; gap: 6px; }
   .stg-dots i { flex: none; width: 15px; height: 15px; aspect-ratio: 1; border-radius: 999px; display: block; }
-  /* box-shadow, not outline: an outline is not guaranteed to follow border-radius and was
-     drawing a rounded rectangle around the circle — the selected swatch read as an oval while
-     the other eight, which have no ring, looked fine. */
-  .stg-dots i.sel { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--ink); }
+  /* NOT `.sel` — that class already exists on this page for the model-picker mockup and brings
+     `padding: 7px 11px` plus a 1px border with it. Under border-box that forced the swatch to
+     24x16 and no amount of width/aspect-ratio/border-radius could win, because padding and
+     border already exceeded the 15px. Measured, after three failed guesses. */
+  .stg-dots i.cur { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--ink); }
   .stg-sw { width: 38px; height: 21px; border-radius: 999px; background: var(--accent); position: relative; }
   .stg-sw::after { content: ""; position: absolute; top: 3px; right: 3px; width: 15px; height: 15px;
                    border-radius: 50%; background: #fff; }
@@ -562,7 +563,7 @@ stamp=$(<span class="k">date</span> +<span class="s">"%Y-%m-%d_%H-%M-%S"</span>)
           <div class="stg-row"><div><div class="t">Theme</div><div class="d">Light / dark appearance. Defaults to your system preference.</div></div>
             <div class="stg-pill"><span class="on">Light</span><span>Dark</span></div></div>
           <div class="stg-row"><div><div class="t">Accent color</div><div class="d">Color of buttons, links and selected items.</div></div>
-            <div class="stg-dots"><i class="sel" style="background:#3584e4"></i><i style="background:#1f9a94"></i><i style="background:#3a944a"></i><i style="background:#d9a107"></i><i style="background:#e06a1b"></i><i style="background:#d0453c"></i><i style="background:#d16ba5"></i><i style="background:#8e5bd0"></i><i style="background:#6b7b8c"></i></div></div>
+            <div class="stg-dots"><i class="cur" style="background:#3584e4"></i><i style="background:#1f9a94"></i><i style="background:#3a944a"></i><i style="background:#d9a107"></i><i style="background:#e06a1b"></i><i style="background:#d0453c"></i><i style="background:#d16ba5"></i><i style="background:#8e5bd0"></i><i style="background:#6b7b8c"></i></div></div>
           <div class="stg-row"><div><div class="t">Interface language</div><div class="d">Nine languages, switched live.</div></div>
             <div class="stg-sel">English</div></div>
           <div class="stg-row"><div><div class="t">Registration open</div><div class="d">When off, new user sign-up is blocked (existing users unaffected).</div></div>
