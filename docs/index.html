@@ -134,7 +134,12 @@
   .rt-node { fill: var(--surface-2); stroke: var(--line); }
   .rt-node.on { stroke: var(--accent); }
   .rt-wire { stroke: var(--line); stroke-width: 1.6; fill: none; }
-  .rt-wire.on { stroke: var(--accent); }
+  /* The three wires share the run out of "your chat", so whichever is painted LAST owns that
+     stretch — the grey ones were covering the active one and only the bottom leg ever looked
+     connected. The lit path is therefore a separate overlay drawn after all three: transparent
+     unless it is this leg's turn, so nothing can paint over the active one. */
+  .rt-live { stroke: transparent; stroke-width: 1.6; fill: none; }
+  .rt-live.on { stroke: var(--accent); }
   /* Hidden by default so that under reduced motion three stacked dots do not sit on the
      origin; the still frame is carried by the .on wire/node instead. */
   .rt-pulse { fill: var(--accent); opacity: 0; }
@@ -145,12 +150,12 @@
        33.3% declare offset-distance), so the easing lands on the movement itself rather than
        being stretched across the two idle legs. */
     .rt-pulse { animation: flow 7.8s linear infinite; }
-    .rt-wire.leg1, .rt-wire.leg2, .rt-wire.leg3,
+    .rt-live.leg1, .rt-live.leg2, .rt-live.leg3 { animation: liveOn 7.8s linear infinite; }
     .rt-node.leg1, .rt-node.leg2, .rt-node.leg3 { animation: legOn 7.8s linear infinite; }
     /* Same specificity as the shorthand above and declared after it — the shorthand resets
        animation-delay to 0, so a lower-specificity selector would silently lose. */
-    .rt-wire.leg2, .rt-node.leg2, .rt-pulse.leg2 { animation-delay: 2.6s; }
-    .rt-wire.leg3, .rt-node.leg3, .rt-pulse.leg3 { animation-delay: 5.2s; }
+    .rt-live.leg2, .rt-node.leg2, .rt-pulse.leg2 { animation-delay: 2.6s; }
+    .rt-live.leg3, .rt-node.leg3, .rt-pulse.leg3 { animation-delay: 5.2s; }
   }
   @keyframes flow {
     0% { offset-distance: 0%; opacity: 0; animation-timing-function: ease-in-out; }
@@ -162,6 +167,10 @@
   @keyframes legOn {
     0%, 33.3% { stroke: var(--accent); }
     33.4%, 100% { stroke: var(--line); }
+  }
+  @keyframes liveOn {
+    0%, 33.3% { stroke: var(--accent); }
+    33.4%, 100% { stroke: transparent; }
   }
 
   /* ---- section scaffolding ---- */
@@ -266,8 +275,11 @@
   .stg-pill span { font-size: 11.5px; padding: 4px 10px; border-radius: 6px; color: var(--muted); }
   .stg-pill span.on { background: var(--surface); color: var(--ink); }
   .stg-dots { display: flex; gap: 6px; }
-  .stg-dots i { flex: none; width: 15px; height: 15px; border-radius: 50%; display: block; }
-  .stg-dots i.sel { outline: 2px solid var(--ink); outline-offset: 2px; }
+  .stg-dots i { flex: none; width: 15px; height: 15px; aspect-ratio: 1; border-radius: 999px; display: block; }
+  /* box-shadow, not outline: an outline is not guaranteed to follow border-radius and was
+     drawing a rounded rectangle around the circle — the selected swatch read as an oval while
+     the other eight, which have no ring, looked fine. */
+  .stg-dots i.sel { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--ink); }
   .stg-sw { width: 38px; height: 21px; border-radius: 999px; background: var(--accent); position: relative; }
   .stg-sw::after { content: ""; position: absolute; top: 3px; right: 3px; width: 15px; height: 15px;
                    border-radius: 50%; background: #fff; }
@@ -379,9 +391,13 @@
     <div class="router" aria-hidden="true">
       <div class="router-cap"><span class="eyebrow">Message routing</span><span class="eyebrow" style="color:var(--accent)">you decide</span></div>
       <svg viewBox="0 0 360 232" role="img">
-        <path class="rt-wire leg1 on" d="M96 116 H164 Q180 116 180 100 V60 Q180 44 196 44 H262"></path>
-        <path class="rt-wire leg2" d="M96 116 H262"></path>
-        <path class="rt-wire leg3" d="M96 116 H164 Q180 116 180 132 V172 Q180 188 196 188 H262"></path>
+        <path class="rt-wire" d="M96 116 H164 Q180 116 180 100 V60 Q180 44 196 44 H262"></path>
+        <path class="rt-wire" d="M96 116 H262"></path>
+        <path class="rt-wire" d="M96 116 H164 Q180 116 180 132 V172 Q180 188 196 188 H262"></path>
+        <!-- lit overlay, painted after every base wire so the active leg is never covered -->
+        <path class="rt-live leg1 on" d="M96 116 H164 Q180 116 180 100 V60 Q180 44 196 44 H262"></path>
+        <path class="rt-live leg2" d="M96 116 H262"></path>
+        <path class="rt-live leg3" d="M96 116 H164 Q180 116 180 132 V172 Q180 188 196 188 H262"></path>
 
         <g>
           <rect class="rt-node" x="10" y="94" width="86" height="44" rx="9"></rect>
