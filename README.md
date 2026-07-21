@@ -98,8 +98,45 @@ tool layer, web search and MCP alike.
 | Exa | `https://mcp.exa.ai/mcp` | `Authorization: Bearer <key>` |
 
 Transport is **HTTP** — either Streamable HTTP or the older HTTP+SSE (pick `SSE` for servers
-like Linear that still serve it). stdio servers (`npx …`) are not supported; run them behind
-a stdio→HTTP bridge container if you need them.
+like Linear that still serve it). For stdio servers (`npx …`), see below.
+
+### stdio MCP servers — the bundled bridge
+
+Calivi never runs stdio servers itself: that would execute an npm or PyPI package named in a web
+form inside the backend container, next to the database and the session key. A bundled, opt-in
+bridge container runs them instead and speaks HTTP to Calivi.
+
+```bash
+cp stdio-bridge/servers.example.json stdio-bridge/servers.json
+# add your servers to stdio-bridge/Dockerfile (pinned) and to servers.json
+docker compose --profile stdio-bridge up -d --build
+```
+
+Then add it in Settings → MCP like any other server, transport **HTTP**, no secret:
+
+```
+http://calivi-mcp-bridge:8096/servers/time/mcp
+```
+
+The example ships `mcp-server-time`, which answers the question models are worst at — what the
+date is right now.
+
+**Servers are installed into the image, pinned** (`stdio-bridge/Dockerfile`), each in its own
+virtualenv. Do not put `npx -y <package>` in the config: that downloads and runs whatever the
+registry serves at the moment of the call, which is the thing the bridge is here to avoid.
+
+> **⚠️ The bridge runs code Calivi does not control.** It is therefore locked down by default: its
+> own `internal: true` network (**no internet, no LAN**), non-root, read-only filesystem, all
+> capabilities dropped, no published port and no authentication of its own.
+>
+> A server that needs the internet — `mcp-server-fetch`, for instance — **will not work** until you
+> remove `internal: true` from the `mcp-bridge` network. That grants it the internet *and* your
+> LAN; Docker routes both the same way, and separating them needs a `DOCKER-USER` firewall rule.
+> Decide it deliberately.
+
+If a bridged server shows **no tools**, it is almost always the read-only gate: a server that does
+not set `readOnlyHint` has its tools default to `off`, and you enable them per tool in Settings.
+`mcp-server-time` sets it; `mcp-server-fetch` does not.
 
 > **⚠️ Only read-only tools are offered.** A tool is registered only if the server marks it
 > read-only, and that mark is the *server's own claim* — treat it as a filter, not a sandbox.

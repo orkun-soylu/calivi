@@ -1,0 +1,17 @@
+{
+  "_comment": [
+    "Copy to servers.json — that file is gitignored, this one is the template.",
+    "Each key becomes a URL path: 'time' is served at /servers/time/mcp (Streamable HTTP)",
+    "and /servers/time/sse (the older transport). Register that URL in Calivi under",
+    "Settings -> MCP, transport HTTP, no secret: the bridge has no authentication, which is",
+    "why it must never be given a published port.",
+    "'command' points at the venv built in the Dockerfile, never at a bare 'npx'/'uvx' —",
+    "nothing here should be downloaded at run time."
+  ],
+  "mcpServers": {
+    "time": {
+      "command": "/opt/mcp/time/bin/python",
+      "args": ["-m", "mcp_server_time", "--local-timezone", "Europe/Istanbul"]
+    }
+  }
+}
