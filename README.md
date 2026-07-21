@@ -38,9 +38,14 @@ llama.cpp-server — all from the same chat window.
 - **Tools (🔧)** — One toggle in the composer offers the tool layer to the model, which then
   calls tools *on its own initiative*; which tool ran is visible in the conversation and
   survives a reload. Bundled SearXNG provides web search.
-- **MCP servers** — Connect remote [Model Context Protocol](https://modelcontextprotocol.io)
-  servers (Context7, GitHub, Exa…) and their tools become available to the model alongside
-  the built-in ones. Read-only tools only, for now.
+- **MCP servers** — Connect [Model Context Protocol](https://modelcontextprotocol.io) servers
+  (Context7, GitHub, Exa…) and their tools become available to the model alongside the built-in
+  ones. HTTP servers directly; stdio servers through a bundled, sandboxed bridge container.
+- **Approval before anything changes** — Read-only tools run on their own; a tool that can change
+  something is **off until you enable it**, and then it asks you before every single run. Silence
+  is a denial, never consent.
+- **Secrets encrypted at rest** — MCP tokens and provider API keys are encrypted in the database,
+  so a copy of it (a backup, a stolen volume) does not hand over your credentials.
 - **Message editing** — Edit a message and either **Update** (regenerate from that point,
   optionally on a different model) or **New chat** (branch while keeping history).
 - **Markdown + math** — Code blocks with copy buttons, tables, KaTeX.
@@ -138,11 +143,15 @@ If a bridged server shows **no tools**, it is almost always the read-only gate: 
 not set `readOnlyHint` has its tools default to `off`, and you enable them per tool in Settings.
 `mcp-server-time` sets it; `mcp-server-fetch` does not.
 
-> **⚠️ Only read-only tools are offered.** A tool is registered only if the server marks it
-> read-only, and that mark is the *server's own claim* — treat it as a filter, not a sandbox.
-> **Give MCP servers least-privilege credentials**: a fine-grained, read-only GitHub token
-> scoped to the repositories you actually want, not a broad one. The GitHub preset points at
-> the `/readonly` endpoint so the restriction is enforced by GitHub as well.
+> **⚠️ Only read-only tools are offered by default.** A tool is offered on its own only if the
+> server marks it read-only; anything else starts **off**. You can switch a tool on per tool in
+> the MCP tab — `auto` to let it run, or **`approve`** to have it stop and ask you before every
+> run — so a mutating tool is always a deliberate act, never a discovery.
+>
+> That mark is the *server's own claim* — treat it as a filter, not a sandbox. **Give MCP servers
+> least-privilege credentials**: a fine-grained, read-only GitHub token scoped to the
+> repositories you actually want, not a broad one. The GitHub preset points at the `/readonly`
+> endpoint so the restriction is enforced by GitHub as well.
 >
 > Adding an MCP server is admin-only, and its tools become available to **every user** of the
 > instance.
