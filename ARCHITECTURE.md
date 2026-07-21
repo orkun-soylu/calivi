@@ -695,6 +695,21 @@ Decisions (all tested, see `tests/test_rate_limit.py`):
 - **A successful login resets the counter.** So does a restart (it is in memory) — accepted,
   because a restart is not an event an attacker can trigger. Stale entries are swept once the key
   dictionary exceeds 1000.
+- **bcrypt also runs for unknown accounts** (against a dummy hash) — skipping it made unknown-user
+  logins ~100x faster, a timing oracle for username enumeration.
+
+**Registration** is limited separately: **10 created accounts / hour, process-global** → `429`
+(`REGISTER_MAX_SUCCESS`, `REGISTER_WINDOW_SECONDS`). Global because there is no account to key on
+before sign-up (and no trustworthy client IP — below). Only *creations* count; failed attempts
+(duplicate email, validation errors) reveal nothing and do not eat the quota. A concurrent
+duplicate sign-up that loses the race at the UNIQUE constraint maps to `409` — it used to escape
+as an unhandled `IntegrityError` (a 500).
+
+> **The cost of keying it globally:** an attacker can burn the hourly quota with junk accounts
+> and block *legitimate* sign-ups for the rest of the window. Accepted — there is nothing better
+> to key on (no account yet, no trustworthy IP), the damage is a delay rather than a compromise,
+> and an admin can close registration outright. Worth knowing it is a deliberate trade-off and
+> not an oversight.
 
 > **⚠️ Why there is no IP keying:** the nginx `/api/` block does **not** forward `X-Forwarded-For`
 > and uvicorn does not run with `--proxy-headers` → `request.client.host` is identical for every

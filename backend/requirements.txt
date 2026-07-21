@@ -9,9 +9,13 @@ httpx==0.28.1
 # 2.11 is the floor imposed by `mcp`; it was 2.10.4 before the MCP work.
 pydantic==2.11.10
 pyyaml==6.0.2
-pypdf==5.1.0
+# 6.13.3 clears every open pypdf advisory (crafted-PDF infinite loops / RAM exhaustion) —
+# all reachable via /api/extract with nothing but a logged-in account.
+pypdf==6.13.3
 python-docx==1.1.2
-python-multipart==0.0.20
+# 0.0.31 clears the multipart-parsing DoS advisories (preamble/epilogue, part-header
+# and Content-Length abuse) — the parser sits in front of /api/extract.
+python-multipart==0.0.31
 bcrypt==4.2.1
 PyJWT==2.10.1
 # MCP client (Streamable HTTP + the older HTTP+SSE transport). Pulls pyjwt[crypto], so

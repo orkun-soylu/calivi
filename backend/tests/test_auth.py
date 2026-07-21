@@ -1,6 +1,9 @@
 """Registration, sessions, super-admin rules and blocking behaviour."""
 from conftest import login, register
 
+from app import auth as auth_core
+from app.routers import auth as auth_router
+
 
 async def test_first_signup_becomes_super_admin(client):
     me = await register(client, "first")
@@ -29,6 +32,26 @@ async def test_login_with_email_or_username(client):
     assert (await client.post(
         "/api/auth/login", json={"identifier": "someone@test.local", "password": "password123"}
     )).status_code == 200
+
+
+async def test_unknown_user_login_still_runs_bcrypt(client, monkeypatch):
+    """Timing-oracle regression: the unknown-account path must pay the same bcrypt cost
+    as the real one (against _DUMMY_HASH), or response time reveals valid usernames."""
+    calls = []
+    original = auth_core.verify_password
+
+    def spy(password, password_hash):
+        calls.append(password_hash)
+        return original(password, password_hash)
+
+    monkeypatch.setattr(auth_core, "verify_password", spy)
+    await register(client, "someone")
+
+    await login(client, "someone", "wrong")          # real user, wrong password
+    await login(client, "no-such-user", "wrong")     # unknown user
+    assert len(calls) == 2                            # bcrypt ran BOTH times
+    assert calls[0] != calls[1]                       # real hash vs the dummy
+    assert calls[1] == auth_router._DUMMY_HASH
 
 
 async def test_logout_ends_the_session(client):
@@ -76,3 +99,57 @@ async def test_deleted_id_is_never_reused(admin, user_client):
     await admin.delete("/api/users/2")
     newer = await register(user_client, "next")
     assert newer["id"] == 3
+
+
+async def test_duplicate_register_race_is_409_not_500(client):
+    """Two concurrent same-email sign-ups both pass the pre-checks; the loser hits the
+    UNIQUE constraint. That IntegrityError must map to 409 — it used to surface as a 500.
+    A true race is not deterministic in-process, so the DB error the race produces is
+    injected at commit time."""
+    from sqlalchemy.exc import IntegrityError
+
+    from app.database import SessionLocal, get_db
+    from app.main import app
+
+    def flaky_get_db():
+        db = SessionLocal()
+
+        def boom():
+            raise IntegrityError("INSERT INTO users ...", {}, Exception("UNIQUE constraint failed: users.email"))
+
+        db.commit = boom  # instance attribute shadows the method — the race's losing commit
+        try:
+            yield db
+        finally:
+            db.close()
+
+    app.dependency_overrides[get_db] = flaky_get_db
+    try:
+        resp = await client.post(
+            "/api/auth/register",
+            json={"email": "dupe@test.local", "username": "dupe", "password": "password123"},
+        )
+        assert resp.status_code == 409
+    finally:
+        app.dependency_overrides.clear()
+
+
+async def test_registration_limit_counts_creations_not_attempts(client, user_client, monkeypatch):
+    """Open registration must not mean unlimited accounts: creations are limited globally;
+    failed attempts (duplicates) must NOT eat the quota."""
+    monkeypatch.setattr(auth_router.register_limiter, "max_attempts", 2)
+    await register(client, "one")  # success 1
+
+    dup = await client.post(
+        "/api/auth/register",
+        json={"email": "one@test.local", "username": "one", "password": "whatever"},
+    )
+    assert dup.status_code == 409  # an attempt — must not count
+
+    await register(user_client, "two")  # success 2 — still allowed
+
+    resp = await user_client.post(
+        "/api/auth/register",
+        json={"email": "three@test.local", "username": "three", "password": "password123"},
+    )
+    assert resp.status_code == 429 and "Retry-After" in resp.headers

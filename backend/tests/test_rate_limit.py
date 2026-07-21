@@ -15,14 +15,14 @@ from conftest import login, register
 def test_below_the_threshold_it_does_not_lock():
     lim = SlidingWindowLimiter(max_attempts=3, window=60)
     for _ in range(2):
-        lim.record_failure("k")
+        lim.record("k")
     assert lim.retry_after("k") == 0
 
 
 def test_at_the_threshold_it_locks_and_reports_retry_after():
     lim = SlidingWindowLimiter(max_attempts=3, window=60)
     for _ in range(3):
-        lim.record_failure("k")
+        lim.record("k")
     retry = lim.retry_after("k")
     assert 0 < retry <= 61
 
@@ -30,7 +30,7 @@ def test_at_the_threshold_it_locks_and_reports_retry_after():
 def test_allowance_returns_as_the_window_slides():
     lim = SlidingWindowLimiter(max_attempts=3, window=60)
     for _ in range(3):
-        lim.record_failure("k")
+        lim.record("k")
     assert lim.retry_after("k") > 0
 
     # Push the oldest attempts out of the window (sliding window, not a wholesale reset)
@@ -42,18 +42,18 @@ def test_partial_slide_only_frees_the_stale_attempts():
     """If one attempt leaves the window, exactly one allowance returns (not all of them)."""
     lim = SlidingWindowLimiter(max_attempts=3, window=60)
     for _ in range(3):
-        lim.record_failure("k")
+        lim.record("k")
     events = list(lim._events["k"])
     lim._events["k"] = deque([events[0] - 61, events[1], events[2]])
 
     assert lim.retry_after("k") == 0
-    lim.record_failure("k")
+    lim.record("k")
     assert lim.retry_after("k") > 0
 
 
 def test_reset_clears_the_counter():
     lim = SlidingWindowLimiter(max_attempts=1, window=60)
-    lim.record_failure("k")
+    lim.record("k")
     assert lim.retry_after("k") > 0
     lim.reset("k")
     assert lim.retry_after("k") == 0
@@ -61,7 +61,7 @@ def test_reset_clears_the_counter():
 
 def test_keys_do_not_affect_each_other():
     lim = SlidingWindowLimiter(max_attempts=1, window=60)
-    lim.record_failure("a")
+    lim.record("a")
     assert lim.retry_after("a") > 0
     assert lim.retry_after("b") == 0
 
@@ -70,7 +70,7 @@ def test_stale_keys_are_swept():
     """The dict must not grow without bound (a spray of random usernames must not bloat memory)."""
     lim = SlidingWindowLimiter(max_attempts=5, window=0.01)
     for i in range(1200):
-        lim.record_failure(f"k{i}")
+        lim.record(f"k{i}")
     assert len(lim._events) < 1200
 
 

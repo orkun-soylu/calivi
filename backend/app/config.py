@@ -22,6 +22,12 @@ SEARCH_TIMEOUT = 15.0  # SearXNG JSON search
 LOGIN_MAX_ATTEMPTS = int(os.environ.get("LOGIN_MAX_ATTEMPTS", "5"))
 LOGIN_WINDOW_SECONDS = float(os.environ.get("LOGIN_WINDOW_SECONDS", "900"))  # 15 min
 
+# Registration flood protection — global (no account to key on, and no trustworthy client
+# IP: see rate_limit.py). Counts CREATED accounts; failed attempts (duplicates, invalid
+# input) are not limited — they reveal nothing and must not eat a legitimate user's quota.
+REGISTER_MAX_SUCCESS = int(os.environ.get("REGISTER_MAX_SUCCESS", "10"))
+REGISTER_WINDOW_SECONDS = float(os.environ.get("REGISTER_WINDOW_SECONDS", "3600"))  # 1 h
+
 # Server probe cache TTLs (seconds) — see routers/servers.py.
 # "down" is shorter so a server you just powered on shows up as "up" quickly.
 PROBE_TTL_UP = 60.0
