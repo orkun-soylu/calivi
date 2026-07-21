@@ -86,6 +86,54 @@ class ServerOut(BaseModel):
     vision_models: list[str] = []  # subset of models: those supporting images (vision)
 
 
+class McpServerCreate(BaseModel):
+    name: str
+    url: str
+    transport: str = "http"  # "http" (Streamable HTTP) | "sse" (older HTTP+SSE)
+    secret: str | None = None
+    secret_header: str = "Authorization"
+    secret_prefix: str = "Bearer "
+    headers: dict[str, str] | None = None
+    enabled: bool = True
+
+
+class McpServerUpdate(BaseModel):
+    # Partial update: only explicitly set fields are applied. Omitting `secret` keeps the
+    # stored one (exclude_unset) — the same contract as ServerUpdate.api_key.
+    name: str | None = None
+    url: str | None = None
+    transport: str | None = None
+    secret: str | None = None
+    secret_header: str | None = None
+    secret_prefix: str | None = None
+    headers: dict[str, str] | None = None
+    enabled: bool | None = None
+
+
+class McpToolOut(BaseModel):
+    name: str  # the namespaced registry name
+    description: str = ""
+    read_only: bool = False
+
+
+class McpServerOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    url: str
+    transport: str = "http"
+    has_secret: bool = False  # the secret itself is never returned
+    secret_header: str = "Authorization"
+    secret_prefix: str = "Bearer "
+    headers: dict[str, str] = {}
+    enabled: bool = True
+    status: str = "unknown"  # "up" | "down" | "disabled"
+    error: str | None = None  # why it is down — shown as a tooltip in Settings
+    tools: list[McpToolOut] = []  # read-only tools actually registered
+    skipped_tools: list[str] = []  # advertised but withheld (not read-only) — Phase 2
+
+
 class ChatCreate(BaseModel):
     title: str = "New Chat"
 

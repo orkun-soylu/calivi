@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import StatusLight from "./StatusLight.jsx";
 import ConfigEditor from "./ConfigEditor.jsx";
 import UserManagement from "./UserManagement.jsx";
+import McpServers from "./McpServers.jsx";
 import { api } from "../api.js";
 import { useT, useLang, setLang, LANGUAGES } from "../i18n.js";
 import { useTheme, setTheme } from "../theme.js";
@@ -19,6 +20,9 @@ export default function SettingsModal({ servers, me, onClose, onAdd, onUpdate, o
   const TABS = [
     { id: "general", key: "settings.tab.general" },
     ...(isAdmin ? [{ id: "servers", key: "settings.tab.servers" }] : []),
+    // MCP is admin-only for a stronger reason than Servers: adding one grants every
+    // user of this instance whatever that server can do.
+    ...(isAdmin ? [{ id: "mcp", key: "settings.tab.mcp" }] : []),
     { id: "prompts", key: "settings.tab.prompts" },
     { id: "search", key: "settings.tab.search" },
     { id: "users", key: "settings.tab.users" },
@@ -266,6 +270,8 @@ export default function SettingsModal({ servers, me, onClose, onAdd, onUpdate, o
               <p className="text-neutral-500">{t("about.footer")}</p>
             </div>
           )}
+
+          {tab === "mcp" && isAdmin && <McpServers />}
 
           {tab === "servers" && (
             <div className="h-full overflow-y-auto themed-scroll space-y-4">

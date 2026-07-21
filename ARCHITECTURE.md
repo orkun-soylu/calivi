@@ -125,7 +125,12 @@ those two; overkill solutions such as an LLM-based injection classifier were del
 - **As more tools land:** on top of this foundation should come (a) human-in-the-loop approval for
   sensitive/state-changing tools, (b) capability scoping (especially an allowlist for internal
   services/SSH), and (c) treating **tool output as untrusted via `_wrap_untrusted`** as well. The
-  existing wrapping discipline is exactly what sets that foundation.
+  existing wrapping discipline is exactly what sets that foundation. (c) is in place: MCP tool
+  results flow through the same wrapping as any external content.
+- **What MCP added to the threat model:** tool *descriptions* now originate from a remote server
+  and are read as instructions by construction — `_wrap_untrusted` covers results, not
+  descriptions. Adding an MCP server is therefore an admin-only act whose blast radius is every
+  user of the instance. See *MCP source — remote tools*.
 
 ## Stack
 
@@ -462,6 +467,78 @@ results, they were fed into context, and the model answered with fresh informati
 no tool call, direct answer ✅; when the cap was reached, the last turn ran without tools → a final
 answer was guaranteed ✅. **The OpenAI path is code-verified but not live-tested.**
 
+## MCP source — remote tools
+
+The second tool source. It is **purely additive**: `ToolRegistry`, the agentic loop and the
+provider wire format are untouched, exactly as the registry's three MCP-ready decisions predicted.
+MCP tools arrive with `source="mcp:<id>"` and JSON Schema parameters, and `chats.py` cannot tell
+them apart from `web_search`.
+
+**HTTP only, no stdio.** Each MCP server is its own network endpoint, which matches how everything
+else here is deployed (`calivi-searxng` is the same shape). Both transports are spoken: Streamable
+HTTP and the older HTTP+SSE, because hosted servers are split between them (Linear still serves
+SSE). stdio would mean running `npx`-delivered packages inside the backend container — executing an
+arbitrary npm package named in an admin web form, in the application's own container. If stdio
+servers are ever wanted, the answer is a **stdio→HTTP bridge container**, not that.
+
+**Connect-per-call — no long-lived sessions.** An MCP session is an async context manager, and
+anyio requires its cancel scope to be exited in the task that entered it. Keeping sessions open
+across requests therefore needs a supervisor task per server, a dispatch queue and reconnection
+logic. Instead each probe and each tool call opens its own short-lived session: one handshake per
+call, and "the server went away" stops being a state to recover from.
+
+**Read-only gate (Phase 1).** Only tools the server marks `readOnlyHint` are registered; everything
+else is **withheld entirely** rather than registered as `mutating` — a tool the model can see but
+never run only wastes context and invites retry loops. Missing annotations count as mutating
+(fail-safe). Verified live: Context7 and Exa both set `readOnlyHint=True` on every tool.
+
+> **⚠️ `readOnlyHint` is the server's own claim, not a security boundary.** It is a filter. The
+> actual guarantees are (a) a **least-privilege credential** — a read-only, narrowly scoped token —
+> and (b) **server-side read-only modes**, such as GitHub's `/readonly` endpoint, where the server
+> simply never advertises a mutating tool. The `github` preset is pinned to that endpoint for this
+> reason. Do not let the gate be mistaken for a sandbox.
+
+**Namespacing is a correctness fix, not cosmetics.** `ToolRegistry._tools` is a flat dict and
+`register()` overwrites silently, so two servers exposing `read_file` would collide — and
+`unregister_source()` for the loser would then delete the *winner's* tool. Every MCP tool is
+therefore `mcp__<server>__<tool>`, capped at 64 characters (providers limit tool-name length) with
+the **server slug** truncated rather than the tool name. Server names are unique in the DB for the
+same reason. Underscores, never dots: several providers restrict tool names to `[a-zA-Z0-9_-]`.
+
+**`tools/call` → `str`.** MCP returns a content array plus `isError`, while the handler contract
+returns a string. Text blocks are joined; images and embedded resources become an explicit
+`[unsupported content block: …]` marker rather than vanishing. `isError` maps to
+**`ERROR_PREFIX`** — the same single source of truth the loop tests for, and the same contract
+that regressed once before (see the warning box in the tool-layer section). Mutation-checked.
+
+**Files:** `tools/mcp_client.py` (transport, probe cache, registration, flattening),
+`routers/mcp.py` (admin-only CRUD), `models.McpServer`, `components/McpServers.jsx` (Settings tab).
+`main.py` moved from the deprecated `@app.on_event("startup")` to a `lifespan` hook, which MCP
+needed anyway; startup registration is best-effort so an unreachable server cannot stop the app
+from booting.
+
+**Secrets and the schema.** The secret lives in its **own column**, deliberately not inside the
+`headers` JSON map: partial updates rely on `exclude_unset`, which cannot express "one value of
+this map is unchanged", so a map round-tripped through the edit form with a masked secret would
+wipe it. `secret_header` + `secret_prefix` exist because servers differ —
+`Authorization: Bearer …` (GitHub) versus a raw `CONTEXT7_API_KEY` (Context7). Extra headers are
+applied *first* so a stray `headers` entry cannot shadow the credential. As with `Server.api_key`,
+the secret is never returned by the API (`has_secret: bool`).
+
+> **Open:** MCP secrets are stored in plaintext, like `Server.api_key`. Encrypting them is only
+> worth doing **after** `CALIVI_SECRET_KEY` is supplied from the environment — with the fallback,
+> the key is written into the same volume the DB lives in, so a backup would carry ciphertext and
+> key together. `cryptography` is already available (it arrives with `mcp` via `pyjwt[crypto]`), so
+> the remaining cost is a migration and a key-rotation story. Tracked as Phase 2, alongside the
+> approval UI that would unlock mutating tools.
+
+**Admin-only, and the blast radius is everyone.** Unlike `/api/servers` (listable by any user for
+the chat picker), the whole MCP router requires admin: adding a server grants every user of the
+instance whatever that server can do. Note also that **tool descriptions now come from a remote
+server** and land in the system layer. Tool *results* go through `_wrap_untrusted` like any other
+external content, but descriptions do not — they are read as instructions by construction. This is
+the one place where the trusted-deployment assumption in the security section genuinely stretches.
+
 ## Brute-force protection
 
 Login attempts are limited: **5 failed attempts per account / 15 min** → `429` + a `Retry-After`
@@ -609,9 +686,10 @@ and caching a transient failure permanently again breaks 1. The tests carry weig
 - **Tool layer Phase 2** (the registry is MCP-ready; this builds on it):
   - Approval / human-in-the-loop UI + capability scoping → **state-changing tools**. The
     `mutating=True` gate is already in the registry (currently rejecting).
-  - **MCP source adapter**: registers remote MCP tools into the **same registry** with
-    `source="mcp:<server>"` (stdio/HTTP transport). The registry, the loop and the wire format
-    **will not change** — only a new source.
+  - ~~**MCP source adapter**~~ — **done**, see *MCP source — remote tools*. The prediction held:
+    the registry, the loop and the wire format did not change. Remaining: **stdio** (via a bridge
+    container, not in-process `npx`) and **encrypting stored MCP secrets** (blocked on
+    `CALIVI_SECRET_KEY` moving to the environment).
   - Persisting tool provenance as messages (currently live-only + a compact 🔍 chip).
   - A prompt-based fallback for non-tool models (not needed today — the models are strong
     tool-callers).

@@ -27,6 +27,7 @@ from app.main import app  # noqa: E402
 from app import ollama_client  # noqa: E402
 from app.routers import auth as auth_router  # noqa: E402
 from app.routers import servers as servers_router  # noqa: E402
+from app.tools import mcp_client, registry as tool_registry  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
@@ -41,6 +42,12 @@ def fresh_db():
     servers_router._locks.clear()
     ollama_client._vision_cache.clear()  # never expires — a leak would keep a stale vision verdict
     auth_router.login_limiter.clear()
+    mcp_client._cache.clear()
+    mcp_client._locks.clear()
+    # Tools registered by an MCP test would otherwise stay in the global registry and leak
+    # into every later test's tool specs.
+    for name in [n for n, t in tool_registry._tools.items() if t.source.startswith("mcp:")]:
+        del tool_registry._tools[name]
     yield
 
 

@@ -48,6 +48,38 @@ class Server(Base):
     created_at: Mapped[datetime.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
+class McpServer(Base):
+    """A remote MCP server. Its tools are registered into the shared tool registry under
+    `source="mcp:<id>"` (see tools/mcp_client.py).
+
+    sqlite_autoincrement (unlike `servers`): a deleted id is never reused, so a stale probe
+    entry can never be inherited by a different server that happens to get the same id —
+    the bug `routers/servers.py` has to defend against with `_invalidate` on DELETE.
+    """
+    __tablename__ = "mcp_servers"
+    __table_args__ = {"sqlite_autoincrement": True}
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    # Unique because it becomes the tool-name namespace (`mcp__<slug>__<tool>`); two servers
+    # with the same name would produce colliding tool names.
+    name: Mapped[str] = mapped_column(String(100), unique=True)
+    url: Mapped[str] = mapped_column(String(500))
+    # "http" = Streamable HTTP, "sse" = the older HTTP+SSE transport (Linear still uses it).
+    transport: Mapped[str] = mapped_column(String(10), default="http")
+    # The secret lives in its own column, deliberately NOT inside `headers`: `exclude_unset`
+    # partial updates cannot express "this one value of the map is unchanged", so a map
+    # round-tripped through the edit form with a masked secret would wipe it.
+    secret: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    # Which header carries `secret` — servers differ: "Authorization" (GitHub, needs the
+    # "Bearer " prefix) vs "CONTEXT7_API_KEY" (Context7, raw value).
+    secret_header: Mapped[str] = mapped_column(String(100), default="Authorization")
+    secret_prefix: Mapped[str] = mapped_column(String(20), default="Bearer ")
+    # Extra non-secret headers, e.g. {"X-MCP-Readonly": "true", "X-MCP-Toolsets": "repos"}.
+    headers: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
 class Chat(Base):
     __tablename__ = "chats"
 

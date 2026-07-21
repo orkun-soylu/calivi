@@ -37,6 +37,9 @@ llama.cpp-server — all from the same chat window.
   **text** and handed to the model (lossless text, not OCR).
 - **Web search (tool)** — Bundled SearXNG. The model calls the tool *on its own
   initiative*; which tool ran is visible in the conversation.
+- **MCP servers** — Connect remote [Model Context Protocol](https://modelcontextprotocol.io)
+  servers (Context7, GitHub, Exa…) and their tools become available to the model alongside
+  the built-in ones. Read-only tools only, for now.
 - **Message editing** — Edit a message and either **Update** (regenerate from that point,
   optionally on a different model) or **New chat** (branch while keeping history).
 - **Markdown + math** — Code blocks with copy buttons, tables, KaTeX.
@@ -77,6 +80,31 @@ the row means the server is reachable; red servers are hidden from the chat pick
 > **Ollama must be reachable over the network.** By default Ollama listens only on
 > `127.0.0.1`. To reach it from another machine, run it with `OLLAMA_HOST=0.0.0.0`.
 
+### Adding an MCP server
+
+Settings (⚙) → **MCP** → presets for Context7, GitHub and Exa prefill the URL and the auth
+header, or fill the form yourself. A green light means the handshake succeeded; the row
+expands to show which tools were registered.
+
+| Server | URL | Auth |
+|---|---|---|
+| Context7 | `https://mcp.context7.com/mcp` | `CONTEXT7_API_KEY` header — optional, raises rate limits |
+| GitHub | `https://api.githubcopilot.com/mcp/readonly` | `Authorization: Bearer <PAT>` |
+| Exa | `https://mcp.exa.ai/mcp` | `Authorization: Bearer <key>` |
+
+Transport is **HTTP** — either Streamable HTTP or the older HTTP+SSE (pick `SSE` for servers
+like Linear that still serve it). stdio servers (`npx …`) are not supported; run them behind
+a stdio→HTTP bridge container if you need them.
+
+> **⚠️ Only read-only tools are offered.** A tool is registered only if the server marks it
+> read-only, and that mark is the *server's own claim* — treat it as a filter, not a sandbox.
+> **Give MCP servers least-privilege credentials**: a fine-grained, read-only GitHub token
+> scoped to the repositories you actually want, not a broad one. The GitHub preset points at
+> the `/readonly` endpoint so the restriction is enforced by GitHub as well.
+>
+> Adding an MCP server is admin-only, and its tools become available to **every user** of the
+> instance.
+
 ### Configuration (environment variables)
 
 Everything has a sensible default. To override, create a `.env` file in the project root
@@ -86,7 +114,22 @@ Everything has a sensible default. To override, create a `.env` file in the proj
 # .env
 CALIVI_PORT=8090        # exposed port
 COOKIE_SECURE=false     # set to true behind HTTPS — see the warning below
+CALIVI_SECRET_KEY=...   # session signing key — see the note below
 ```
+
+> ### Set `CALIVI_SECRET_KEY` if you back up the data volume
+> Unset, the backend generates and stores the session signing key at `/data/secret_key` —
+> the same volume as `calivi.db`. A copy of that volume then contains both your data *and*
+> the key that signs sessions, so whoever holds it can mint a valid session for any user,
+> admin included. Setting the variable stops the key from being written there at all:
+>
+> ```bash
+> openssl rand -hex 32   # put the output in .env, then: docker compose up -d
+> ```
+>
+> Changing an existing key signs everyone out once; nothing else is lost. If you want to
+> avoid even that, copy the current contents of `/data/secret_key` into `.env` instead of
+> generating a new one.
 
 Other variables the backend understands (`backend/app/config.py`): `DB_PATH`,
 `SYSTEM_PROMPTS_PATH`, `TOOLS_CONFIG_PATH`, `SEARXNG_URL`, `CORS_ORIGINS`,
