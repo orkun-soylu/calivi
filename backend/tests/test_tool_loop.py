@@ -62,7 +62,7 @@ async def _tool_results(monkeypatch, chat_id, calls):
         {"name": "s", "type": "ollama", "host": "h", "port": 1, "base_url": None, "api_key": None},
         "m",
         [{"role": "user", "content": "hi"}],
-        web_search=True,
+        use_tools=True,
     )
     events = []
     async for chunk in resp.body_iterator:

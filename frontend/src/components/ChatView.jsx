@@ -6,7 +6,7 @@ import { SettingsIcon } from "./icons.jsx";
 import { useChatStream } from "../hooks/useChatStream.js";
 import { useServerModel } from "../hooks/useServerModel.js";
 import { fileToScaledDataUrl } from "../lib/images.js";
-import { WEB_SEARCH_KEY } from "../lib/modelPrefs.js";
+import { USE_TOOLS_KEY, loadUseTools } from "../lib/modelPrefs.js";
 import { api } from "../api.js";
 import { useT } from "../i18n.js";
 
@@ -22,7 +22,7 @@ export default function ChatView({ chat, servers, onMessageSent, onForked, onOpe
   const [attachments, setAttachments] = useState([]); // attached documents {name, text}
   const [pending, setPending] = useState({ user: null, images: [], attachments: [] });
   const [lightbox, setLightbox] = useState(null); // image to display full size (data-URI)
-  const [webSearch, setWebSearch] = useState(() => localStorage.getItem(WEB_SEARCH_KEY) === "1");
+  const [useTools, setUseTools] = useState(loadUseTools);
 
   const [editingId, setEditingId] = useState(null);
   const [editContent, setEditContent] = useState("");
@@ -32,8 +32,8 @@ export default function ChatView({ chat, servers, onMessageSent, onForked, onOpe
   const canSend = (!!input.trim() || !!images.length || !!attachments.length) && !!serverId && !!model;
 
   useEffect(() => {
-    localStorage.setItem(WEB_SEARCH_KEY, webSearch ? "1" : "0");
-  }, [webSearch]);
+    localStorage.setItem(USE_TOOLS_KEY, useTools ? "1" : "0");
+  }, [useTools]);
 
   // Clear attached images if the model does not support vision (they cannot be sent).
   useEffect(() => {
@@ -104,7 +104,7 @@ export default function ChatView({ chat, servers, onMessageSent, onForked, onOpe
       ({ signal, onPiece }) =>
         api.sendMessage(
           chat.id,
-          { content, images: imgs, attachments: atts, serverId, model, webSearch, signal },
+          { content, images: imgs, attachments: atts, serverId, model, useTools, signal },
           onPiece
         ),
       {
@@ -142,7 +142,7 @@ export default function ChatView({ chat, servers, onMessageSent, onForked, onOpe
     cancelEdit();
     await stream.run(
       ({ signal, onPiece }) =>
-        api.editMessage(chat.id, mid, { content, ...editTarget, webSearch, signal }, onPiece),
+        api.editMessage(chat.id, mid, { content, ...editTarget, useTools, signal }, onPiece),
       { afterClear: () => onMessageSent() }
     );
   }
@@ -156,7 +156,7 @@ export default function ChatView({ chat, servers, onMessageSent, onForked, onOpe
       ({ signal, onPiece }) =>
         api.forkChat(
           chat.id,
-          { messageId: mid, content, ...editTarget, webSearch, signal },
+          { messageId: mid, content, ...editTarget, useTools, signal },
           (newId) => onForked(newId),
           onPiece
         ),
@@ -212,8 +212,8 @@ export default function ChatView({ chat, servers, onMessageSent, onForked, onOpe
         onRemoveAttachment={(i) => setAttachments(attachments.filter((_, j) => j !== i))}
         onFiles={addFiles}
         onPaste={handlePaste}
-        webSearch={webSearch}
-        onToggleWebSearch={() => setWebSearch((v) => !v)}
+        useTools={useTools}
+        onToggleUseTools={() => setUseTools((v) => !v)}
       />
 
       {lightbox && (

@@ -35,8 +35,9 @@ llama.cpp-server — all from the same chat window.
   full-screen viewer (lightbox).
 - **Document attachments** — PDF / docx / txt / code / csv / json are extracted as
   **text** and handed to the model (lossless text, not OCR).
-- **Web search (tool)** — Bundled SearXNG. The model calls the tool *on its own
-  initiative*; which tool ran is visible in the conversation.
+- **Tools (🔧)** — One toggle in the composer offers the tool layer to the model, which then
+  calls tools *on its own initiative*; which tool ran is visible in the conversation and
+  survives a reload. Bundled SearXNG provides web search.
 - **MCP servers** — Connect remote [Model Context Protocol](https://modelcontextprotocol.io)
   servers (Context7, GitHub, Exa…) and their tools become available to the model alongside
   the built-in ones. Read-only tools only, for now.
@@ -84,7 +85,11 @@ the row means the server is reachable; red servers are hidden from the chat pick
 
 Settings (⚙) → **MCP** → presets for Context7, GitHub and Exa prefill the URL and the auth
 header, or fill the form yourself. A green light means the handshake succeeded; the row
-expands to show which tools were registered.
+expands to show which tools were registered — each with a checkbox, so individual tools can be
+switched off without removing the server.
+
+Turn the **🔧 toggle** on in the composer for any of it to reach the model: it gates the whole
+tool layer, web search and MCP alike.
 
 | Server | URL | Auth |
 |---|---|---|

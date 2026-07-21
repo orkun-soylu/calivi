@@ -24,7 +24,7 @@ export default function SettingsModal({ servers, me, onClose, onAdd, onUpdate, o
     // user of this instance whatever that server can do.
     ...(isAdmin ? [{ id: "mcp", key: "settings.tab.mcp" }] : []),
     { id: "prompts", key: "settings.tab.prompts" },
-    { id: "search", key: "settings.tab.search" },
+    { id: "tools", key: "settings.tab.tools" },
     { id: "users", key: "settings.tab.users" },
     { id: "about", key: "settings.tab.about" },
   ];
@@ -261,7 +261,7 @@ export default function SettingsModal({ servers, me, onClose, onAdd, onUpdate, o
 
           {tab === "prompts" && <ConfigEditor name="system_prompts" hint={t("settings.prompts.hint")} readOnly={!isAdmin} />}
 
-          {tab === "search" && <ConfigEditor name="tools" hint={t("settings.search.hint")} readOnly={!isAdmin} />}
+          {tab === "tools" && <ConfigEditor name="tools" hint={t("settings.tools.hint")} readOnly={!isAdmin} />}
 
           {tab === "about" && (
             <div className="text-sm text-neutral-300 space-y-3 leading-relaxed">

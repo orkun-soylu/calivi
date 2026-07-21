@@ -2,7 +2,15 @@
 
 export const LAST_SERVER_KEY = "calivi_last_server_id";
 export const MODEL_BY_SERVER_KEY = "calivi_model_by_server";
-export const WEB_SEARCH_KEY = "calivi_web_search";
+export const USE_TOOLS_KEY = "calivi_use_tools";
+const LEGACY_WEB_SEARCH_KEY = "calivi_web_search"; // pre-rename; read once so the toggle
+                                                   // does not silently reset to off on upgrade
+
+export function loadUseTools() {
+  const v = localStorage.getItem(USE_TOOLS_KEY);
+  if (v !== null) return v === "1";
+  return localStorage.getItem(LEGACY_WEB_SEARCH_KEY) === "1";
+}
 
 export function loadModelMap() {
   try {

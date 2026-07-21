@@ -122,12 +122,12 @@ def _persist_chips(chat_id: int, chips: list[dict]) -> None:
 
 def build_stream_response(
     chat_id: int, target: dict, model: str, history: list[dict],
-    web_search: bool = False, extra_headers: dict | None = None,
+    use_tools: bool = False, extra_headers: dict | None = None,
 ) -> StreamingResponse:
     """Injects the system prompt (and optional tools), returns the NDJSON stream and saves the
     assistant message at the end.
 
-    `web_search=True` (the 🔍 toggle) offers tools to the model (Phase 1: web_search); if the
+    `use_tools=True` (the 🔧 toggle) offers the tool layer to the model; if the
     model calls one, the agentic loop runs it, feeds the result back into context, and the
     model produces the final answer.
     """
@@ -140,7 +140,7 @@ def build_stream_response(
 
         # Tool layer: if 🔍 is on and the master switch is on, offer the enabled tools.
         tools_spec = None
-        if web_search and tools_config.is_enabled():
+        if use_tools and tools_config.is_enabled():
             enabled = [n for n in registry.names() if tools_config.tool_enabled(n)]
             tools_spec = registry.specs(enabled) or None
         # Tool output will be untrusted, so keep the guard in place from the first turn.
@@ -360,7 +360,7 @@ async def send_message(
     db.commit()
     history.append({"role": "user", "content": payload.content, "images": payload.images, "attachments": atts})
 
-    return build_stream_response(chat.id, target, model, history, web_search=payload.web_search)
+    return build_stream_response(chat.id, target, model, history, use_tools=payload.use_tools)
 
 
 @router.delete("/{chat_id}/messages/{message_id}", status_code=204)
@@ -405,7 +405,7 @@ async def edit_message(
     db.commit()
 
     history = _history_of(db, chat_id)
-    return build_stream_response(chat_id, target, model, history, web_search=payload.web_search)
+    return build_stream_response(chat_id, target, model, history, use_tools=payload.use_tools)
 
 
 @router.post("/{chat_id}/fork")
@@ -452,5 +452,5 @@ async def fork_chat(
     history = _history_of(db, new_chat.id)
     return build_stream_response(
         new_chat.id, target, model, history,
-        web_search=payload.web_search, extra_headers={"X-Calivi-Chat-Id": str(new_chat.id)},
+        use_tools=payload.use_tools, extra_headers={"X-Calivi-Chat-Id": str(new_chat.id)},
     )

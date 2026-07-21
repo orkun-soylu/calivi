@@ -16,8 +16,8 @@ export default function Composer({
   onRemoveAttachment,
   onFiles,
   onPaste,
-  webSearch,
-  onToggleWebSearch,
+  useTools,
+  onToggleUseTools,
 }) {
   const t = useT();
   const fileInputRef = useRef(null);
@@ -99,15 +99,15 @@ export default function Composer({
           </svg>
         </button>
         <button
-          onClick={onToggleWebSearch}
-          title={webSearch ? t("chat.webSearchOn") : t("chat.webSearchOff")}
+          onClick={onToggleUseTools}
+          title={useTools ? t("chat.toolsOn") : t("chat.toolsOff")}
           className={`h-10 px-4 rounded-xl shrink-0 flex items-center justify-center ${
-            webSearch ? "bg-accent text-white hover:bg-accent-hover" : "bg-neutral-800 text-neutral-300 hover:bg-neutral-700"
+            useTools ? "bg-accent text-white hover:bg-accent-hover" : "bg-neutral-800 text-neutral-300 hover:bg-neutral-700"
           }`}
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="11" cy="11" r="8" />
-            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            <path d="M14.7 6.3a4 4 0 0 0 5.3 5.3l-8.4 8.4a2.8 2.8 0 0 1-4-4l8.4-8.4a4 4 0 0 0-1.3-1.3z" />
+            <path d="M14.7 6.3l3-3a4 4 0 0 1 3 6l-1.7 1.7" />
           </svg>
         </button>
         <textarea
