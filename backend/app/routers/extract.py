@@ -13,9 +13,10 @@ from app.auth import get_current_user
 router = APIRouter(prefix="/api", tags=["extract"], dependencies=[Depends(get_current_user)])
 
 MAX_CHARS = 100_000  # cap, so the context is not blown out
-# Upload cap. nginx already limits request bodies to 25M, but parsing costs RAM/CPU on top
-# of the raw bytes, concurrent uploads multiply it, and the output is capped at MAX_CHARS
-# anyway — anything beyond ~10 MB buys the user nothing.
+# Upload cap. Parsing costs RAM/CPU on top of the raw bytes, concurrent uploads multiply it,
+# and the output is capped at MAX_CHARS anyway — beyond ~10 MB nothing is gained.
+# nginx enforces the same 10M on this exact route so an oversize body is refused at the edge;
+# the check below is the backend's own guarantee, independent of any proxy in front.
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 # pypdf/python-docx parse UNTRUSTED files and have a long history of crafted-file hangs —
 # they run in a worker thread (CPU-bound; must not block the event loop) under a hard time
@@ -58,8 +59,12 @@ async def extract(file: UploadFile):
     """Extracts the file's text. Returns {name, text, truncated}."""
     name = file.filename or "file"
     lower = name.lower()
-    # Bounded read: at most MAX_UPLOAD_BYTES+1 bytes ever land in memory, however big the
-    # upload really is (UploadFile.size is not reliably populated — measure, don't trust).
+    # Bounded read: the PARSER never sees more than MAX_UPLOAD_BYTES+1 bytes, whatever was
+    # uploaded (UploadFile.size is not reliably populated — measure, don't trust).
+    # It does NOT bound what the upload itself costs: Starlette's multipart parser has already
+    # consumed the whole body into a SpooledTemporaryFile (RAM up to 1 MB, then disk) before
+    # this function runs. Bounding the body is nginx's job — see client_max_body_size on
+    # `location = /api/extract` in frontend/nginx.conf.
     data = await file.read(MAX_UPLOAD_BYTES + 1)
     if len(data) > MAX_UPLOAD_BYTES:
         raise HTTPException(413, f"File too large ({name}): the limit is {MAX_UPLOAD_BYTES // 1024 // 1024} MB")
