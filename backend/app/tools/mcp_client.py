@@ -76,6 +76,19 @@ def namespaced(server_name: str, tool_name: str) -> str:
     return f"{NAMESPACE_PREFIX}{slug[:budget]}__{tool}"
 
 
+def display_label(tool_name: str) -> str | None:
+    """`"<server>: <tool>"` for a namespaced MCP tool name, `None` for anything else.
+
+    Lives next to `namespaced()` on purpose: the namespace format gets exactly one owner. This
+    is the ERROR_PREFIX lesson applied to a second shared string — a copy of the parsing rule
+    somewhere else would drift the moment the format changes.
+    """
+    if not tool_name.startswith(NAMESPACE_PREFIX):
+        return None
+    server, sep, tool = tool_name[len(NAMESPACE_PREFIX):].partition("__")
+    return f"{server}: {tool}" if sep and server and tool else None
+
+
 def build_headers(server: models.McpServer) -> dict[str, str]:
     """Extra headers first, so the secret header cannot be shadowed by a stray `headers` entry."""
     headers = {str(k): str(v) for k, v in (server.headers or {}).items()}

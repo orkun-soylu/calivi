@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from app import auth, models, schemas, llm, tools_config
 from app.database import get_db, SessionLocal
 from app.system_prompts import get_system_prompt
-from app.tools import ERROR_PREFIX, registry
+from app.tools import ERROR_PREFIX, mcp_client, registry
 
 router = APIRouter(prefix="/api/chats", tags=["chats"])
 
@@ -86,9 +86,25 @@ def resolve_target(db: Session, server_id: int | None, model: str | None) -> tup
     }, model
 
 
-def _persist_chip(chat_id: int, att: dict) -> None:
-    """Persists a chip ({name, text}) onto the last user message's attachments so it survives
-    a reload. Used to record tool usage (e.g. 🔍 web_search)."""
+def _chip_for(name: str, args: dict, result: str) -> dict:
+    """The chip recording that a tool ran, persisted onto the last user message.
+
+    `web_search` keeps carrying its result text — that is how a search stays in context on
+    later turns, and changing it would change existing behaviour. **MCP chips deliberately
+    carry no text**: they are provenance only. Attachment text is re-injected into *every*
+    subsequent turn of the chat (`_inject_attachments`), so a documentation dump would be
+    re-sent for the rest of the conversation, while the answer that used it is already in
+    the history.
+    """
+    if name == "web_search":
+        return {"name": f"🔍 {args.get('query', '')}".strip(), "text": result}
+    label = mcp_client.display_label(name)
+    return {"name": f"🔧 {label or name}"}
+
+
+def _persist_chips(chat_id: int, chips: list[dict]) -> None:
+    """Persists chips ({name, text?}) onto the last user message's attachments so tool usage
+    survives a reload."""
     db = SessionLocal()
     try:
         msg = (
@@ -98,7 +114,7 @@ def _persist_chip(chat_id: int, att: dict) -> None:
             .first()
         )
         if msg:
-            msg.attachments = [*(msg.attachments or []), att]  # new list → SQLAlchemy detects the change
+            msg.attachments = [*(msg.attachments or []), *chips]  # new list → SQLAlchemy detects the change
             db.commit()
     finally:
         db.close()
@@ -146,7 +162,7 @@ def build_stream_response(
         collected = ""
         tokens_per_sec = None
         error_msg = None
-        tool_chip = None  # tool-usage chip shown after a reload (e.g. 🔍 <query>)
+        tool_chips: list[dict] = []  # tool-usage chips shown after a reload
         try:
             max_iter = tools_config.get_max_iterations() if tools_spec else 1
             for i in range(max_iter):
@@ -187,8 +203,12 @@ def build_stream_response(
                         "content": _wrap_untrusted(f"tool: {call['name']}", result),
                     })
                     yield json.dumps({"type": "tool_result", "name": call["name"], "ok": ok}) + "\n"
-                    if call["name"] == "web_search" and ok:
-                        tool_chip = {"name": f"🔍 {args.get('query', '')}".strip(), "text": result}
+                    if ok:
+                        # Every tool leaves a trace, not just web_search — otherwise a reloaded
+                        # chat gives no clue that an MCP server was consulted at all.
+                        chip = _chip_for(call["name"], args, result)
+                        if chip["name"] not in {c["name"] for c in tool_chips}:
+                            tool_chips.append(chip)
         except Exception as e:
             # Only genuine upstream errors (httpx etc. → Exception). A client abort/disconnect
             # raises CancelledError/GeneratorExit, which are BaseException and do not land here,
@@ -201,24 +221,31 @@ def build_stream_response(
             if error_msg:
                 marker = f"⚠️ {error_msg}"
                 content_to_save = f"{collected}\n\n{marker}".strip() if collected.strip() else marker
-            if tool_chip:
-                _persist_chip(chat_id, tool_chip)
-            save_db = SessionLocal()
-            try:
-                save_db.add(
-                    models.Message(
-                        chat_id=chat_id,
-                        role="assistant",
-                        content=content_to_save,
-                        model_used=model,
-                        server_used=server_name,
-                        tokens_per_sec=tokens_per_sec,
+            if tool_chips:
+                _persist_chips(chat_id, tool_chips)
+            # Nothing generated and nothing that failed loudly → save nothing. The comment
+            # above has claimed since the marker was introduced that a "ghost" empty message is
+            # avoided, but the guard only ever covered the error path: a client abort
+            # (CancelledError is a BaseException, so it never reaches the except) or a model
+            # that simply returned no text still persisted an empty row, which renders as a
+            # blank assistant bubble indistinguishable from a real reply.
+            if content_to_save.strip():
+                save_db = SessionLocal()
+                try:
+                    save_db.add(
+                        models.Message(
+                            chat_id=chat_id,
+                            role="assistant",
+                            content=content_to_save,
+                            model_used=model,
+                            server_used=server_name,
+                            tokens_per_sec=tokens_per_sec,
+                        )
                     )
-                )
-                save_db.query(models.Chat).filter(models.Chat.id == chat_id).update({"updated_at": models.utcnow()})
-                save_db.commit()
-            finally:
-                save_db.close()
+                    save_db.query(models.Chat).filter(models.Chat.id == chat_id).update({"updated_at": models.utcnow()})
+                    save_db.commit()
+                finally:
+                    save_db.close()
 
     return StreamingResponse(generate(), media_type="application/x-ndjson", headers=extra_headers)
 
@@ -240,7 +267,8 @@ def _inject_attachments(messages: list[dict]) -> list[dict]:
     """Prepends attachment text to the relevant message's content as context."""
     out = []
     for m in messages:
-        atts = m.get("attachments") or []
+        # Chips without text (MCP provenance markers) are labels, not context — skip them.
+        atts = [a for a in (m.get("attachments") or []) if a.get("text")]
         if atts:
             prefix = "".join(_wrap_untrusted(f"Ek: {a['name']}", a["text"]) + "\n\n" for a in atts)
             m = {**m, "content": prefix + (m.get("content") or "")}
