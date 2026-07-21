@@ -6,6 +6,19 @@ You pick which model runs where — no hidden routing.
 Your own GPU box, Ollama Cloud, OpenRouter, Moonshot, LM Studio, vLLM,
 llama.cpp-server — all from the same chat window.
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/app-dark.png">
+    <img
+      src="docs/images/app-light.png"
+      width="900"
+      alt="The Calivi chat window: server and model pickers in the top bar, a streamed answer containing a bash code block with a Copy button, a tokens-per-second readout, and a web_search tool chip under the next message."
+    />
+  </picture>
+</p>
+
+<p align="center"><sub>The interface, rendered with placeholder data — not a real conversation.</sub></p>
+
 ```
 ┌──────────────┐     ┌──────────────┐     ┌────────────────────────┐
 │   Browser    │────▶│ nginx (:8090)│────▶│ FastAPI backend        │
