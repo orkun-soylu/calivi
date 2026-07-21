@@ -644,6 +644,37 @@ chat. Both failures return 404: an approval id is a capability and must not be p
 > a summary. Summarising here *is* the vulnerability: the operator has to see exactly what will
 > run. This is the one place in the UI where the "render it nicely" instinct must be resisted.
 
+### Playwright MCP — evaluated and declined
+
+Browser automation was the motivating example for building the approval layer. It was then
+assessed against the finished layer and **rejected**. Recorded here so the question is not
+re-opened from scratch.
+
+- **Approval is the wrong primary control for it.** Browser work is inherently many-step; every
+  `browser_navigate` / `browser_click` / `browser_type` would prompt. A real session produces
+  dozens of cards, the operator starts approving reflexively, and the control decays to nothing.
+  Where a capability needs a decision *per step*, the decision stops being meaningful.
+- **Its own origin filters are explicitly not a boundary.** Upstream documents `--allowed-origins`
+  / `--blocked-origins` as *"does not serve as a security boundary and does not affect
+  redirects"*. There is nothing to lean on there.
+- **The readers are read-only, so they default to `auto`.** `browser_snapshot`,
+  `browser_take_screenshot`, `browser_cookie_list`, `browser_storage_state` are all annotated
+  read-only. Navigation is gated, but once a page is open its content, cookies and storage can be
+  read without a prompt. Our mode axis is *state change*; it does not capture *network reach*,
+  and Playwright is the tool where that gap matters.
+- **A container on the default bridge reaches the whole LAN.** Router, NAS, hypervisor,
+  Vaultwarden. A prompt-injected model with a browser inside the trust boundary is an SSRF
+  primitive, and the CSP that protects the chat UI does not apply to a headless browser the
+  backend drives.
+- **60+ tools** would enter every request's tool spec and produce 60 rows of mode selectors in
+  Settings.
+
+**If it is ever revisited**, the primary control must be the **network**, not approval: an
+`internal: true` Compose network (no LAN, no internet — fine for driving another container under
+test), or LAN-blocking egress filtering on the host, which lives outside this repo. For the
+"read the page behind a search result" use case, Exa's remote `web_fetch_exa` is strictly better:
+read-only, no container, no reach into the LAN.
+
 ## Brute-force protection
 
 Login attempts are limited: **5 failed attempts per account / 15 min** → `429` + a `Retry-After`
@@ -790,8 +821,6 @@ and caching a transient failure permanently again breaks 1. The tests carry weig
 - A reroute comparison mode (for now reroute = truncate+regen; fork preserves the history)
 - **Tool layer Phase 2** (the registry is MCP-ready; this builds on it):
   - ~~Approval / human-in-the-loop UI + capability scoping~~ — **done**, see *Tool approval*.
-    Remaining in this area: **Playwright** (a browser container plus a "drive a browser anywhere
-    on the LAN" capability grant, which deserves its own risk discussion).
   - ~~**MCP source adapter**~~ — **done**, see *MCP source — remote tools*. The prediction held:
     the registry, the loop and the wire format did not change. Remaining: **stdio** (via a bridge
     container, not in-process `npx`) and **encrypting stored MCP secrets** (blocked on
