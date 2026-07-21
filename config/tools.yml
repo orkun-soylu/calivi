@@ -3,7 +3,10 @@
 # max_iterations: upper bound on the agentic loop (call tool → run → repeat), 1-20.
 # tools.<name>.enabled: whether that tool is offered to the model.
 enabled: true
-max_iterations: 5
+# Raised from 5 when MCP landed: a single Context7 lookup already costs two turns
+# (resolve-library-id → query-docs) and the last turn is spent forcing a final answer, so 5
+# left almost no room for the model to consult a second source before running out.
+max_iterations: 8
 tools:
   web_search:
     enabled: true

@@ -96,6 +96,12 @@ depend on role (Servers/Users are admin-only). `api.js` sends `credentials:"incl
   "ghost empty message"). A client abort (`AbortController`) is a `BaseException` → it does not
   land in `except Exception`, so no error is shown (the partial is saved). See
   `chats.py::_humanize_error`.
+  > **The "no ghost message" claim used to be only half true.** The marker covered the *error*
+  > path; a turn that ended with **no content and no exception** — a client abort, or a model
+  > that simply returned no text — still persisted an empty row, which renders as a blank
+  > assistant bubble indistinguishable from a real reply. Found in production after MCP landed,
+  > where multi-turn tool sequences make the case easy to hit. Now **nothing is saved** unless
+  > there is content or an error marker. Mutation-checked.
 
 ## Security — Prompt Injection Defence
 
@@ -436,10 +442,21 @@ frontend/localStorage/`api.js` **did not change**.
 4. **On the last permitted turn the tools are removed** (`turn_tools=None`) → the model is forced
    to produce a final answer from what it has, rather than looping on searches and never answering
    (observed end-to-end, then added).
-5. **Reload chip:** if a tool ran, `_persist_chip` writes `🔍 <query>` into the last user message's
-   `attachments` → it survives a reload (the old search-chip UX was preserved). Tool turns are
-   **not persisted** as messages (the final answer carries the context) → history reconstruction
-   and the DB schema did not change.
+5. **Reload chips:** every **successful** tool call writes a chip into the last user message's
+   `attachments` (`_chip_for` → `_persist_chips`), deduplicated by label, so it survives a reload.
+   Tool turns themselves are **not persisted** as messages (the final answer carries the context)
+   → history reconstruction and the DB schema did not change.
+   - `web_search` → `🔍 <query>` **with its result text**, which is how a search stays in context
+     on later turns (`_inject_attachments` re-injects attachment text on *every* subsequent turn).
+   - Any other tool → `🔧 <label>`, and for MCP `mcp_client.display_label` renders
+     `🔧 <server>: <tool>`. These carry **no text**: they are provenance only. Re-injecting a
+     documentation dump into the rest of the conversation would cost far more context than it is
+     worth, and the answer that used it is already in the history. `_inject_attachments` therefore
+     skips text-less chips.
+   - A **failed** tool leaves no chip — a chip asserts "this ran and informed the answer".
+   > Originally only `web_search` left a chip. After MCP shipped, a reloaded chat gave no sign
+   > that an MCP server had been consulted at all — which made a live test unreadable (a web
+   > search was mistaken for a Context7 lookup).
 
 > **⚠️ The tool error prefix has a single source of truth (`tools/registry.py::ERROR_PREFIX`).**
 > The loop (`chats.py`) decides whether a tool call failed by **testing the result string for this
