@@ -1,4 +1,5 @@
 import os
+import secrets
 
 DB_PATH = os.environ.get("DB_PATH", "/data/calivi.db")
 SYSTEM_PROMPTS_PATH = os.environ.get("SYSTEM_PROMPTS_PATH", "/config/system_prompts.yml")
@@ -9,6 +10,45 @@ TOOLS_CONFIG_PATH = os.environ.get("TOOLS_CONFIG_PATH", "/config/tools.yml")
 # separately during development (vite dev server on :5173). Leave it empty to allow no
 # cross-origin requests at all.
 CORS_ORIGINS = [o for o in os.environ.get("CORS_ORIGINS", "http://localhost:5173").split(",") if o]
+
+
+def _load_secret() -> str:
+    """SECRET_KEY: use the env var if set, otherwise /data/secret_key (generated and persisted).
+
+    This keeps cookies valid across restarts and keeps the secret out of git.
+
+    The fallback is convenient but writes the key **into the data volume**, next to
+    calivi.db — so a copy of that volume (a backup) carries both the data and the key that
+    signs sessions, and holding it is enough to forge a session for any user. It now also
+    guards the encrypted columns (crypto.py), which makes the volume self-sufficient in a
+    second way. Prefer CALIVI_SECRET_KEY from the environment; see the note in README.md.
+    """
+    env = os.environ.get("CALIVI_SECRET_KEY")
+    if env:
+        return env
+    path = os.path.join(os.path.dirname(DB_PATH) or ".", "secret_key")
+    try:
+        with open(path, encoding="utf-8") as f:
+            val = f.read().strip()
+            if val:
+                return val
+    except FileNotFoundError:
+        pass
+    val = secrets.token_hex(32)
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(val)
+    return val
+
+
+# Signs session JWTs (auth.py) and, through a separate derived key, encrypts the secrets
+# stored in the database (crypto.py). It lives here rather than in auth.py so that the models
+# can reach it without importing the auth layer — `models -> crypto -> auth -> models` would
+# be a cycle.
+SECRET_KEY = _load_secret()
+
+# Set to the PREVIOUS key during a key rotation: values encrypted under it stay readable and
+# are re-encrypted under the current key at startup. Remove it once the app has booted once.
+SECRET_KEY_OLD = os.environ.get("CALIVI_SECRET_KEY_OLD", "")
 
 # Bundled SearXNG (the calivi-searxng service in docker-compose). Not exposed externally.
 SEARXNG_URL = os.environ.get("SEARXNG_URL", "http://calivi-searxng:8080")

@@ -11,13 +11,18 @@ services:
       - SEARCH_CONFIG_PATH=/config/search.yml
       - TOOLS_CONFIG_PATH=/config/tools.yml
       - SEARXNG_URL=http://calivi-searxng:8080
-      # Signs the session cookies. Left unset, the backend generates and persists
+      # Signs the session cookies AND encrypts the secrets stored in the database (MCP
+      # tokens, provider API keys). Left unset, the backend generates and persists
       # /data/secret_key — inside the same volume as calivi.db, so a copy of that volume (a
       # backup, for instance) carries both the data and the key that authenticates access to
-      # it, and anyone holding it can mint a session for any user. Set it here, from the
-      # host's .env, and the volume stops being self-sufficient.
+      # it, and anyone holding it can mint a session for any user and read every stored
+      # credential. Set it here, from the host's .env, and the volume stops being
+      # self-sufficient.
       # Generate once with:  openssl rand -hex 32
+      # Changing it later: pass the previous value as CALIVI_SECRET_KEY_OLD for one boot,
+      # or the stored secrets have to be re-entered. See README.
       - CALIVI_SECRET_KEY=${CALIVI_SECRET_KEY:-}
+      - CALIVI_SECRET_KEY_OLD=${CALIVI_SECRET_KEY_OLD:-}
       # The Secure flag on the session cookie. This compose file serves plain HTTP (:8090),
       # so the default is false: with true the browser would not send the cookie over a
       # non-HTTPS connection and login would fail silently (the classic "works on localhost,

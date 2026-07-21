@@ -119,27 +119,37 @@ Everything has a sensible default. To override, create a `.env` file in the proj
 # .env
 CALIVI_PORT=8090        # exposed port
 COOKIE_SECURE=false     # set to true behind HTTPS — see the warning below
-CALIVI_SECRET_KEY=...   # session signing key — see the note below
+CALIVI_SECRET_KEY=...   # signs sessions AND encrypts stored secrets — see the note below
 ```
 
 > ### Set `CALIVI_SECRET_KEY` if you back up the data volume
-> Unset, the backend generates and stores the session signing key at `/data/secret_key` —
-> the same volume as `calivi.db`. A copy of that volume then contains both your data *and*
-> the key that signs sessions, so whoever holds it can mint a valid session for any user,
-> admin included. Setting the variable stops the key from being written there at all:
+> Unset, the backend generates and stores the key at `/data/secret_key` — the same volume as
+> `calivi.db`. A copy of that volume then contains both your data *and* the key, so whoever
+> holds it can mint a valid session for any user, admin included, **and** decrypt the MCP
+> tokens and provider API keys stored in the database. Setting the variable stops the key
+> from being written there at all:
 >
 > ```bash
 > openssl rand -hex 32   # put the output in .env, then: docker compose up -d
 > ```
 >
-> Changing an existing key signs everyone out once; nothing else is lost. If you want to
-> avoid even that, copy the current contents of `/data/secret_key` into `.env` instead of
-> generating a new one.
+> **Changing an existing key** signs everyone out once *and* makes every stored secret
+> unreadable, because the same key encrypts them. To change it without losing them, hand the
+> old one over for one boot:
+>
+> ```bash
+> CALIVI_SECRET_KEY=<the new key>
+> CALIVI_SECRET_KEY_OLD=<the previous key>
+> ```
+>
+> On startup every stored secret is re-encrypted under the new key; remove
+> `CALIVI_SECRET_KEY_OLD` afterwards. Skip this and the secrets simply have to be re-entered
+> in Settings — nothing else breaks, and the app still starts.
 
 Other variables the backend understands (`backend/app/config.py`): `DB_PATH`,
 `SYSTEM_PROMPTS_PATH`, `TOOLS_CONFIG_PATH`, `SEARXNG_URL`, `CORS_ORIGINS`,
 `LOGIN_MAX_ATTEMPTS`, `LOGIN_WINDOW_SECONDS`, `REGISTER_MAX_SUCCESS`,
-`REGISTER_WINDOW_SECONDS`.
+`REGISTER_WINDOW_SECONDS`, `CALIVI_SECRET_KEY_OLD` (key rotation, above).
 
 > ### ⚠️ Putting it behind HTTPS: set `COOKIE_SECURE=true`
 > This Compose file serves plain HTTP, so the default is `false`. If you put Calivi

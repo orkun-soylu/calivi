@@ -138,6 +138,52 @@ those two; overkill solutions such as an LLM-based injection classifier were del
   descriptions. Adding an MCP server is therefore an admin-only act whose blast radius is every
   user of the instance. See *MCP source — remote tools*.
 
+## Secrets at rest
+
+`mcp_servers.secret` and `servers.api_key` hold **bearer credentials for other people's
+systems** — a GitHub PAT, a Context7 key, an OpenAI key. They are encrypted in the database
+(`crypto.py`, Fernet/AES-128-CBC + HMAC).
+
+**The threat model is an attacker holding `calivi.db` without the environment the app runs
+in**: the nightly backup on the NAS, a copied volume, a `sqlite3` dump pasted into a ticket.
+It is explicitly *not* protection against someone who has the running container — they can
+read the decrypted value off the ORM attribute.
+
+That makes `CALIVI_SECRET_KEY` load-bearing in a second way. Left unset it is generated into
+`/data/secret_key`, **next to `calivi.db` in the same volume** — and then a copy of the volume
+carries the ciphertext and the key together, which is no protection at all. The feature is only
+worth anything with the key in the environment; the README says so, and so does the compose
+file.
+
+- **A column type, not call sites.** `EncryptedString` is a SQLAlchemy `TypeDecorator`, so every
+  read and write goes through it. A new endpoint that touches `server.secret` cannot forget to
+  encrypt it, and there is no encrypt-here/decrypt-there pair to keep in sync. The routers were
+  not touched at all — they already mask on the way out (`has_secret` / `has_api_key` booleans,
+  never the value).
+- **The key is derived, not reused.** HKDF-SHA256 over `SECRET_KEY` with
+  `info=b"calivi column encryption v1"`. `SECRET_KEY` also signs session JWTs; domain separation
+  means the two uses never share key material. That string is part of the storage format —
+  changing it makes every stored secret undecryptable.
+- **`SECRET_KEY` moved to `config.py`** (from `auth.py`) so the models can reach it without
+  importing the auth layer: `models → crypto → auth → models` would be a cycle.
+- **Three states on read, and they are different.** A value that decrypts is returned; a value
+  that was *never* encrypted is returned as-is (a row from before this shipped, or a database
+  restored from an older backup — an upgrade must not look like data loss); a value that looks
+  like a token but will not decrypt returns **None with a warning**, because one unreadable
+  secret must not 500 the settings page.
+- **Rotation is supported, not just survivable.** `CALIVI_SECRET_KEY_OLD` holds the previous key
+  for one boot: `MultiFernet` decrypts under either, and the startup migration re-encrypts
+  everything under the current key (`rotate()`), converging in a single restart.
+- **The migration uses raw SQL, deliberately.** Through the ORM it would decrypt on read and
+  re-encrypt on write, which cannot express either case: a legacy plaintext value is not a token
+  to decrypt, and a value under the old key has to be re-encrypted under the new one.
+
+> Verified against a copy of the production database before deploying — 3 real secrets, all
+> three plaintext beforehand, all three ciphertext afterwards, and every one decrypting back to
+> a byte-identical value. Tests assert against the **raw column**, not through the ORM: a
+> round-trip through the ORM passes just as well with no encryption at all, which is precisely
+> the test that would have missed this.
+
 ## Stack
 
 - Backend: FastAPI (Python), SQLite (SQLAlchemy), `backend/app/`
@@ -808,7 +854,7 @@ ordering), `components/chat/MessageItem.test.jsx` (render conditions),
 Fake timers (`vi.useFakeTimers`) deadlock with RTL's async `act` wrapper; the two tests that verify
 delay behaviour deliberately use **real** timers (~3s).
 
-### Backend — pytest (167 tests)
+### Backend — pytest (174 tests)
 
 `backend/tests/` — pytest + `httpx.ASGITransport` (a real HTTP layer, no live server needed). They
 do not ship in the prod image: the `Dockerfile` installs only `requirements.txt`, and the test
@@ -827,7 +873,8 @@ python3 -m venv .venv-test && ./.venv-test/bin/pip install -r requirements-dev.t
 `test_config_editor.py` (whitelist, malformed YAML → 400 **and the file is not corrupted**),
 `test_account_deletion.py` (FK cascade — no orphaned messages), `test_probe_cache.py`,
 `test_model_liveness.py`, `test_image_stripping.py`, `test_extract.py` (upload caps, and the
-parse subprocess: killed on timeout, capped in number), `test_tools_registry.py` (the read-only
+parse subprocess: killed on timeout, capped in number), `test_secret_encryption.py` (ciphertext
+in the raw column, legacy plaintext, key rotation), `test_tools_registry.py` (the read-only
 `mutating` gate), `test_tool_loop.py` (the agentic loop's `tool_result.ok` flag — the error-prefix
 contract above).
 
@@ -904,9 +951,9 @@ and caching a transient failure permanently again breaks 1. The tests carry weig
 - **Tool layer Phase 2** (the registry is MCP-ready; this builds on it):
   - ~~Approval / human-in-the-loop UI + capability scoping~~ — **done**, see *Tool approval*.
   - ~~**MCP source adapter**~~ — **done**, see *MCP source — remote tools*. The prediction held:
-    the registry, the loop and the wire format did not change. Remaining: **stdio** (via a bridge
-    container, not in-process `npx`) and **encrypting stored MCP secrets** (blocked on
-    `CALIVI_SECRET_KEY` moving to the environment).
+    the registry, the loop and the wire format did not change. ~~Encrypting stored MCP
+    secrets~~ — **done**, see *Secrets at rest*. Remaining: **stdio** (via a bridge container,
+    not in-process `npx`).
   - Persisting tool provenance as messages (currently live-only + a compact 🔍 chip).
   - A prompt-based fallback for non-tool models (not needed today — the models are strong
     tool-callers).

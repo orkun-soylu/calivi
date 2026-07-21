@@ -1,14 +1,13 @@
 """Authentication core: password hashing, JWT, httpOnly cookie sessions, dependencies."""
 import datetime
 import os
-import secrets
 
 import bcrypt
 import jwt
 from fastapi import Depends, HTTPException, Request, Response
 from sqlalchemy.orm import Session
 
-from app.config import DB_PATH
+from app.config import SECRET_KEY
 from app.database import get_db
 from app import models
 
@@ -17,36 +16,6 @@ COOKIE_MAX_AGE = 30 * 24 * 3600  # 30 days
 ALGORITHM = "HS256"
 # Cookie Secure flag: on for production (https). Turn it off when testing over plain http.
 COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "true").lower() != "false"
-
-
-def _load_secret() -> str:
-    """SECRET_KEY: use the env var if set, otherwise /data/secret_key (generated and persisted).
-
-    This keeps cookies valid across restarts and keeps the secret out of git.
-
-    The fallback is convenient but writes the key **into the data volume**, next to
-    calivi.db — so a copy of that volume (a backup) carries both the data and the key that
-    signs sessions, and holding it is enough to forge a session for any user. Prefer
-    CALIVI_SECRET_KEY from the environment; see the note in README.md.
-    """
-    env = os.environ.get("CALIVI_SECRET_KEY")
-    if env:
-        return env
-    path = os.path.join(os.path.dirname(DB_PATH) or ".", "secret_key")
-    try:
-        with open(path, encoding="utf-8") as f:
-            val = f.read().strip()
-            if val:
-                return val
-    except FileNotFoundError:
-        pass
-    val = secrets.token_hex(32)
-    with open(path, "w", encoding="utf-8") as f:
-        f.write(val)
-    return val
-
-
-SECRET_KEY = _load_secret()
 
 
 def hash_password(password: str) -> str:

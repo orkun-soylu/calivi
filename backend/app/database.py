@@ -1,9 +1,14 @@
 import json
+import logging
 
+from cryptography.fernet import InvalidToken
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
+from app import config
 from app.config import DB_PATH
+
+log = logging.getLogger(__name__)
 
 
 class Base(DeclarativeBase):
@@ -90,4 +95,46 @@ def _migrate():
             conn.exec_driver_sql("ALTER TABLE messages ADD COLUMN images JSON")
         if "attachments" not in mcols:
             conn.exec_driver_sql("ALTER TABLE messages ADD COLUMN attachments JSON")
+
+        _encrypt_existing_secrets(conn)
         conn.commit()
+
+
+# (table, column) pairs whose values are bearer credentials for someone else's system.
+_SECRET_COLUMNS = (("mcp_servers", "secret"), ("servers", "api_key"))
+
+
+def _encrypt_existing_secrets(conn):
+    """Brings stored secrets up to date with crypto.py — raw SQL on purpose.
+
+    Going through the ORM would decrypt on read and re-encrypt on write, which cannot express
+    either case here: a value written before encryption shipped is not a token to decrypt, and
+    a value under the previous key has to be re-encrypted under the current one.
+    """
+    from app import crypto
+
+    for table, col in _SECRET_COLUMNS:
+        cols = [row[1] for row in conn.exec_driver_sql(f"PRAGMA table_info({table})").fetchall()]
+        if col not in cols:  # empty for a table that does not exist yet
+            continue
+        rows = conn.exec_driver_sql(
+            f"SELECT id, {col} FROM {table} WHERE {col} IS NOT NULL AND {col} != ''"
+        ).fetchall()
+        for row_id, value in rows:
+            if not crypto.looks_encrypted(value):
+                new = crypto.encrypt(value)  # written before encryption shipped
+            elif config.SECRET_KEY_OLD:
+                # A rotation is in progress. `rotate` decrypts with any configured key and
+                # re-encrypts with the current one; it is a no-op in effect for a value that
+                # is already current, so this converges in one boot.
+                try:
+                    new = crypto.cipher().rotate(value).decode("ascii")
+                except InvalidToken:
+                    log.warning(
+                        "%s.%s id=%s decrypts under neither the current nor the old key; "
+                        "leaving it alone. It has to be re-entered.", table, col, row_id,
+                    )
+                    continue
+            else:
+                continue
+            conn.exec_driver_sql(f"UPDATE {table} SET {col} = ? WHERE id = ?", (new, row_id))
