@@ -3,6 +3,7 @@ import datetime
 from sqlalchemy import ForeignKey, String, Text, Boolean, Integer, DateTime, Float, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.crypto import EncryptedString
 from app.database import Base
 
 
@@ -42,7 +43,10 @@ class Server(Base):
     host: Mapped[str] = mapped_column(String(255), default="")  # for ollama; empty for openai
     port: Mapped[int] = mapped_column(Integer, default=11434)
     base_url: Mapped[str | None] = mapped_column(String(500), nullable=True)  # openai (e.g. https://api.openai.com/v1)
-    api_key: Mapped[str | None] = mapped_column(String(500), nullable=True)  # openai
+    # Encrypted at rest (crypto.py); plaintext on the attribute. Wider than the plaintext it
+    # holds because a Fernet token is ~40% longer than its input plus a fixed header — SQLite
+    # does not enforce the length, but the declaration should not lie.
+    api_key: Mapped[str | None] = mapped_column(EncryptedString(1000), nullable=True)  # openai
     wol_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     wol_target: Mapped[str | None] = mapped_column(String(50), nullable=True)
     created_at: Mapped[datetime.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
@@ -69,7 +73,9 @@ class McpServer(Base):
     # The secret lives in its own column, deliberately NOT inside `headers`: `exclude_unset`
     # partial updates cannot express "this one value of the map is unchanged", so a map
     # round-tripped through the edit form with a masked secret would wipe it.
-    secret: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    # Encrypted at rest (crypto.py); plaintext on the attribute. See the width note on
+    # Server.api_key.
+    secret: Mapped[str | None] = mapped_column(EncryptedString(2000), nullable=True)
     # Which header carries `secret` — servers differ: "Authorization" (GitHub, needs the
     # "Bearer " prefix) vs "CONTEXT7_API_KEY" (Context7, raw value).
     secret_header: Mapped[str] = mapped_column(String(100), default="Authorization")
