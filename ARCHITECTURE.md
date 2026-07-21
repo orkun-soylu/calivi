@@ -619,9 +619,17 @@ justify changing the data model.
 2. **A timeout is a denial.** `APPROVAL_TIMEOUT` (300s) expiring yields `False`. Silence must
    never be read as consent — the opposite default turns walking away from the keyboard into a
    blanket grant.
-3. **Pings, or the connection dies.** No bytes flow while a human decides, and Traefik's default
-   idle timeout is **180s**. `approvals.wait` is a generator that yields `None` every
-   `APPROVAL_HEARTBEAT` (20s) so the loop can emit `{"type":"ping"}`; the frontend ignores it.
+3. **Pings, or the connection dies.** No bytes flow while a human decides. The binding limit is
+   **nginx's `proxy_read_timeout 300s`** in `frontend/nginx.conf` — the gap allowed between
+   successive reads from the backend. Without pings that lands *exactly* on `APPROVAL_TIMEOUT`
+   (also 300s), so the proxy would cut the connection at the same instant the auto-denial fires.
+   `approvals.wait` is a generator that yields `None` every `APPROVAL_HEARTBEAT` (20s) so the
+   loop can emit `{"type":"ping"}`; the frontend ignores it.
+   > Traefik is **not** the constraint, despite the obvious-looking 180s number: its
+   > `respondingTimeouts.idleTimeout` governs idle **keep-alive** connections between requests,
+   > not a response already in flight (that is `writeTimeout`, unlimited by default). Do not
+   > remove the pings on the strength of a Traefik timeout change — nginx is what would drop
+   > you, and the client would be next.
 4. **Cleanup in a `finally`.** A closed tab raises `CancelledError`, a `BaseException` that skips
    `except Exception` — without `approvals.discard` in a `finally` the process accumulates
    pending entries forever.
