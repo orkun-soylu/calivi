@@ -1,7 +1,11 @@
-"""Upload extraction limits: bounded reads, a parse time budget, and the event loop
-staying free (parsing runs in a worker thread)."""
+"""Upload extraction limits: bounded reads, a parse time budget, and a parser that is
+killed when it outlives it (parsing runs in a subprocess)."""
+import asyncio
 import io
-import time
+import os
+import sys
+
+import pytest
 
 from app.routers import extract as extract_router
 
@@ -54,17 +58,76 @@ async def test_oversize_upload_is_rejected(admin, monkeypatch):
     assert resp.status_code == 413
 
 
-async def test_parse_timeout_returns_400_instead_of_hanging(admin, monkeypatch):
-    """A parser that outlives its budget loses the request — the loop stays free."""
-    monkeypatch.setattr(extract_router, "PARSE_TIMEOUT", 0.1)
+async def test_a_hung_parse_is_killed_not_just_abandoned(admin, monkeypatch, tmp_path):
+    """The point of the subprocess: the budget ends the parse, not merely the request.
 
-    def hang(_data: bytes) -> str:
-        time.sleep(5)
-        return "never"
+    A thread could not be killed, so a hung parse held its worker until the process
+    restarted and enough of them took the endpoint down. This asserts the child is really
+    gone — the 400 alone would still pass if it were only abandoned.
+    """
+    pidfile = tmp_path / "worker.pid"
+    monkeypatch.setattr(extract_router, "PARSE_TIMEOUT", 0.5)
+    monkeypatch.setattr(extract_router, "_WORKER_ARGV", [
+        sys.executable, "-c",
+        f"import os, time; open({str(pidfile)!r}, 'w').write(str(os.getpid())); time.sleep(120)",
+    ])
 
-    monkeypatch.setattr(extract_router, "_extract_pdf", hang)
     resp = await admin.post("/api/extract", files={"file": ("evil.pdf", b"%PDF-1.4", "application/pdf")})
     assert resp.status_code == 400 and "too long" in resp.json()["detail"]
+
+    pid = int(pidfile.read_text())
+    # Reaped by the `await proc.wait()` in the kill path, so the pid is gone rather than a
+    # zombie — signal 0 only checks for existence.
+    with pytest.raises(ProcessLookupError):
+        os.kill(pid, 0)
+
+
+async def test_a_hung_parse_does_not_wedge_the_next_upload(admin, monkeypatch):
+    """The capability comes back, which is the part a thread pool could not give.
+
+    Three hangs in a row used to be three worker threads gone for good; the fourth upload
+    is a real PDF through the real worker.
+    """
+    with monkeypatch.context() as hung:
+        hung.setattr(extract_router, "PARSE_TIMEOUT", 0.5)
+        hung.setattr(extract_router, "_WORKER_ARGV", [sys.executable, "-c", "import time; time.sleep(120)"])
+        for _ in range(3):
+            resp = await admin.post("/api/extract", files={"file": ("evil.pdf", b"%PDF-1.4", "application/pdf")})
+            assert resp.status_code == 400
+
+    resp = await admin.post(
+        "/api/extract",
+        files={"file": ("doc.pdf", _minimal_pdf("Still here"), "application/pdf")},
+    )
+    assert resp.status_code == 200 and "Still here" in resp.json()["text"]
+
+
+async def test_concurrent_parses_are_capped(admin, monkeypatch, tmp_path):
+    """A process per upload needs a ceiling — the old thread pool capped this at 8 by accident.
+
+    Six uploads race; each child logs its own start and end, so the transcript shows how many
+    ran at once. Without the semaphore this is 6.
+    """
+    log = tmp_path / "overlap.log"
+    monkeypatch.setattr(extract_router, "_parse_slots", asyncio.Semaphore(2))
+    monkeypatch.setattr(extract_router, "_WORKER_ARGV", [
+        sys.executable, "-c",
+        "import os, sys, time\n"
+        f"f = {str(log)!r}\n"
+        "open(f, 'a').write('+\\n'); time.sleep(0.3); open(f, 'a').write('-\\n')\n"
+        "sys.stdout.write('ok')\n",
+    ])
+
+    await asyncio.gather(*[
+        admin.post("/api/extract", files={"file": (f"{i}.pdf", b"%PDF-1.4", "application/pdf")})
+        for i in range(6)
+    ])
+
+    live = peak = 0
+    for event in log.read_text().split():
+        live += 1 if event == "+" else -1
+        peak = max(peak, live)
+    assert peak <= 2, f"{peak} parsers ran at once"
 
 
 async def test_valid_pdf_round_trip(admin):
@@ -87,8 +150,8 @@ async def test_corrupt_pdf_is_a_400_not_a_500(admin):
     assert resp.status_code == 400
 
 
-async def test_docx_round_trip_through_the_worker_thread(admin):
-    """End-to-end through asyncio.to_thread: a real docx parses and yields its text."""
+async def test_docx_round_trip_through_the_worker_process(admin):
+    """End-to-end through the spawned worker: a real docx parses and yields its text."""
     from docx import Document
 
     buf = io.BytesIO()
