@@ -17,6 +17,15 @@
 #      (Tried it: the proxy came up and every session died with "Connection closed".)
 FROM ghcr.io/sparfenyuk/mcp-proxy:v0.12.0
 
+# The user is created BEFORE anything is installed, and nothing is chowned afterwards.
+#
+# A trailing `chown -R bridge:bridge /opt/mcp` looks free and is not: chown rewrites every
+# inode, and on an overlay filesystem that copies the whole tree into a new layer, so the image
+# carried two copies of every server. It cost 59 MB here — a quarter of the image — for a
+# permission bit. The installs leave world-readable files, the process only ever reads them,
+# and the compose service mounts the root filesystem read-only regardless.
+RUN adduser -D -u 65532 bridge
+
 # One venv per server. Add your own the same way, always with a pinned version.
 #
 # `time` is the default because it needs no network at all, so it works under the locked-down
@@ -40,7 +49,6 @@ RUN python3 -m venv /opt/mcp/time \
 
 # The upstream image runs as root and nothing here needs to. The compose service drops
 # capabilities and mounts the root filesystem read-only on top of this.
-RUN adduser -D -u 65532 bridge && chown -R bridge:bridge /opt/mcp
 USER bridge
 
 ENTRYPOINT ["catatonit", "--", "mcp-proxy"]
