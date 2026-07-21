@@ -42,6 +42,8 @@ MCP_MAX_TOOL_NAME = 64
 # Tool approval (human-in-the-loop) — see approvals.py.
 # A timeout is a DENIAL: silence must never be read as consent.
 APPROVAL_TIMEOUT = 300.0
-# Sent while waiting so the connection is not judged idle. Traefik's default idle timeout is
-# 180s and no bytes flow down the stream while a person is deciding.
+# Sent while waiting so no proxy sees the stream as stalled — no bytes flow while a person is
+# deciding. The binding limit is nginx's `proxy_read_timeout 300s` (frontend/nginx.conf), which
+# without pings would land exactly on APPROVAL_TIMEOUT above. Traefik is not the constraint: its
+# idleTimeout applies to idle keep-alive connections, not a response in flight.
 APPROVAL_HEARTBEAT = 20.0

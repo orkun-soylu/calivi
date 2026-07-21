@@ -63,8 +63,9 @@ async def wait(approval_id: str, timeout: float, heartbeat: float):
     """Yields once per `heartbeat` while waiting, then finally the decision.
 
     The generator yields rather than simply awaiting because **no bytes flow down the stream
-    while a human is deciding**, and Traefik's default idle timeout is 180s — a deliberation
-    longer than that would drop the connection. Callers forward each `None` as a ping.
+    while a human is deciding**, and nginx's `proxy_read_timeout` (300s) measures exactly that
+    gap — without pings it would fire at the same moment as the auto-denial. Callers forward
+    each `None` as a ping.
 
     Yields `None` on each heartbeat tick and `True`/`False` once as the final value. A timeout
     is a denial: silence must never be read as consent.
