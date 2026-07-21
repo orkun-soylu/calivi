@@ -492,8 +492,16 @@ tool is still called `web_search` — that is a tool name, and it is accurate.
 > written and **measured over five runs per arm**. It was worse: the false claim went from 0/5 to
 > **2/5**, one run exhausted the iteration cap and produced nothing, and average tool calls rose
 > from 4.6 to 5.4. The likely reason is that telling a model to "say plainly when something is not
-> covered" encourages exactly the confident claim of absence that was the bug. It was not shipped;
-> the branch is `fix/tool-retrieval-guidance` if anyone wants the transcript before trying again.
+> covered" encourages exactly the confident claim of absence that was the bug. It was not shipped
+> and the branch was not kept, so the wording that lost is recorded here instead — a second attempt
+> should start from the measurement, not from this text:
+>
+> > USING TOOLS: a documentation or search tool returns only the passages that matched your query,
+> > never a complete reference. If the result does not cover part of the question, query again with
+> > a narrower, more specific wording before answering — you may call tools several times. If
+> > something is still not covered by what you retrieved, say so plainly instead of filling the gap
+> > from memory, and never describe an answer as coming from the documentation when part of it did
+> > not.
 >
 > The same measurement showed the failure is **intermittent** — 0/5 without the guard — so it is
 > variance, not a systematic defect. Which is the argument for this panel: the model cannot be
