@@ -48,7 +48,12 @@ class AttachmentIn(BaseModel):
 
 class AttachmentOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-    name: str  # shown as a chip in the UI; the text itself is not returned
+    name: str  # shown as a chip in the UI
+    # What a tool returned, for the inspection panel. `text` stays out: on a document
+    # attachment it holds the whole extracted file, which would be re-sent on every chat load
+    # for no purpose. `detail` is clipped at MAX_DETAIL_CHARS and is the only reason the panel
+    # can exist — omitting it here silently disabled the feature while the data sat in the DB.
+    detail: str | None = None
 
 
 class ServerCreate(BaseModel):

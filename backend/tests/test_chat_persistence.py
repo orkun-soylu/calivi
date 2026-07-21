@@ -71,6 +71,22 @@ def _messages(chat_id):
         db.close()
 
 
+@pytest.fixture
+def admin_chat(admin):
+    """A chat owned by the signed-in admin, so the API can be queried as that user. The plain
+    `chat_id` fixture makes its own user, which cannot read it back over HTTP."""
+    db = SessionLocal()
+    try:
+        chat = models.Chat(user_id=1, title="t")
+        db.add(chat)
+        db.commit()
+        db.add(models.Message(chat_id=chat.id, role="user", content="hi"))
+        db.commit()
+        return chat.id
+    finally:
+        db.close()
+
+
 def _register(name, result="fine"):
     async def handler(args):
         return result
@@ -284,3 +300,41 @@ async def test_web_search_keeps_both_text_and_detail(monkeypatch, chat_id):
 
     chip = _messages(chat_id)[0].attachments[0]
     assert chip["text"] and chip["detail"] == chip["text"]
+
+
+async def test_the_api_actually_returns_detail(monkeypatch, admin, admin_chat):
+    """The gap that shipped: `detail` was written to the DB and stripped by AttachmentOut, so
+    the chip was never clickable. Storage and the UI component were each tested; the
+    serialisation boundary between them was not."""
+    name = mcp_client.namespaced("context7", "query-docs")
+    _register(name, result="WHAT THE TOOL RETURNED")
+    try:
+        await _run(
+            monkeypatch,
+            admin_chat,
+            [[{"type": "tool_calls", "calls": [{"id": "c1", "name": name, "arguments": {}}]}],
+             [{"type": "content", "text": "answer"}]],
+        )
+    finally:
+        registry._tools.pop(name, None)
+
+    body = (await admin.get(f"/api/chats/{admin_chat}")).json()
+    chips = body["messages"][0]["attachments"]
+    assert chips[0]["detail"] == "WHAT THE TOOL RETURNED"
+
+
+async def test_the_api_still_withholds_document_text(monkeypatch, admin, admin_chat):
+    """`text` must NOT start leaking out with it — on a document attachment that is the whole
+    extracted file, re-sent on every chat load."""
+    await _run(
+        monkeypatch,
+        admin_chat,
+        [[{"type": "tool_calls",
+           "calls": [{"id": "c1", "name": "web_search", "arguments": {"query": "bitcoin"}}]}],
+         [{"type": "content", "text": "answer"}]],
+    )
+
+    body = (await admin.get(f"/api/chats/{admin_chat}")).json()
+    chip = body["messages"][0]["attachments"][0]
+    assert "text" not in chip
+    assert chip["detail"]
