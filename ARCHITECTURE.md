@@ -629,8 +629,51 @@ them apart from `web_search`.
 else here is deployed (`calivi-searxng` is the same shape). Both transports are spoken: Streamable
 HTTP and the older HTTP+SSE, because hosted servers are split between them (Linear still serves
 SSE). stdio would mean running `npx`-delivered packages inside the backend container — executing an
-arbitrary npm package named in an admin web form, in the application's own container. If stdio
-servers are ever wanted, the answer is a **stdio→HTTP bridge container**, not that.
+arbitrary npm package named in an admin web form, in the application's own container. stdio servers
+are supported through a **bridge container** instead — see below.
+
+### stdio servers — the bridge (`stdio-bridge/`)
+
+Opt-in compose service (`--profile stdio-bridge`) running `mcp-proxy`, which speaks stdio to the
+servers and HTTP to Calivi. **The backend gained no code for this**: the bridge is registered like
+any other HTTP MCP server, at `http://calivi-mcp-bridge:8096/servers/<name>/mcp`. That is the
+dividend of the HTTP-only decision above — the transport question was already answered.
+
+Two build rules, both learned the hard way:
+
+- **Servers are installed at build time, pinned** — never `npx -y <package>` or `uvx <package>` at
+  run time. A runtime fetch executes whatever the registry serves at that moment, which is the
+  supply-chain problem the bridge exists to contain, and it forces the container to keep egress it
+  would otherwise not need.
+- **One virtualenv per server.** `mcp-proxy` and the servers both depend on `mcp`; installing a
+  server into the proxy's own environment moves that dependency underneath it. Observed exactly
+  once: the proxy started and every session died with `Connection closed`.
+
+**Isolation is the primary control, and `networks:` is not it.** Measured before the compose
+service was written: on an ordinary compose network the bridge reached the LAN router, the NAS and
+the open internet — **as root**. The service therefore runs on `mcp-bridge`, a network declared
+`internal: true`, as a non-root user, with a read-only root filesystem, `cap_drop: ALL`,
+`no-new-privileges` and a pid limit. Re-measured after: all three destinations refused, `uid=65532`,
+`/` read-only, and the backend still reaches both the bridge and searxng. This is the control the
+Playwright evaluation said would have to come first if untrusted tool containers ever appeared —
+see *Playwright MCP — evaluated and declined*.
+
+> `internal: true` is a real constraint, not a formality: a server that needs the internet
+> (`mcp-server-fetch`) does not work under it. Removing it grants the internet **and** the LAN,
+> because Docker routes both the same way — separating them is a `DOCKER-USER` firewall rule, not a
+> compose setting. The default is the strict one so the choice has to be made deliberately.
+
+**The bridge has no authentication.** Anything that can reach port 8096 can drive every server
+behind it, which is why it has no published port and its own network. Do not put it on
+`traefik_default`.
+
+**`readOnlyHint` decides whether anything shows up.** The gate above applies unchanged, and stdio
+servers differ: `mcp-server-time` sets the annotation, so its two tools register automatically;
+`mcp-server-fetch` does **not**, so its tool lands as `off` and an admin has to opt in from
+Settings. A bridge that appears to expose "no tools" is usually this, not a fault.
+
+Verified end to end through `mcp_client.refresh()` against the running bridge: probe `up`, both
+`mcp-server-time` tools read-only and registered, and a live call returning the correct local time.
 
 **Connect-per-call — no long-lived sessions.** An MCP session is an async context manager, and
 anyio requires its cancel scope to be exited in the task that entered it. Keeping sessions open
@@ -676,12 +719,7 @@ wipe it. `secret_header` + `secret_prefix` exist because servers differ —
 applied *first* so a stray `headers` entry cannot shadow the credential. As with `Server.api_key`,
 the secret is never returned by the API (`has_secret: bool`).
 
-> **Open:** MCP secrets are stored in plaintext, like `Server.api_key`. Encrypting them is only
-> worth doing **after** `CALIVI_SECRET_KEY` is supplied from the environment — with the fallback,
-> the key is written into the same volume the DB lives in, so a backup would carry ciphertext and
-> key together. `cryptography` is already available (it arrives with `mcp` via `pyjwt[crypto]`), so
-> the remaining cost is a migration and a key-rotation story. Tracked as Phase 2, alongside the
-> approval UI that would unlock mutating tools.
+The secret is **encrypted at rest**, along with `Server.api_key` — see *Secrets at rest*.
 
 **Per-tool modes.** `McpServer.tool_modes` maps a tool (by the server's own un-namespaced name)
 to `off` / `auto` / `approve`. Unlisted tools fall back to a default derived from `readOnlyHint`:
@@ -952,8 +990,8 @@ and caching a transient failure permanently again breaks 1. The tests carry weig
   - ~~Approval / human-in-the-loop UI + capability scoping~~ — **done**, see *Tool approval*.
   - ~~**MCP source adapter**~~ — **done**, see *MCP source — remote tools*. The prediction held:
     the registry, the loop and the wire format did not change. ~~Encrypting stored MCP
-    secrets~~ — **done**, see *Secrets at rest*. Remaining: **stdio** (via a bridge container,
-    not in-process `npx`).
+    secrets~~ — **done**, see *Secrets at rest*. ~~**stdio**~~ — **done**, via a bridge
+    container, see *stdio servers — the bridge*.
   - Persisting tool provenance as messages (currently live-only + a compact 🔍 chip).
   - A prompt-based fallback for non-tool models (not needed today — the models are strong
     tool-callers).

@@ -32,6 +32,12 @@ services:
     volumes:
       - calivi-data:/data
       - ./config:/config
+    # `default` has to be listed explicitly: naming any network opts the service out of the
+    # implicit one, which would cut it off from searxng and the frontend. `mcp-bridge` exists
+    # whether or not the bridge profile is running, so this is harmless when it is not.
+    networks:
+      - default
+      - mcp-bridge
 
   # Bundled metasearch — the engine behind Calivi's web search (🔍). No port is published;
   # only calivi-backend reaches it, over the compose network at http://calivi-searxng:8080.
@@ -50,6 +56,53 @@ services:
       - calivi-backend
     ports:
       - "${CALIVI_PORT:-8090}:80"
+
+  # stdio→HTTP bridge for MCP servers that do not speak HTTP. OPT-IN: it only starts with
+  #   docker compose --profile stdio-bridge up -d
+  # See stdio-bridge/Dockerfile for why the servers live in there rather than in the backend.
+  #
+  # Register it in Calivi as an ordinary HTTP MCP server:
+  #   http://calivi-mcp-bridge:8096/servers/<name>/mcp
+  # There is no authentication on it — hence no published port, and its own network below.
+  calivi-mcp-bridge:
+    profiles: ["stdio-bridge"]
+    build: ./stdio-bridge
+    container_name: calivi-mcp-bridge
+    restart: unless-stopped
+    command:
+      - "--named-server-config=/config/servers.json"
+      - "--host=0.0.0.0"
+      - "--port=8096"
+    volumes:
+      - ./stdio-bridge/servers.json:/config/servers.json:ro
+    networks:
+      - mcp-bridge
+    # This container runs code Calivi does not control, so it gets none of the privileges it
+    # does not need. Measured before writing this: on an ordinary compose network the bridge
+    # reached the LAN router and the NAS as root — `networks:` alone is not isolation.
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 256
+    # Silently discarded on kernels without cgroup memory accounting — Raspberry Pi OS ships
+    # that way unless `cgroup_enable=memory` is added to cmdline.txt. Docker says so on start
+    # ("Your kernel does not support memory limit capabilities... Limitation discarded") and
+    # then runs the container unlimited, so do not read this line as a guarantee.
+    mem_limit: 512m
+
+networks:
+  # `internal: true` is the whole point: no route off the host, so a compromised or simply
+  # curious stdio server cannot reach the internet — or, more to the point, your LAN. The
+  # backend joins it to talk to the bridge and keeps its own default network for everything else.
+  #
+  # A server that genuinely needs the internet (mcp-server-fetch) will NOT work until you remove
+  # `internal: true`. Doing so gives it the internet AND your LAN, because Docker routes both the
+  # same way; if you want one without the other, that is a DOCKER-USER firewall rule, not a
+  # compose setting. Deciding that deliberately is the intent.
+  mcp-bridge:
+    internal: true
 
 volumes:
   calivi-data:
