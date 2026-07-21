@@ -83,3 +83,40 @@ describe("MessageItem", () => {
     expect(screen.getByText("report.pdf")).toBeTruthy();
   });
 });
+
+describe("tool output chips", () => {
+  const withChips = {
+    role: "user",
+    content: "question",
+    timestamp: "2026-07-21T17:54:09",
+    attachments: [
+      { name: "🔧 context7: query-docs", detail: "WHAT THE TOOL RETURNED" },
+      { name: "📎 notes.pdf" },
+    ],
+  };
+
+  test("a chip carrying tool output opens it on click", async () => {
+    const onInspect = vi.fn();
+    render(
+      <MessageItem m={withChips} onEdit={noop} onDelete={noop} onImageClick={noop} onInspect={onInspect} />
+    );
+
+    screen.getByText("🔧 context7: query-docs").click();
+
+    expect(onInspect).toHaveBeenCalledWith({
+      name: "🔧 context7: query-docs",
+      detail: "WHAT THE TOOL RETURNED",
+    });
+  });
+
+  test("a plain document chip stays inert", () => {
+    const onInspect = vi.fn();
+    render(
+      <MessageItem m={withChips} onEdit={noop} onDelete={noop} onImageClick={noop} onInspect={onInspect} />
+    );
+
+    screen.getByText("📎 notes.pdf").click();
+
+    expect(onInspect).not.toHaveBeenCalled();
+  });
+});
