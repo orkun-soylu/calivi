@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Calivi — self-hosted chat for Ollama &amp; OpenAI-compatible servers</title>
-<meta name="description" content="Calivi is a self-hosted chat interface for your own Ollama and OpenAI-compatible servers. You pick which model runs where — no hidden routing." />
+<meta name="description" content="Calivi is a self-hosted chat interface for your own Ollama and OpenAI-compatible servers. You pick which model runs where: the server first, then the model on it." />
 <link rel="canonical" href="https://calivi.ai/" />
 <meta property="og:type" content="website" />
 <meta property="og:url" content="https://calivi.ai/" />
@@ -435,8 +435,8 @@
       <h1>You pick which model<br />runs <span class="em">where</span>.</h1>
       <p class="lede">
         Calivi is a self-hosted chat interface for your own Ollama and OpenAI-compatible
-        servers. Every message goes to the exact server and model you choose — no hidden
-        router deciding for you.
+        servers. You pick the server first, then the model on it — because the same model
+        name on two machines is not the same thing.
       </p>
       <div class="cta-row">
         <a class="btn btn-primary" href="#start">Get started
@@ -803,7 +803,7 @@ Source: https://github.com/pydantic/pydantic/blob/main/pydantic/functional_valid
       <div class="feat">
         <span class="fl">Routing</span>
         <h3>Manual, always</h3>
-        <p>Choose the server and model from the top bar for every message. Only reachable servers appear — no auto-router second-guessing you.</p>
+        <p>Choose the server and model from the top bar for every message. Only servers that answered their last probe appear, so a box that is asleep or unreachable cannot be picked by mistake.</p>
       </div>
       <div class="feat">
         <span class="fl">Backends</span>
