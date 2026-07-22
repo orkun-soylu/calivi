@@ -22,14 +22,28 @@ llama.cpp-server — all from the same chat window.
 ```
 ┌──────────────┐     ┌──────────────┐     ┌────────────────────────┐
 │   Browser    │────▶│ nginx (:8090)│────▶│ FastAPI backend        │
-└──────────────┘     │  SPA + /api  │     │  SQLite · tool loop    │
-                     └──────────────┘     └───────────┬────────────┘
+└──────────────┘     │  SPA + /api  │     │  SQLite · tool loop ·  │
+                     └──────────────┘     │  approvals             │
+                                          └───────────┬────────────┘
                                                       │
-                                  ┌───────────────────┼───────────────────┐
-                                  ▼                   ▼                   ▼
-                            Ollama servers    OpenAI-compatible     SearXNG (bundled)
-                            (LAN / remote)    API (cloud / local)   web search
+              ┌───────────────┬───────────────────────┼───────────────┐
+              ▼               ▼                       ▼               ▼
+        Ollama servers  OpenAI-compatible      SearXNG (bundled)   MCP servers
+        (LAN / remote)  API (cloud / local)    web search          ├─ HTTP, direct
+                                                                   └─ stdio, through
+                                                                      the sandboxed
+                                                                      bridge container
 ```
+
+> ### ⚠️ Heavy development — use at your own risk
+>
+> Calivi works today and it is what I use daily, but it is under **heavy development**.
+> Things break between commits, defaults change, and security holes get found and closed
+> as the code moves. There is no stable release channel, no versioned upgrade path, and no
+> guarantee that today's database survives tomorrow's migration untouched.
+>
+> If you run it: **watch the commits, update often, and keep your own backups.** Read the
+> diff before you pull. **Use at your own risk.**
 
 ---
 
