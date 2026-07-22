@@ -906,7 +906,7 @@ as an unhandled `IntegrityError` (a 500).
 
 ## Tests
 
-### Frontend — `npm test` (vitest + jsdom, 41 tests)
+### Frontend — `npm test` (vitest + jsdom, 43 tests)
 
 ```bash
 cd frontend && npm install && npm test     # or: npm run test:watch

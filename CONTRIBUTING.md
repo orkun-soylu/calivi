@@ -141,6 +141,7 @@ map, tool loop, security notes and "don't fall into this again" warnings all liv
 - [ ] Frontend build is clean (`npm run build`)
 - [ ] If you added a guard, you ran a **mutation test**
 - [ ] `ARCHITECTURE.md` updated if behaviour changed
+- [ ] `CHANGELOG.md` updated under `## [Unreleased]` if the change is user-visible
 - [ ] No secrets: no `.env`, API keys, tokens or real hosts/IPs committed
 
 For behavioural changes, verify your work by **actually running it** — don't rely on
