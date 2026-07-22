@@ -1,7 +1,7 @@
 # calivi
 
 A self-hosted, multi-user chat interface for Ollama and OpenAI-compatible servers.
-You pick which model runs where — no hidden routing.
+You pick which model runs where: the server first, then the model on it.
 
 Your own GPU box, Ollama Cloud, OpenRouter, Moonshot, LM Studio, vLLM,
 llama.cpp-server — all from the same chat window.
