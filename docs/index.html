@@ -17,7 +17,7 @@
 <meta property="og:image" content="https://calivi.ai/images/og-cover.png" />
 <meta property="og:image:width" content="2400" />
 <meta property="og:image:height" content="1260" />
-<meta property="og:image:alt" content="Calivi landing page: the headline &quot;You pick which model runs where&quot; beside a routing diagram sending one chat message to a local GPU, OpenRouter or Ollama Cloud." />
+<meta property="og:image:alt" content="Calivi landing page: the headline &quot;The chat interface that shows you the machinery&quot; beside a routing diagram sending one chat message to a local GPU, OpenRouter or Ollama Cloud." />
 <!-- summary_large_image, not summary: with a plain summary card X crops this to a small square
      thumbnail and the headline in the image becomes unreadable. -->
 <meta name="twitter:card" content="summary_large_image" />
@@ -124,7 +124,9 @@
   /* ---- hero ---- */
   .hero { padding: 76px 0 40px; }
   .hero-grid { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 56px; align-items: center; }
-  h1 { font-size: clamp(2.35rem, 5vw, 3.6rem); line-height: 1.04; letter-spacing: -0.025em; font-weight: 720; margin: 16px 0 0; text-wrap: balance; }
+  /* 3.25rem, not 3.6: at 3.6 the current headline wraps to four lines and pushes the CTA row
+     out of the 1200x630 share-card frame (measured). Raising it again means re-checking that. */
+  h1 { font-size: clamp(2.35rem, 5vw, 3.25rem); line-height: 1.04; letter-spacing: -0.025em; font-weight: 720; margin: 16px 0 0; text-wrap: balance; }
   h1 .em { color: var(--accent); }
   .lede { font-size: 1.16rem; color: var(--muted); margin: 20px 0 0; max-width: 34em; }
   .cta-row { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 30px; }
@@ -432,11 +434,14 @@
   <div class="wrap hero-grid">
     <div>
       <span class="eyebrow">Self-hosted · MIT · Docker</span>
-      <h1>You pick which model<br />runs <span class="em">where</span>.</h1>
+      <!-- No hard <br />: this headline is half again as long as the one it replaced, and a
+           break tuned for the old text split it into four lines. `text-wrap: balance` (below)
+           does it properly, and the size cap drops to match the extra length. -->
+      <h1>The chat interface that shows you the <span class="em">machinery</span>.</h1>
       <p class="lede">
-        Calivi is a self-hosted chat interface for your own Ollama and OpenAI-compatible
-        servers. You pick the server first, then the model on it — because the same model
-        name on two machines is not the same thing.
+        You pick which model runs where: the server first, then the model on it. Every answer
+        keeps the model, the server and the speed behind it — and the chat is yours to rewind,
+        fork or lift out whole.
       </p>
       <div class="cta-row">
         <a class="btn btn-primary" href="#start">Get started
@@ -497,7 +502,7 @@
 <section class="showcase">
   <div class="wrap">
     <span class="eyebrow">The interface</span>
-    <h2>A chat window that shows the machinery.</h2>
+    <h2>Two dropdowns, and everything else in plain sight.</h2>
     <p class="sec-lede">Two dropdowns pick the server and model. Streaming answers with reasoning,
       tool calls, and per-message attribution — visible, not hidden.</p>
 
