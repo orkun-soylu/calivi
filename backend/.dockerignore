@@ -1,0 +1,10 @@
+# The Dockerfile only COPYs requirements.txt and app/, so nothing here changes the image — but
+# everything not excluded is still uploaded to the daemon as build context on every build, and
+# .venv-test alone is ~128 MB of that.
+.venv*
+tests
+requirements-dev.txt
+pytest.ini
+__pycache__
+*.pyc
+.pytest_cache

@@ -3,7 +3,13 @@ fastapi==0.115.6
 # `starlette>=0.27`, so an unconstrained rebuild resolves starlette to 1.x and silently breaks
 # fastapi 0.115.6 (which requires <0.42). Bump these two together, never one alone.
 starlette==0.41.3
-uvicorn[standard]==0.34.0
+# The `[standard]` extra is deliberately NOT used: it pulls `websockets` and `watchfiles`, and
+# neither is reachable here — streaming is Server-Sent Events (`StreamingResponse`, see
+# chats.py), there is no WebSocket endpoint, and the container CMD has no `--reload`. That is
+# ~3 MB of dead weight. The two extras worth having are pinned explicitly below.
+uvicorn==0.34.0
+uvloop==0.21.0
+httptools==0.6.4
 sqlalchemy==2.0.36
 httpx==0.28.1
 # 2.11 is the floor imposed by `mcp`; it was 2.10.4 before the MCP work.
