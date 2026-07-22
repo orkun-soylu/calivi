@@ -385,10 +385,17 @@
     .side { flex-direction: row; align-items: center; gap: 8px; overflow-x: auto; }
     .side .grp, .side .who { display: none; }
   }
+  /* The bar gives out before the rest of the page does, so it gets its own breakpoint. Measured:
+     the five links plus the wordmark and the theme button need 600px; the flex row cannot shrink
+     past a 32px gap, so from 599px down they push past the right edge and the WHOLE PAGE scrolls
+     sideways. Folding this into the 560px block below is what caused that — the block is tuned
+     for phone layout (single-column grid, tighter hero), and the nav runs out 40px earlier. */
+  @media (max-width: 599px) {
+    .bar a.navlink.hide-sm { display: none; }
+  }
   @media (max-width: 560px) {
     .features { grid-template-columns: 1fr; }
     .hero { padding: 48px 0 28px; }
-    .bar a.navlink.hide-sm { display: none; }
     .umsg { max-width: 84%; }
   }
 </style>
