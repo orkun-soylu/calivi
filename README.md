@@ -75,6 +75,10 @@ llama.cpp-server — all from the same chat window.
   so a copy of it (a backup, a stolen volume) does not hand over your credentials.
 - **Message editing** — Edit a message and either **Update** (regenerate from that point,
   optionally on a different model) or **New chat** (branch while keeping history).
+- **Every answer accounted for** — Each reply carries the model and the server that produced it
+  and the tokens/sec it ran at, stored with the message so they survive a reload — a chat you
+  came back to still tells you what answered, where, and how fast. Copy any single answer, or
+  the whole conversation, to the clipboard in one click; delete a message to walk the chat back.
 - **Markdown + math** — Code blocks with copy buttons, tables, KaTeX.
 - **9 languages** — TR, EN, DE, ES, IT, PT, RU, JA, ZH.
 - **Light/dark theme** with a selectable accent color.
