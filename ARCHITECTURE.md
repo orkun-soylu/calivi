@@ -287,6 +287,41 @@ docker compose up -d --build
 - Frontend (nginx, `/api` → backend proxy): host `:8090`. Put it behind your own reverse proxy /
   TLS terminator if you want a hostname; the application itself assumes a trusted network.
 
+### Backend image — why Alpine, and the one flag that must stay
+
+The backend runs on `python:3.12-alpine`, not `-slim`. Measured on arm64 (RPi5), a full working
+install costs **836 MB** on disk (three services) and the backend was **363 MB** of it — the
+Debian rootfs alone accounted for ~118 MB of that, and nothing in the dependency set needs glibc.
+Alpine plus the trims below brings the backend to **230 MB**.
+
+Where the saving came from, measured rather than assumed:
+
+| | Disk | `app.main` import |
+|---|---:|---:|
+| `-slim`, `uvicorn[standard]`, pip kept | 363 MB | 1.56s |
+| Alpine + trims, **bytecode compiled** | **230 MB** | **1.94s** |
+| Alpine + trims + `--no-compile` | 198 MB | 4.01s |
+
+The trims are `pip uninstall -y pip` (12 MB, unused after install) and dropping the
+`uvicorn[standard]` extra (`websockets` + `watchfiles`, ~3 MB, neither reachable — see the
+comment in `requirements.txt`). `uvloop` and `httptools` are kept, pinned explicitly, so nothing
+is given up on the performance side. Precompiled bytecode is kept deliberately: `--no-compile`
+saves a further 32 MB but costs ~1.6s on every start, which is the wrong trade for a
+long-running server.
+
+> ⚠️ **`--only-binary=:all:` in the Dockerfile is a guard, not an optimisation.** Every
+> dependency currently ships a musllinux wheel. Without the flag, the day one stops, pip
+> silently falls back to a source build that needs a Rust/C toolchain this image does not carry
+> — about an hour on a Pi, or a confusing failure. With it the build fails immediately and says
+> which package. **A failure here is information; do not remove the flag to make it pass.**
+
+musl was verified, not assumed: `lxml`, `cryptography`, `bcrypt`, `pydantic_core`, `uvloop` and
+`httptools` all import and run (bcrypt round-trip, RSA keygen), and **container-name DNS
+resolves** — the classic Alpine trap — with both `socket.gethostbyname` and `httpx` reaching
+`calivi-searxng` over the compose network. The remaining known trade-off is musl's allocator
+being slower than glibc's on CPU-bound work; this workload is I/O-bound on LLM streaming, so it
+should not matter, but it was not benchmarked.
+
 ## Config Editor (Settings UI)
 
 The `config/*.yml` files can be edited as raw YAML from the System Prompts tab of the Settings
