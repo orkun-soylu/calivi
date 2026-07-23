@@ -9,6 +9,11 @@ Read this file before upgrading.
 
 ## [Unreleased]
 
+### Added
+
+- A favicon, so the browser tab shows the Calivi mark instead of a blank page icon. It is the
+  same mark the calivi.ai landing page uses.
+
 ## [0.1.0] — 2026-07-22
 
 The first tagged release. Everything below already worked before this tag; it marks a point
