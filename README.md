@@ -226,7 +226,9 @@ CALIVI_SECRET_KEY=...   # signs sessions AND encrypts stored secrets — see the
 Other variables the backend understands (`backend/app/config.py`): `DB_PATH`,
 `SYSTEM_PROMPTS_PATH`, `TOOLS_CONFIG_PATH`, `SEARXNG_URL`, `CORS_ORIGINS`,
 `LOGIN_MAX_ATTEMPTS`, `LOGIN_WINDOW_SECONDS`, `REGISTER_MAX_SUCCESS`,
-`REGISTER_WINDOW_SECONDS`, `CALIVI_SECRET_KEY_OLD` (key rotation, above).
+`REGISTER_WINDOW_SECONDS`, `OLLAMA_CHAT_TIMEOUT` (seconds, default `300` — raise it if you
+send very large prompts, see [ARCHITECTURE](ARCHITECTURE.md#long-prompts-and-the-streaming-timeout)),
+`CALIVI_SECRET_KEY_OLD` (key rotation, above).
 
 > ### ⚠️ Putting it behind HTTPS: set `COOKIE_SECURE=true`
 > This Compose file serves plain HTTP, so the default is `false`. If you put Calivi

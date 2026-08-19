@@ -54,7 +54,15 @@ SECRET_KEY_OLD = os.environ.get("CALIVI_SECRET_KEY_OLD", "")
 SEARXNG_URL = os.environ.get("SEARXNG_URL", "http://calivi-searxng:8080")
 
 OLLAMA_PROBE_TIMEOUT = 2.0
-OLLAMA_CHAT_TIMEOUT = 300.0
+
+# Streaming chat timeout, shared by the Ollama and OpenAI-compatible clients. It is httpx's
+# per-read timeout, not a total budget: it caps the silence BETWEEN stream chunks. Prompt
+# processing (prefill) happens before the first chunk, so a large prompt spends that whole
+# time silent and the read times out mid-prefill. A local 27B at long context prefills around
+# 240 tok/s, which puts the default's ceiling near 70-100k prompt tokens; past that the stream
+# is dropped before the model has said anything, and the user sees a bare timeout with no clue
+# that the prompt was simply too long. Configurable so large-context setups can raise it.
+OLLAMA_CHAT_TIMEOUT = float(os.environ.get("OLLAMA_CHAT_TIMEOUT", "300"))
 OPENAI_PROBE_TIMEOUT = 5.0  # a little longer, since these APIs are remote
 SEARCH_TIMEOUT = 15.0  # SearXNG JSON search
 

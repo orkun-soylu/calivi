@@ -13,6 +13,11 @@ Read this file before upgrading.
 
 - A favicon, so the browser tab shows the Calivi mark instead of a blank page icon. It is the
   same mark the calivi.ai landing page uses.
+- `OLLAMA_CHAT_TIMEOUT` is now configurable via environment variable (seconds, default `300`,
+  unchanged). The old hard-coded value silently dropped very large prompts: it caps the silence
+  between stream chunks, and prompt processing produces none, so a prompt big enough to prefill
+  for over five minutes timed out before the model had said anything — with no hint that its
+  size was the cause. Large-context setups can now raise it.
 
 ## [0.1.0] — 2026-07-22
 

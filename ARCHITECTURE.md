@@ -965,6 +965,31 @@ creates a real server and a real message → ownership is the only source of the
 under the same mutation). **When adding a new guard test, deliberately break the guard and confirm
 the test actually fails.**
 
+## Long prompts and the streaming timeout
+
+`OLLAMA_CHAT_TIMEOUT` (`config.py`, default **300 s**, env-configurable) is passed to
+`httpx.AsyncClient(timeout=...)` in both `ollama_client.stream_chat` and the OpenAI-compatible
+client. Despite the name it is a **per-read** timeout, not a total budget: it limits how long the
+stream may stay silent between chunks, so a slow-but-talking model never trips it.
+
+The trap is **prefill**. Prompt processing finishes before the first chunk is emitted, so the
+whole prefill is silence as far as httpx is concerned. Prefill also gets slower as the prompt
+grows — a local 27B dense model measured **239 tok/s at a 168k-token prompt** (vs ~580 tok/s at
+25k). At the default 300 s that puts the ceiling somewhere around **70-100k prompt tokens**.
+
+Past that the read times out *before the model has produced anything*, and the failure is
+indistinguishable from a dead server: no partial answer, no message, just a timeout. Nothing in
+the error says "your prompt was too long", which is exactly why this is written down.
+
+Two things follow:
+
+- **Raising the limit is the fix for large-context setups**, not a workaround. A 262k-context
+  local model can legitimately need 10+ minutes of prefill.
+- The existing "forward the thinking phase so the stream does not go silent" comment in
+  `stream_chat` solves the *neighbouring* problem (silence during reasoning, which could get an
+  intermediate proxy to drop the connection). It does not help here, because prefill happens
+  before any token — thinking or otherwise — exists to forward.
+
 ## Server probe cache
 
 The frontend calls `GET /api/servers` **every 3 seconds**. Previously each request live-probed
