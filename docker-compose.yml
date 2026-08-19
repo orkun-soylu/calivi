@@ -29,6 +29,12 @@ services:
       # not from the LAN IP" trap). If you put this behind a TLS-terminating reverse proxy,
       # you MUST set it: COOKIE_SECURE=true
       - COOKIE_SECURE=${COOKIE_SECURE:-false}
+      # Seconds a streaming chat may stay SILENT before httpx gives up — not a total
+      # budget. Prompt processing emits nothing, so a large prompt spends its whole prefill
+      # silent and trips this before the model has said a word; the failure looks exactly
+      # like a dead server. The default suits typical chat; raise it for local models with
+      # very large context windows. See ARCHITECTURE.md.
+      - OLLAMA_CHAT_TIMEOUT=${OLLAMA_CHAT_TIMEOUT:-300}
     volumes:
       - calivi-data:/data
       - ./config:/config
