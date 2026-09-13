@@ -25,6 +25,10 @@ Read this file before upgrading.
   bottom on every new token. The chat now follows new output only while you are at the bottom;
   scroll up and it stays where you left it, scroll back down and it follows again. Sending a
   message or opening a chat still takes you to the end.
+- When a tool-using answer hit the `max_iterations` cap, the model could reply with a tool call
+  written out as text (for example `<…:function_calls>` markup) instead of an answer, and that
+  markup was saved as the reply. The last turn already ran without tools; it now also tells the
+  model so — no tools left, answer from the results gathered, do not write tool calls.
 
 ## [0.1.0] — 2026-07-22
 

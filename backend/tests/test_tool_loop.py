@@ -14,9 +14,9 @@ import json
 
 import pytest
 
-from app import llm
+from app import llm, tools_config
 from app.database import SessionLocal
-from app.routers.chats import build_stream_response
+from app.routers.chats import FINAL_TURN_NOTICE, build_stream_response
 from app.tools.registry import Tool, registry
 
 
@@ -125,3 +125,70 @@ async def test_successful_tool_is_reported_as_ok(monkeypatch, chat_id):
         assert results == [{"type": "tool_result", "name": "fine_test_tool", "ok": True}]
     finally:
         registry._tools.pop("fine_test_tool", None)
+
+
+# --- The capped last turn ------------------------------------------------------------------
+# Regression: the last permitted turn used to lose its tools silently. A local model that still
+# wanted to search wrote the call out as text, no tool_calls arrived, and that markup was saved
+# as the answer. These drive a model that asks for a tool whenever it is offered one.
+
+_TARGET = {"name": "s", "type": "ollama", "host": "h", "port": 1, "base_url": None, "api_key": None}
+
+
+@pytest.fixture
+def cap_tool():
+    async def handler(args):
+        return "a result"
+
+    registry.register(
+        Tool(
+            name="cap_test_tool",
+            description="d",
+            parameters={"type": "object", "properties": {}},
+            handler=handler,
+        )
+    )
+    yield
+    registry._tools.pop("cap_test_tool", None)
+
+
+async def _run_tool_hungry_model(monkeypatch, chat_id, max_iterations):
+    """Returns, per turn, the (tools, messages) the model was called with."""
+    seen = []
+
+    async def stream_chat(target, model, messages, tools=None):
+        seen.append((tools, [dict(m) for m in messages]))
+        if tools:
+            call = {"id": f"c{len(seen)}", "name": "cap_test_tool", "arguments": {}}
+            yield {"type": "tool_calls", "calls": [call]}
+        else:
+            yield {"type": "content", "text": "final answer"}
+
+    monkeypatch.setattr(llm, "stream_chat", stream_chat)
+    monkeypatch.setattr(tools_config, "is_enabled", lambda: True)
+    monkeypatch.setattr(tools_config, "tool_enabled", lambda name: True)
+    monkeypatch.setattr(tools_config, "get_max_iterations", lambda: max_iterations)
+    resp = build_stream_response(
+        chat_id, _TARGET, "m", [{"role": "user", "content": "hi"}], use_tools=True
+    )
+    async for _chunk in resp.body_iterator:
+        pass
+    return seen
+
+
+def _has_notice(messages):
+    return any(m.get("content") == FINAL_TURN_NOTICE for m in messages)
+
+
+async def test_capped_last_turn_drops_tools_and_tells_the_model(monkeypatch, chat_id, cap_tool):
+    seen = await _run_tool_hungry_model(monkeypatch, chat_id, max_iterations=2)
+    assert [bool(tools) for tools, _ in seen] == [True, False]
+    assert not _has_notice(seen[0][1])
+    assert seen[1][1][-1] == {"role": "user", "content": FINAL_TURN_NOTICE}
+
+
+async def test_single_turn_budget_sends_no_notice(monkeypatch, chat_id, cap_tool):
+    """max_iterations 1: no tool ran, so there are no results for the notice to point at."""
+    seen = await _run_tool_hungry_model(monkeypatch, chat_id, max_iterations=1)
+    assert len(seen) == 1
+    assert not _has_notice(seen[0][1])
