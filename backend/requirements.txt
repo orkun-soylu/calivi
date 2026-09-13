@@ -17,7 +17,7 @@ pydantic==2.11.10
 pyyaml==6.0.2
 # 6.13.3 clears every open pypdf advisory (crafted-PDF infinite loops / RAM exhaustion) —
 # all reachable via /api/extract with nothing but a logged-in account.
-pypdf==6.13.3
+pypdf==6.16.1
 python-docx==1.1.2
 # 0.0.31 clears the multipart-parsing DoS advisories (preamble/epilogue, part-header
 # and Content-Length abuse) — the parser sits in front of /api/extract.
