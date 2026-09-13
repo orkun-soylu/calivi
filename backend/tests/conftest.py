@@ -12,7 +12,7 @@ import tempfile
 TMP = tempfile.mkdtemp(prefix="calivi-tests-")
 
 os.environ["DB_PATH"] = os.path.join(TMP, "test.db")
-os.environ["CALIVI_SECRET_KEY"] = "test-secret-key"  # keeps it from writing /data/secret_key
+os.environ["CALIVI_SECRET_KEY"] = "test-secret-key-long-enough-for-hs256-0123456789"  # keeps it from writing /data/secret_key
 os.environ["COOKIE_SECURE"] = "false"  # httpx will not send Secure cookies to http://testserver
 os.environ["SYSTEM_PROMPTS_PATH"] = os.path.join(TMP, "system_prompts.yml")
 os.environ["VISION_OVERRIDES_PATH"] = os.path.join(TMP, "vision_models.yml")

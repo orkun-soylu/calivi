@@ -30,6 +30,20 @@ Read this file before upgrading.
   markup was saved as the reply. The last turn already ran without tools; it now also tells the
   model so — no tools left, answer from the results gathered, do not write tool calls.
 
+### Security
+
+- Dependency updates for published advisories. Dependabot's grouped pull requests for these could
+  not be installed as proposed — Starlette 1.x needs a newer FastAPI, and Vite 8 needs a newer
+  React plugin — so the fixes land here as a set that resolves and passes the tests:
+  - **Backend:** FastAPI 0.115.6 → 0.141.1 with Starlette 0.41.3 → 1.3.1 (7 advisories, among them
+    a denial of service through large multipart uploads, which the document upload uses), and
+    PyJWT 2.10.1 → 2.13.0 (7 advisories; sessions are HS256 with a server-side secret, so the
+    JWK and key-confusion ones do not apply, while the unbounded-decoding denial of service does).
+  - **Test tooling:** pytest 8.3.4 → 9.0.3 and pytest-asyncio 0.25.0 → 1.4.0 (the old plugin pins
+    pytest below 9). The test JWT secret is now 48 bytes, since PyJWT 2.13 warns below 32.
+  - **Frontend build:** PostCSS → 8.5.28. Vite stays on 6.4.3, which has no open advisory; moving
+    to Vite 8 is left for a separate change.
+
 ## [0.1.0] — 2026-07-22
 
 The first tagged release. Everything below already worked before this tag; it marks a point
