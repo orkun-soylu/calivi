@@ -318,6 +318,8 @@ warnings live there.
 
 ## Security
 
+Found a vulnerability? Please report it privately — see [SECURITY.md](SECURITY.md).
+
 Calivi is designed as a single-tenant application running on your own network. Before
 exposing it directly to the internet, know that:
 
@@ -326,7 +328,8 @@ exposing it directly to the internet, know that:
 - The frontend is served with a strict Content-Security-Policy; remote images in model
   output are not fetched (a data-exfiltration vector).
 - Login attempts are rate-limited per account (default: 5 attempts / 15 minutes).
-- The tool layer is currently **read-only** — state-changing tools are rejected.
+- Tools that can change state are **off by default**. An admin has to enable them, and even
+  then every single run waits for a person to approve it; silence counts as a denial.
 
 ---
 

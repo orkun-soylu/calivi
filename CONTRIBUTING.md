@@ -151,17 +151,18 @@ tests alone. The app comes up with `docker compose up -d --build`.
 
 ## 6. Security
 
-If you find a vulnerability, **do not open a public issue** — contact the maintainer
-directly.
+If you find a vulnerability, **do not open a public issue** — report it privately as
+described in [SECURITY.md](SECURITY.md).
 
 Things to know while contributing:
 
 - Web search results and document attachments count as **untrusted content** and are
   passed to the model inside delimited blocks (`_wrap_untrusted`). If you add another
   path that carries external content to the model, use the same wrapping.
-- The tool layer is currently **read-only**: tools declared `mutating=True` are rejected.
-  A pull request that opens this gate will not be accepted without human-in-the-loop
-  approval and capability scoping.
+- Tools that change state run **only after a person approves each call**: `registry.execute`
+  refuses a `mutating=True` tool unless the approval flow in `routers/chats.py` returned a yes,
+  and MCP tools without `readOnlyHint` stay off until an admin opts in. A pull request that
+  lets a state-changing tool run without that approval will not be accepted.
 - The frontend is served under a strict Content-Security-Policy. If you edit the inline
   theme-bootstrap script in `index.html`, **recompute the CSP hash** (explained in a
   comment in `frontend/nginx.conf`), or the theme will flash on load.
