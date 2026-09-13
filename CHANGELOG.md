@@ -19,6 +19,13 @@ Read this file before upgrading.
   for over five minutes timed out before the model had said anything — with no hint that its
   size was the cause. Large-context setups can now raise it.
 
+### Fixed
+
+- When a tool-using answer hit the `max_iterations` cap, the model could reply with a tool call
+  written out as text (for example `<…:function_calls>` markup) instead of an answer, and that
+  markup was saved as the reply. The last turn already ran without tools; it now also tells the
+  model so — no tools left, answer from the results gathered, do not write tool calls.
+
 ## [0.1.0] — 2026-07-22
 
 The first tagged release. Everything below already worked before this tag; it marks a point

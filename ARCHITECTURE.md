@@ -580,7 +580,13 @@ tool is still called `web_search` — that is a tool name, and it is accurate.
    line).
 4. **On the last permitted turn the tools are removed** (`turn_tools=None`) → the model is forced
    to produce a final answer from what it has, rather than looping on searches and never answering
-   (observed end-to-end, then added).
+   (observed end-to-end, then added). **Removing them is not enough on its own, so the turn also
+   carries `FINAL_TURN_NOTICE`** (a user-role message: tools are gone, answer from the results
+   above, do not write tool calls). Without it a local 30B model that still wanted to search
+   wrote its call out as text (`<…:function_calls><…:invoke name="mcp__exa__web_search_exa">`);
+   no `tool_calls` arrived, the loop broke, and that markup was saved as the answer. The notice
+   is only added when at least one tool turn ran (`i > 0`) — with `max_iterations: 1` there are
+   no results to point at.
 5. **Reload chips:** every **successful** tool call writes a chip into the last user message's
    `attachments` (`_chip_for` → `_persist_chips`), deduplicated by label, so it survives a reload.
    Tool turns themselves are **not persisted** as messages (the final answer carries the context)
