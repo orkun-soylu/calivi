@@ -2,7 +2,7 @@ fastapi==0.115.6
 # Pinned explicitly, not left to fastapi's transitive resolution: `mcp` declares an open
 # `starlette>=0.27`, so an unconstrained rebuild resolves starlette to 1.x and silently breaks
 # fastapi 0.115.6 (which requires <0.42). Bump these two together, never one alone.
-starlette==0.41.3
+starlette==1.3.1
 # The `[standard]` extra is deliberately NOT used: it pulls `websockets` and `watchfiles`, and
 # neither is reachable here — streaming is Server-Sent Events (`StreamingResponse`, see
 # chats.py), there is no WebSocket endpoint, and the container CMD has no `--reload`. That is
@@ -23,7 +23,7 @@ python-docx==1.1.2
 # and Content-Length abuse) — the parser sits in front of /api/extract.
 python-multipart==0.0.31
 bcrypt==4.2.1
-PyJWT==2.10.1
+PyJWT==2.13.0
 # MCP client (Streamable HTTP + the older HTTP+SSE transport). Pulls pyjwt[crypto], so
 # `cryptography` is now available without adding a dependency of its own.
 mcp==1.28.1
