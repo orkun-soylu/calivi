@@ -53,8 +53,6 @@ function overlay(container) {
 
 beforeEach(() => {
   localStorage.clear();
-  // jsdom does not implement scrollIntoView; MessageList calls it on every render.
-  Element.prototype.scrollIntoView = vi.fn();
 });
 
 describe("lightbox", () => {

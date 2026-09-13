@@ -7,6 +7,10 @@ import ApprovalCard from "./ApprovalCard.jsx";
 import { searchLabel } from "../../lib/format.js";
 import { useT } from "../../i18n.js";
 
+/** Within this many px of the bottom the list counts as "at the bottom" and follows new output;
+ *  scrolled further up, it stays where the user left it. */
+export const STICK_THRESHOLD_PX = 32;
+
 /** The message stream: persisted messages + the optimistic user bubble + live stream indicators. */
 export default function MessageList({
   chat,
@@ -21,16 +25,52 @@ export default function MessageList({
   onInspect,
 }) {
   const t = useT();
-  const bottomRef = useRef(null);
+  const scrollRef = useRef(null);
+  // Follow new output only while the user is at the bottom. The list used to scroll to the end on
+  // every streamed token, so scrolling up to read a long answer was undone mid-sentence.
+  const stickRef = useRef(true);
+  // Where the list last scrolled itself to. The browser delivers that scroll's event a frame later,
+  // and content can grow in between (a code block arriving), so a plain distance-from-bottom check
+  // read the list's own scroll as the user leaving. Only moving above this position is the user.
+  const autoTopRef = useRef(0);
   const { streaming, thinking, sending, searchInfo, approval } = stream;
 
+  const onScroll = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    if (el.scrollHeight - el.scrollTop - el.clientHeight <= STICK_THRESHOLD_PX) {
+      stickRef.current = true;
+    } else if (el.scrollTop < autoTopRef.current - 1) {
+      stickRef.current = false;
+    }
+  };
+
+  // Opening a chat or sending a message means "take me to the end" again. A finishing answer
+  // (pending.user back to null) does not: the user may be reading further up.
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    stickRef.current = true;
+  }, [chat?.id]);
+  useEffect(() => {
+    if (pending.user !== null) stickRef.current = true;
+  }, [pending.user]);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    // Instant, not smooth: a smooth scroll emits intermediate scroll events, which read as the user
+    // leaving the bottom and would switch following off in the middle of a stream.
+    if (el && stickRef.current) {
+      el.scrollTop = el.scrollHeight;
+      autoTopRef.current = el.scrollTop; // read back: the browser clamps it to the real maximum
+    }
   }, [chat?.messages, streaming, thinking, pending.user]);
 
   return (
     <div className="relative flex-1 min-h-0">
-      <div className="themed-scroll h-full overflow-y-auto px-6 py-6 space-y-4">
+      <div
+        ref={scrollRef}
+        onScroll={onScroll}
+        className="themed-scroll h-full overflow-y-auto px-6 py-6 space-y-4"
+      >
         {chat?.messages.map((m) =>
           m.role === "user" && edit.editingId === m.id ? (
             <MessageEditor
@@ -114,7 +154,6 @@ export default function MessageList({
             </div>
           </div>
         )}
-        <div ref={bottomRef} />
       </div>
       {/* Top/bottom fade: a dark→transparent transition from the model-picker and composer bars
           into the message area. Inset 10px from the right so it does not cover the scrollbar. */}

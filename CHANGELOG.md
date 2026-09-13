@@ -19,6 +19,13 @@ Read this file before upgrading.
   for over five minutes timed out before the model had said anything — with no hint that its
   size was the cause. Large-context setups can now raise it.
 
+### Fixed
+
+- Scrolling up to read a long answer while it was still streaming no longer snaps back to the
+  bottom on every new token. The chat now follows new output only while you are at the bottom;
+  scroll up and it stays where you left it, scroll back down and it follows again. Sending a
+  message or opening a chat still takes you to the end.
+
 ## [0.1.0] — 2026-07-22
 
 The first tagged release. Everything below already worked before this tag; it marks a point
