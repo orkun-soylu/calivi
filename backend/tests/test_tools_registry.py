@@ -107,3 +107,18 @@ async def test_web_search_builtin_is_registered_and_read_only():
 
     tool = registry.get("web_search")
     assert tool is not None and tool.mutating is False
+
+
+async def test_unknown_name_hints_the_namespaced_tool(reg):
+    """A model that drops the MCP namespace gets the real name back instead of a dead end."""
+    reg.register(_tool(name="mcp__cve__scan_packages", source="mcp:cve"))
+    result = await reg.execute("scan_packages", {})
+    assert result.startswith("ERROR:") and "Did you mean 'mcp__cve__scan_packages'?" in result
+    assert "Did you mean" in await reg.execute("other__scan_packages", {})
+
+
+async def test_unknown_name_gives_no_hint_when_ambiguous_or_absent(reg):
+    reg.register(_tool(name="mcp__a__search", source="mcp:a"))
+    reg.register(_tool(name="mcp__b__search", source="mcp:b"))
+    assert "Did you mean" not in await reg.execute("search", {})
+    assert "Did you mean" not in await reg.execute("nothing_like_it", {})

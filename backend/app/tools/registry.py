@@ -70,10 +70,18 @@ class ToolRegistry:
         """
         tool = self._tools.get(name)
         if tool is None:
-            return f"{ERROR_PREFIX} no tool named '{name}'."
+            return f"{ERROR_PREFIX} no tool named '{name}'.{self._name_hint(name)}"
         if tool.mutating and not approved:
             return f"{ERROR_PREFIX} tool '{name}' changes state and was not approved."
         return await tool.handler(args or {})
+
+    def _name_hint(self, name: str) -> str:
+        """Points at the real name when a model drops a namespace (calls `scan_packages` for
+        `mcp__cve__scan_packages`). Only a hint: running the guessed tool would bypass the loop's
+        per-name approval lookup, and an ambiguous guess could run the wrong server's tool."""
+        bare = name.rsplit("__", 1)[-1]
+        matches = [n for n in self._tools if n.rsplit("__", 1)[-1] == bare]
+        return f" Did you mean '{matches[0]}'?" if len(matches) == 1 else ""
 
 
 registry = ToolRegistry()

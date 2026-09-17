@@ -11,6 +11,10 @@ Read this file before upgrading.
 
 ### Added
 
+- When a model calls a tool by a name that does not exist but matches exactly one registered
+  tool once the namespace is dropped (`scan_packages` for `mcp__cve__scan_packages`), the error
+  returned to the model now names the real tool, so its next attempt can succeed. The tool is not
+  run on the guess.
 - A favicon, so the browser tab shows the Calivi mark instead of a blank page icon. It is the
   same mark the calivi.ai landing page uses.
 - `OLLAMA_CHAT_TIMEOUT` is now configurable via environment variable (seconds, default `300`,
