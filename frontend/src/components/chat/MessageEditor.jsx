@@ -16,7 +16,7 @@ export default function MessageEditor({
   const t = useT();
   return (
     <div className="flex justify-end">
-      <div className="w-full max-w-[70%] rounded-2xl border border-accent/50 bg-neutral-900 p-3 space-y-2">
+      <div className="w-full max-w-[88%] md:max-w-[70%] rounded-2xl border border-accent/50 bg-neutral-900 p-3 space-y-2">
         <textarea
           value={content}
           onChange={(e) => onContentChange(e.target.value)}

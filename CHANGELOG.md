@@ -11,6 +11,10 @@ Read this file before upgrading.
 
 ### Added
 
+- A phone layout (#61). Below 768px the chat list and the open chat are separate full-screen
+  views: tap a chat to open it, and the back button — or your phone's back gesture — returns to
+  the list. Message bubbles use more of the width, the model pickers shrink to fit, and Settings
+  opens full screen. The desktop layout is unchanged.
 - When a model calls a tool by a name that does not exist but matches exactly one registered
   tool once the namespace is dropped (`scan_packages` for `mcp__cve__scan_packages`), the error
   returned to the model now names the real tool, so its next attempt can succeed. The tool is not

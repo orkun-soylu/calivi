@@ -5,6 +5,7 @@ import SettingsModal from "./components/SettingsModal.jsx";
 import AuthView from "./components/AuthView.jsx";
 import { SettingsIcon } from "./components/icons.jsx";
 import { api, setUnauthorizedHandler } from "./api.js";
+import { useIsMobile } from "./hooks/useIsMobile.js";
 import { useT } from "./i18n.js";
 
 // Renders a chat as plain text: title + "User:" / "Assistant (model @ server):" blocks.
@@ -29,6 +30,7 @@ const ACTIVE_CHAT_KEY = "calivi_active_chat_id";
 
 export default function App() {
   const t = useT();
+  const isMobile = useIsMobile();
 
   // Session state: me=null + authReady=true → show AuthView.
   const [me, setMe] = useState(null);
@@ -57,7 +59,12 @@ export default function App() {
   }, []);
 
   const refreshActiveChat = useCallback(async (id) => {
-    if (!id) return;
+    if (!id) {
+      // Closing a chat (the phone layout's back button) must drop the loaded detail too, or
+      // the chat stays on screen with no id behind it.
+      setActiveChat(null);
+      return;
+    }
     try {
       setActiveChat(await api.getChat(id));
     } catch {
@@ -122,10 +129,36 @@ export default function App() {
     setSettingsOpen(false);
   }
 
+  // Phone layout (#61): opening a chat pushes a history entry, so the device's back gesture
+  // returns to the list instead of leaving the app. Desktop keeps a single history entry.
+  const openChat = useCallback(
+    (id) => {
+      if (isMobile && id && window.history.state?.caliviChat == null) {
+        window.history.pushState({ caliviChat: id }, "");
+      }
+      setActiveChatId(id);
+    },
+    [isMobile]
+  );
+
+  function closeChat() {
+    if (window.history.state?.caliviChat != null) window.history.back(); // → popstate below
+    else setActiveChatId(null);
+  }
+
+  useEffect(() => {
+    if (!isMobile) return;
+    function onPop() {
+      if (window.history.state?.caliviChat == null) setActiveChatId(null);
+    }
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, [isMobile]);
+
   async function handleNewChat() {
     const chat = await api.createChat();
     await refreshChats();
-    setActiveChatId(chat.id);
+    openChat(chat.id);
   }
 
   async function handleDeleteChat(id) {
@@ -184,18 +217,25 @@ export default function App() {
   }
 
   if (!authReady) {
-    return <div className="flex items-center justify-center h-screen text-neutral-500">{t("common.loading")}</div>;
+    return <div className="flex items-center justify-center h-dvh text-neutral-500">{t("common.loading")}</div>;
   }
   if (!me) {
     return <AuthView registrationEnabled={registrationEnabled} onAuthed={handleAuthed} />;
   }
 
+  // On a phone only one of the two panes is on screen: the list, or the open chat.
+  const showSidebar = !isMobile || !activeChat;
+  const showMain = !isMobile || !!activeChat;
+
   return (
     <div className="flex">
+      {showSidebar && (
       <Sidebar
+        mobile={isMobile}
+        onOpenSettings={() => setSettingsOpen(true)}
         chats={chats}
         activeChatId={activeChatId}
-        onSelectChat={setActiveChatId}
+        onSelectChat={openChat}
         onNewChat={handleNewChat}
         onDeleteChat={handleDeleteChat}
         onRenameChat={handleRenameChat}
@@ -204,9 +244,11 @@ export default function App() {
         me={me}
         onLogout={handleLogout}
       />
+      )}
 
-      {activeChat ? (
+      {!showMain ? null : activeChat ? (
         <ChatView
+          onBack={isMobile ? closeChat : undefined}
           chat={activeChat}
           servers={servers}
           onMessageSent={handleMessageSent}
@@ -214,7 +256,7 @@ export default function App() {
           onOpenSettings={() => setSettingsOpen(true)}
         />
       ) : (
-        <div className="flex-1 relative h-screen">
+        <div className="flex-1 relative h-dvh">
           <button
             onClick={() => setSettingsOpen(true)}
             className="absolute top-4 right-5 text-neutral-300 opacity-70 hover:opacity-100"

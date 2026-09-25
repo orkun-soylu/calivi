@@ -13,7 +13,7 @@ import { useT } from "../i18n.js";
 
 /** Orchestrates the chat screen: combines the selected target (useServerModel), stream state
  * (useChatStream) and attachment/edit state; the rendering is done by child components. */
-export default function ChatView({ chat, servers, onMessageSent, onForked, onOpenSettings }) {
+export default function ChatView({ chat, servers, onMessageSent, onForked, onOpenSettings, onBack }) {
   const t = useT();
   const { serverId, model, setTarget, upServers, selectedServer } = useServerModel(servers);
   const stream = useChatStream();
@@ -185,12 +185,24 @@ export default function ChatView({ chat, servers, onMessageSent, onForked, onOpe
   };
 
   return (
-    <div className="flex-1 flex flex-col h-screen">
-      <div className="flex items-center gap-3 px-5 py-4">
-        <ServerModelPicker servers={upServers} value={{ serverId, model }} onChange={setTarget} />
+    <div className="flex-1 min-w-0 flex flex-col h-dvh">
+      <div className="flex items-center gap-2 md:gap-3 px-3 py-3 md:px-5 md:py-4">
+        {/* Phone layout only (#61): back to the chat list. */}
+        {onBack && (
+          <button
+            onClick={onBack}
+            title={t("chat.back")}
+            className="shrink-0 w-9 h-9 -ml-1 rounded-full hover:bg-neutral-800 text-2xl leading-none text-neutral-300"
+          >
+            ‹
+          </button>
+        )}
+        <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1 md:flex-none">
+          <ServerModelPicker servers={upServers} value={{ serverId, model }} onChange={setTarget} />
+        </div>
         <button
           onClick={onOpenSettings}
-          className="ml-auto text-neutral-300 opacity-70 hover:opacity-100"
+          className="ml-auto shrink-0 text-neutral-300 opacity-70 hover:opacity-100"
           title={t("common.settings")}
         >
           <SettingsIcon className="w-5 h-5" />

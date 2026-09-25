@@ -1,10 +1,12 @@
 import { useState, useRef, useEffect } from "react";
-import { MenuIcon } from "./icons.jsx";
+import { MenuIcon, SettingsIcon } from "./icons.jsx";
 import { useT } from "../i18n.js";
 
 const WIDTH_KEY = "calivi_sidebar_width";
 
 export default function Sidebar({
+  mobile = false, // phone layout (#61): full-width list with its own header, no resize handle
+  onOpenSettings,
   chats,
   activeChatId,
   onSelectChat,
@@ -71,22 +73,45 @@ export default function Sidebar({
   }
 
   return (
-    <div className="relative shrink-0 bg-neutral-900 flex flex-col h-screen" style={{ width }}>
-      <div className="p-3">
-        <button
-          onClick={onNewChat}
-          className="w-full px-3 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-sm text-left transition-colors"
-        >
-          {t("sidebar.newChat")}
-        </button>
-      </div>
+    <div
+      className={`relative shrink-0 bg-neutral-900 flex flex-col h-dvh ${mobile ? "w-full" : ""}`}
+      style={mobile ? undefined : { width }}
+    >
+      {mobile ? (
+        <div className="flex items-center gap-2 px-4 pt-4 pb-2">
+          <div className="flex-1 text-lg font-semibold text-neutral-100">Calivi</div>
+          <button
+            onClick={onNewChat}
+            title={t("sidebar.newChat")}
+            className="w-10 h-10 rounded-full bg-neutral-800 hover:bg-neutral-700 text-xl leading-none"
+          >
+            +
+          </button>
+          <button
+            onClick={onOpenSettings}
+            title={t("common.settings")}
+            className="w-10 h-10 rounded-full bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center text-neutral-300"
+          >
+            <SettingsIcon className="w-5 h-5" />
+          </button>
+        </div>
+      ) : (
+        <div className="p-3">
+          <button
+            onClick={onNewChat}
+            className="w-full px-3 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-sm text-left transition-colors"
+          >
+            {t("sidebar.newChat")}
+          </button>
+        </div>
+      )}
 
       <div className="flex-1 overflow-y-auto themed-scroll px-3 space-y-1">
         {chats.map((chat) => (
           <div
             key={chat.id}
             onClick={() => renamingId !== chat.id && onSelectChat(chat.id)}
-            className={`group flex items-center gap-1.5 px-3 py-2 rounded-lg cursor-pointer text-sm ${
+            className={`group flex items-center gap-1.5 px-3 rounded-lg cursor-pointer ${mobile ? "py-3.5 text-base" : "py-2 text-sm"} ${
               chat.id === activeChatId ? "bg-neutral-800" : "hover:bg-neutral-800/60"
             }`}
           >
@@ -124,7 +149,7 @@ export default function Sidebar({
             )}
             <button
               onClick={(e) => openMenu(e, chat.id)}
-              className="opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 shrink-0 hover:bg-neutral-700 rounded p-0.5 text-neutral-300"
+              className={`opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 shrink-0 hover:bg-neutral-700 rounded text-neutral-300 ${mobile ? "p-2 -mr-2" : "p-0.5"}`}
               title={t("sidebar.menu")}
             >
               <MenuIcon className="w-4 h-4" />
@@ -154,10 +179,12 @@ export default function Sidebar({
       )}
 
       {/* Width resize handle (right edge) */}
-      <div
-        onMouseDown={() => (draggingRef.current = true)}
-        className="absolute top-0 right-0 h-full w-1.5 cursor-col-resize hover:bg-neutral-700/70"
-      />
+      {!mobile && (
+        <div
+          onMouseDown={() => (draggingRef.current = true)}
+          className="absolute top-0 right-0 h-full w-1.5 cursor-col-resize hover:bg-neutral-700/70"
+        />
+      )}
 
       {menu && menuChat && (
         <>

@@ -3,7 +3,9 @@
 export default function ServerModelPicker({ servers, value, onChange }) {
   const { serverId, model } = value;
   const selectedServer = servers.find((s) => s.id === serverId);
-  const cls = "bg-neutral-800 text-sm rounded-lg px-2 py-1 border border-neutral-700";
+  // On a phone the two selects share the row and shrink (min-w-0 + flex-1) rather than push the
+  // header buttons off screen with a long model name (#61). Desktop sizes them to content.
+  const cls = "bg-neutral-800 text-sm rounded-lg px-2 py-1 border border-neutral-700 min-w-0 flex-1 md:flex-none";
 
   function handleServerChange(raw) {
     const next = Number(raw);

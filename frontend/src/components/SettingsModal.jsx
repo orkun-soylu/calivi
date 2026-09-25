@@ -7,6 +7,7 @@ import { api } from "../api.js";
 import { useT, useLang, setLang, LANGUAGES } from "../i18n.js";
 import { useTheme, setTheme } from "../theme.js";
 import { useAccent, setAccent, ACCENTS } from "../accent.js";
+import { useIsMobile } from "../hooks/useIsMobile.js";
 
 export default function SettingsModal({ servers, me, onClose, onAdd, onUpdate, onDelete, onMeUpdated, onAccountDeleted }) {
   const t = useT();
@@ -14,6 +15,8 @@ export default function SettingsModal({ servers, me, onClose, onAdd, onUpdate, o
   const theme = useTheme();
   const accent = useAccent();
   const isAdmin = me?.role === "admin";
+  // Phone layout (#61): the 816px draggable window does not fit — go full screen instead.
+  const isMobile = useIsMobile();
 
   // Tabs: Servers is admin-only. Users is visible to everyone
   // (admin → full list + management, regular user → only their own row + profile editing).
@@ -141,20 +144,25 @@ export default function SettingsModal({ servers, me, onClose, onAdd, onUpdate, o
   return (
     <div className="fixed inset-0 bg-black/40 z-50">
       <div
-        className="absolute bg-neutral-900 rounded-2xl shadow-2xl ring-1 ring-neutral-700/60 flex flex-col overflow-hidden"
-        style={{ left: pos.x, top: pos.y, width: size.w, height: size.h }}
+        className={`absolute bg-neutral-900 flex flex-col overflow-hidden ${
+          isMobile ? "inset-0" : "rounded-2xl shadow-2xl ring-1 ring-neutral-700/60"
+        }`}
+        style={isMobile ? undefined : { left: pos.x, top: pos.y, width: size.w, height: size.h }}
       >
         {/* Title bar = drag handle */}
         <div
-          onMouseDown={startDrag}
-          className="flex items-center justify-between px-5 py-3 cursor-move select-none shrink-0"
+          onMouseDown={isMobile ? undefined : startDrag}
+          className={`flex items-center justify-between gap-2 py-3 select-none shrink-0 ${
+            isMobile ? "px-3" : "px-5 cursor-move"
+          }`}
         >
-          <div className="flex gap-1">
+          {/* Tabs scroll sideways on a phone rather than wrapping into the content. */}
+          <div className="flex gap-1 min-w-0 overflow-x-auto">
             {TABS.map((tb) => (
               <button
                 key={tb.id}
                 onClick={() => setTab(tb.id)}
-                className={`px-3 py-1.5 rounded-lg text-sm ${
+                className={`shrink-0 px-3 py-1.5 rounded-lg text-sm ${
                   tab === tb.id ? "bg-neutral-800 text-neutral-100" : "text-neutral-400 hover:bg-neutral-800/60"
                 }`}
               >
@@ -162,13 +170,13 @@ export default function SettingsModal({ servers, me, onClose, onAdd, onUpdate, o
               </button>
             ))}
           </div>
-          <button onClick={onClose} className="text-neutral-500 hover:text-neutral-200">
+          <button onClick={onClose} className="shrink-0 px-1 text-neutral-500 hover:text-neutral-200">
             ✕
           </button>
         </div>
 
         {/* Content */}
-        <div className="flex-1 min-h-0 px-5 pb-5">
+        <div className="flex-1 min-h-0 px-3 pb-3 md:px-5 md:pb-5">
           {tab === "general" && (
             <div className="h-full overflow-y-auto themed-scroll">
               {/* Row-based settings. Future settings are added here as additional rows. */}
@@ -382,6 +390,7 @@ export default function SettingsModal({ servers, me, onClose, onAdd, onUpdate, o
         </div>
 
         {/* Resize handle (bottom-right corner) */}
+        {!isMobile && (
         <div
           onMouseDown={startResize}
           className="absolute bottom-0 right-0 w-5 h-5 flex items-end justify-end pr-1 pb-0.5 cursor-nwse-resize text-neutral-600 hover:text-neutral-400 text-xs leading-none select-none"
@@ -389,6 +398,7 @@ export default function SettingsModal({ servers, me, onClose, onAdd, onUpdate, o
         >
           ◢
         </div>
+        )}
       </div>
     </div>
   );

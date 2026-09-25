@@ -69,7 +69,7 @@ export default function MessageList({
       <div
         ref={scrollRef}
         onScroll={onScroll}
-        className="themed-scroll h-full overflow-y-auto px-6 py-6 space-y-4"
+        className="themed-scroll h-full overflow-y-auto px-3 py-4 md:px-6 md:py-6 space-y-4"
       >
         {chat?.messages.map((m) =>
           m.role === "user" && edit.editingId === m.id ? (
@@ -98,7 +98,7 @@ export default function MessageList({
 
         {pending.user !== null && (
           <div className="flex justify-end">
-            <div className="max-w-[70%] rounded-2xl px-4 py-2 whitespace-pre-wrap bg-accent text-white">
+            <div className="max-w-[88%] md:max-w-[70%] rounded-2xl px-4 py-2 whitespace-pre-wrap bg-accent text-white">
               {pending.images.length > 0 && (
                 <div className="flex gap-2 flex-wrap mb-2">
                   {/* Same behaviour as the persisted images in MessageItem: it must stay
@@ -132,7 +132,7 @@ export default function MessageList({
 
         {sending && searchInfo && (
           <div className="flex justify-start">
-            <div className="max-w-[70%] rounded-xl px-3 py-1.5 bg-neutral-900 text-neutral-400 text-xs">
+            <div className="max-w-[88%] md:max-w-[70%] rounded-xl px-3 py-1.5 bg-neutral-900 text-neutral-400 text-xs">
               {searchLabel(t, searchInfo)}
             </div>
           </div>
@@ -141,7 +141,7 @@ export default function MessageList({
         {/* Fixed height: as the thinking text grows the box must not expand and jump the page. */}
         {sending && thinking && !streaming && (
           <div className="flex justify-start">
-            <div className="w-[70%] h-64 overflow-hidden rounded-2xl px-4 py-2 bg-neutral-900 text-neutral-500 text-sm italic whitespace-pre-wrap flex flex-col justify-end">
+            <div className="w-[88%] md:w-[70%] h-64 overflow-hidden rounded-2xl px-4 py-2 bg-neutral-900 text-neutral-500 text-sm italic whitespace-pre-wrap flex flex-col justify-end">
               💭 {thinking.slice(-400)}
             </div>
           </div>
@@ -149,7 +149,7 @@ export default function MessageList({
 
         {sending && (streaming || !thinking) && (
           <div className="flex justify-start">
-            <div className="max-w-[70%] rounded-2xl px-4 py-2 bg-neutral-800 text-neutral-100">
+            <div className="max-w-[88%] md:max-w-[70%] rounded-2xl px-4 py-2 bg-neutral-800 text-neutral-100">
               {streaming ? <Markdown content={streaming} /> : "…"}
             </div>
           </div>
