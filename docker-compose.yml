@@ -35,6 +35,11 @@ services:
       # like a dead server. The default suits typical chat; raise it for local models with
       # very large context windows. See ARCHITECTURE.md.
       - OLLAMA_CHAT_TIMEOUT=${OLLAMA_CHAT_TIMEOUT:-300}
+      # Conversation compaction: the estimated context size (tokens) at which the UI suggests
+      # compacting a chat, and how many recent turns stay verbatim. Compaction itself is
+      # always started by the user.
+      - COMPACT_SUGGEST_TOKENS=${COMPACT_SUGGEST_TOKENS:-16000}
+      - COMPACT_KEEP_TURNS=${COMPACT_KEEP_TURNS:-4}
     volumes:
       - calivi-data:/data
       - ./config:/config

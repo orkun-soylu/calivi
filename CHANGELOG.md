@@ -11,6 +11,14 @@ Read this file before upgrading.
 
 ### Added
 
+- Conversation compaction (#62). A long chat can now be compacted: older messages are
+  summarised by the model you pick, and from then on the model gets that summary plus the last
+  few turns instead of the whole history — so a long chat no longer has to be fully re-processed
+  after a restart. The messages themselves stay in the chat. Compaction only happens when you
+  ask for it; past an estimated size (`COMPACT_SUGGEST_TOKENS`, default 16000) the chat suggests
+  it. A switch sends the full history again whenever a detail matters, and "View summary" shows
+  exactly what the model is working from. Editing or deleting a summarised message drops the
+  summary. New columns on `chats` are added automatically on startup.
 - A phone layout (#61). Below 768px the chat list and the open chat are separate full-screen
   views: tap a chat to open it, and the back button — or your phone's back gesture — returns to
   the list. Message bubbles use more of the width, the model pickers shrink to fit, and Settings

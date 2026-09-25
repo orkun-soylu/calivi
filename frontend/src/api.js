@@ -144,6 +144,19 @@ export const api = {
     await streamNdjson(resp, onPiece);
   },
 
+  // Summarise the older messages into the chat's context summary (#62). Streams like a reply:
+  // {type:"content"|"thinking"} while it writes, then {type:"compacted"} or {type:"error"}.
+  async compactChat(chatId, { serverId, model, signal }, onPiece) {
+    const resp = await fetch(`${BASE}/chats/${chatId}/compact`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify(normalizeTarget(serverId, model)),
+      signal,
+    });
+    await streamNdjson(resp, onPiece);
+  },
+
   // Fork a new chat from history. onChatId(newId) comes from the header, then the stream flows.
   async forkChat(chatId, { messageId, content, serverId, model, useTools, signal }, onChatId, onPiece) {
     const resp = await fetch(`${BASE}/chats/${chatId}/fork`, {

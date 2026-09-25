@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import ServerModelPicker from "./ServerModelPicker.jsx";
 import MessageList from "./chat/MessageList.jsx";
 import ToolOutputModal from "./chat/ToolOutputModal.jsx";
+import ContextBar from "./chat/ContextBar.jsx";
 import Composer from "./chat/Composer.jsx";
-import { SettingsIcon } from "./icons.jsx";
+import { CompactIcon, SettingsIcon } from "./icons.jsx";
 import { useChatStream } from "../hooks/useChatStream.js";
 import { useServerModel } from "../hooks/useServerModel.js";
 import { fileToScaledDataUrl } from "../lib/images.js";
@@ -18,6 +19,8 @@ export default function ChatView({ chat, servers, onMessageSent, onForked, onOpe
   const { serverId, model, setTarget, upServers, selectedServer } = useServerModel(servers);
   const stream = useChatStream();
   const [inspecting, setInspecting] = useState(null); // tool output being read
+  const [compacting, setCompacting] = useState(null); // {chars} while a summary is being written
+  const compactAbortRef = useRef(null);
 
   const [input, setInput] = useState("");
   const [images, setImages] = useState([]); // attached images (data-URI), until sent
@@ -173,6 +176,42 @@ export default function ChatView({ chat, servers, onMessageSent, onForked, onOpe
     );
   }
 
+  // Compaction (#62): always user-triggered. Uses the model picked in the header.
+  async function handleCompact() {
+    if (compacting || stream.sending || !serverId || !model) return;
+    const ctrl = new AbortController();
+    compactAbortRef.current = ctrl;
+    setCompacting({ chars: 0 });
+    let failed = null;
+    try {
+      await api.compactChat(chat.id, { serverId, model, signal: ctrl.signal }, (piece) => {
+        if (piece.type === "content") setCompacting((c) => ({ chars: (c?.chars || 0) + piece.text.length }));
+        else if (piece.type === "error") failed = piece.message;
+      });
+    } catch (e) {
+      if (e.name !== "AbortError") failed = e.message;
+    } finally {
+      compactAbortRef.current = null;
+      setCompacting(null);
+    }
+    if (failed) stream.flashError(failed);
+    await onMessageSent();
+  }
+
+  async function handleSetContextMode(mode) {
+    await api.updateChat(chat.id, { context_mode: mode });
+    await onMessageSent();
+  }
+
+  function viewSummary() {
+    setInspecting({
+      name: t("compact.summaryTitle"),
+      detail: chat.summary,
+      label: t("compact.summaryLabel"),
+      hint: t("compact.summaryHint"),
+    });
+  }
+
   const edit = {
     editingId,
     content: editContent,
@@ -200,14 +239,33 @@ export default function ChatView({ chat, servers, onMessageSent, onForked, onOpe
         <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1 md:flex-none">
           <ServerModelPicker servers={upServers} value={{ serverId, model }} onChange={setTarget} />
         </div>
+        {chat.compactable && (
+          <button
+            onClick={handleCompact}
+            disabled={!!compacting || stream.sending}
+            className="ml-auto shrink-0 text-neutral-300 opacity-70 hover:opacity-100 disabled:opacity-30"
+            title={t("compact.buttonTitle")}
+          >
+            <CompactIcon className="w-5 h-5" />
+          </button>
+        )}
         <button
           onClick={onOpenSettings}
-          className="ml-auto shrink-0 text-neutral-300 opacity-70 hover:opacity-100"
+          className={`${chat.compactable ? "" : "ml-auto "}shrink-0 text-neutral-300 opacity-70 hover:opacity-100`}
           title={t("common.settings")}
         >
           <SettingsIcon className="w-5 h-5" />
         </button>
       </div>
+
+      <ContextBar
+        chat={chat}
+        compacting={compacting}
+        onCompact={handleCompact}
+        onStopCompact={() => compactAbortRef.current?.abort()}
+        onSetMode={handleSetContextMode}
+        onViewSummary={viewSummary}
+      />
 
       <MessageList
         chat={chat}

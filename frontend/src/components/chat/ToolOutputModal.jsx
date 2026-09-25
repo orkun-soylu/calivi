@@ -7,6 +7,9 @@ import { useT } from "../../i18n.js";
 // is untrusted by definition. It is rendered as PLAIN TEXT in a <pre>, never as markdown and
 // never as HTML. That is the whole point of the panel: the operator has to see the material as
 // it arrived, not a rendering of it, to check an answer against what was really retrieved.
+//
+// Also shows the chat's compaction summary (`label` / `hint` override the tool wording) — the
+// same plain-text rule applies, since the summary was written from that same material.
 export default function ToolOutputModal({ tool, onClose }) {
   const t = useT();
 
@@ -36,7 +39,7 @@ export default function ToolOutputModal({ tool, onClose }) {
       >
         <div className="flex items-center gap-3 px-5 py-3 border-b border-neutral-800">
           <span className="text-sm text-neutral-200 truncate">{tool.name}</span>
-          <span className="text-xs text-neutral-500 shrink-0">{t("tools.rawOutput")}</span>
+          <span className="text-xs text-neutral-500 shrink-0">{tool.label ?? t("tools.rawOutput")}</span>
           <button onClick={onClose} className="ml-auto text-neutral-500 hover:text-neutral-200">
             ✕
           </button>
@@ -45,7 +48,7 @@ export default function ToolOutputModal({ tool, onClose }) {
           {tool.detail}
         </pre>
         <p className="px-5 py-2.5 border-t border-neutral-800 text-xs text-neutral-500">
-          {t("tools.rawHint")}
+          {tool.hint ?? t("tools.rawHint")}
         </p>
       </div>
     </div>

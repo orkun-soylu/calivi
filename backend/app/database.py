@@ -52,6 +52,12 @@ def _migrate():
         if "user_id" not in cols:
             # Existing (single-user) chats are attached to the super admin (id=1, the first sign-up).
             conn.exec_driver_sql("ALTER TABLE chats ADD COLUMN user_id INTEGER NOT NULL DEFAULT 1")
+        if "summary" not in cols:
+            conn.exec_driver_sql("ALTER TABLE chats ADD COLUMN summary TEXT")
+        if "summary_upto_id" not in cols:
+            conn.exec_driver_sql("ALTER TABLE chats ADD COLUMN summary_upto_id INTEGER")
+        if "context_mode" not in cols:
+            conn.exec_driver_sql("ALTER TABLE chats ADD COLUMN context_mode VARCHAR(10) NOT NULL DEFAULT 'compact'")
 
         # Create the single settings row if absent (registration open by default).
         conn.exec_driver_sql(

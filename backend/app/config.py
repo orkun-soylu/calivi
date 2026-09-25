@@ -63,6 +63,10 @@ OLLAMA_PROBE_TIMEOUT = 2.0
 # is dropped before the model has said anything, and the user sees a bare timeout with no clue
 # that the prompt was simply too long. Configurable so large-context setups can raise it.
 OLLAMA_CHAT_TIMEOUT = float(os.environ.get("OLLAMA_CHAT_TIMEOUT", "300"))
+# Conversation compaction (compaction.py). Compaction is always user-triggered; the threshold
+# only decides when the UI suggests it. A turn = a user message plus the replies after it.
+COMPACT_SUGGEST_TOKENS = int(os.environ.get("COMPACT_SUGGEST_TOKENS", "16000"))
+COMPACT_KEEP_TURNS = int(os.environ.get("COMPACT_KEEP_TURNS", "4"))
 OPENAI_PROBE_TIMEOUT = 5.0  # a little longer, since these APIs are remote
 SEARCH_TIMEOUT = 15.0  # SearXNG JSON search
 

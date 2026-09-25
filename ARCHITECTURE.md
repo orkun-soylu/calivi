@@ -103,6 +103,48 @@ depend on role (Servers/Users are admin-only). `api.js` sends `credentials:"incl
   > where multi-turn tool sequences make the case easy to hit. Now **nothing is saved** unless
   > there is content or an error marker. Mutation-checked.
 
+## Conversation compaction
+
+A long chat re-sends its whole history on every turn. On a local backend after a restart (or
+when hopping between chats) that means re-prefilling tens of thousands of tokens before the
+first word (#62: ~31k tokens, minutes on a constrained 35B MoE). Compaction replaces the older
+part of the **model's context** with a persisted summary. The **stored messages are never
+touched** — the UI still shows the whole chat. Code: `backend/app/compaction.py`, the
+`/compact` route in `routers/chats.py`, `frontend/src/components/chat/ContextBar.jsx`.
+
+- **User-triggered only.** `GET /api/chats/{id}` reports `context_tokens_estimate` (chars/4 of
+  what the current mode would send — no tokenizer, it only drives a suggestion),
+  `compactable` and `compact_suggested` (estimate ≥ `COMPACT_SUGGEST_TOKENS`, default 16000).
+  The UI shows a suggestion bar; nothing is summarised unless the user clicks. Summarising
+  silently would change what the model knows without the user having asked.
+- **`POST /api/chats/{id}/compact`** (`server_id` + `model` — the model picked in the header
+  writes the summary). Everything before the last `COMPACT_KEEP_TURNS` turns (default 4; a turn
+  starts at a user message) is folded into `chats.summary`, and `chats.summary_upto_id` records
+  the last message covered. A second compaction **extends** the existing summary with only the
+  messages since `summary_upto_id` rather than re-reading the whole chat. 400 when there is
+  nothing new to fold. The response **streams NDJSON** (`content`/`thinking`, then `compacted`
+  or `error`): summarising a long chat can take minutes, and a silent request would be dropped
+  by the proxy.
+- **Context construction** (`chats.py::_context_of`): in `compact` mode the model gets the
+  summary in the system layer (after the persona prompt, framed as background, not
+  instructions) plus the messages after `summary_upto_id`. `chats.context_mode = "full"`
+  (`PATCH /api/chats/{id}`) sends the whole history and ignores the summary — for when a detail
+  the summary lost matters. The summary is kept, so switching back is free. Compacting sets the
+  mode back to `compact`.
+- **Edits and deletes:** editing or deleting a message **inside** the summarised range drops the
+  summary (`_drop_summary_if_covers`) — it would otherwise keep telling the model what the user
+  just took back. The chat falls back to full history until compacted again. Edits after the
+  range keep it.
+- **Forks** carry the summary only when the fork point is after `summary_upto_id` (the id is
+  remapped onto the copy). A fork from inside the range starts without one — it would inherit a
+  summary of its own future.
+- **Races:** the summary is saved only if `summary_upto_id` is unchanged and the cutoff message
+  still exists when the model finishes; otherwise the stream ends with an `error` and nothing is
+  written (two tabs, or an edit during a long summary).
+- The summary is untrusted-derived text (it was written from whatever the chat contained,
+  documents and tool output included), so `View summary` shows it in `ToolOutputModal` as
+  plain text, never markdown.
+
 ## Security — Prompt Injection Defence
 
 The threat model assumes a trusted, self-hosted deployment. The worst realistic impact of an
@@ -223,7 +265,8 @@ Both are tested (`useChatStream.test.jsx`) and mutation-verified.
   **Copy**: renders the chat as plain text into the clipboard (`App.jsx::formatChatForCopy` → title +
   `User:` / `Assistant (model @ server):` blocks, raw markdown content; the detail is fetched with
   `api.getChat` because the list does not include `messages`). The button shows a brief "Copied ✓".
-- `ChatView.jsx` — top bar (`ServerModelPicker` [up servers only] + ⚙ settings); message area (top/bottom fade gradient, `.themed-scroll`); a **fixed-height** "💭 thinking" box (`h-64`, bottom-aligned); optimistic user message (`pending`); **scroll follows new output only while the user is at the bottom** (`MessageList`: within 32px of the end it follows; scrolled up it stays put, scrolled back down it follows again; sending a message or opening a chat jumps to the end, a finishing answer does not). Before, every streamed token ran `scrollIntoView`, so a long answer could not be read while it was still being written. The follow scroll is **instant, not smooth**: a smooth scroll emits intermediate scroll events, which read as the user leaving the bottom and would switch following off mid-stream. For the same reason a scroll event only counts as the user leaving when `scrollTop` moved **above where the list last scrolled itself to**: the browser delivers the list's own scroll event a frame later, content can grow in between (a code block arriving), and a plain distance-from-bottom check then read the list's own scroll as the user leaving — caught in a real-browser run, not by jsdom; message footers — assistant: copy + delete(X) + `model · server · N t/s · timestamp` (when t/s exists), user: copy + edit + delete(X) + `timestamp`. Delete(X) removes a single message immediately (DELETE endpoint), no confirmation. **Assistant content is rendered through `Markdown.jsx`** (react-markdown + remark-gfm); user messages are plain `whitespace-pre-wrap`. The copy button copies the raw `m.content` (markdown source) → rendered on screen, raw markdown in the clipboard (deliberate: copy the whole thing). The streaming bubble goes through Markdown too. **Cancelling a response:** during the stream the send button becomes **Stop (■)** and **Esc** works (`AbortController` → fetch cancelled → on the backend disconnect, `generate()`'s finally saves the partial answer collected so far to the DB, and upstream generation stops too). AbortError shows no ⚠️.
+- `ContextBar.jsx` — under the top bar: the compaction suggestion, progress while a summary is written, and the "Summary + recent / Full history" switch once one exists. `MessageList` draws a divider after `summary_upto_id` in compact mode.
+- `ChatView.jsx` — top bar (`ServerModelPicker` [up servers only] + compact button when `compactable` + ⚙ settings); message area (top/bottom fade gradient, `.themed-scroll`); a **fixed-height** "💭 thinking" box (`h-64`, bottom-aligned); optimistic user message (`pending`); **scroll follows new output only while the user is at the bottom** (`MessageList`: within 32px of the end it follows; scrolled up it stays put, scrolled back down it follows again; sending a message or opening a chat jumps to the end, a finishing answer does not). Before, every streamed token ran `scrollIntoView`, so a long answer could not be read while it was still being written. The follow scroll is **instant, not smooth**: a smooth scroll emits intermediate scroll events, which read as the user leaving the bottom and would switch following off mid-stream. For the same reason a scroll event only counts as the user leaving when `scrollTop` moved **above where the list last scrolled itself to**: the browser delivers the list's own scroll event a frame later, content can grow in between (a code block arriving), and a plain distance-from-bottom check then read the list's own scroll as the user leaving — caught in a real-browser run, not by jsdom; message footers — assistant: copy + delete(X) + `model · server · N t/s · timestamp` (when t/s exists), user: copy + edit + delete(X) + `timestamp`. Delete(X) removes a single message immediately (DELETE endpoint), no confirmation. **Assistant content is rendered through `Markdown.jsx`** (react-markdown + remark-gfm); user messages are plain `whitespace-pre-wrap`. The copy button copies the raw `m.content` (markdown source) → rendered on screen, raw markdown in the clipboard (deliberate: copy the whole thing). The streaming bubble goes through Markdown too. **Cancelling a response:** during the stream the send button becomes **Stop (■)** and **Esc** works (`AbortController` → fetch cancelled → on the backend disconnect, `generate()`'s finally saves the partial answer collected so far to the DB, and upstream generation stops too). AbortError shows no ⚠️.
 - `Markdown.jsx` — react-markdown element overrides (with Tailwind classes; NO prose plugin). `code`/`pre`: a fenced block (language class OR multi-line) → a `CodeBlock` with a header, a Copy button and horizontal scrolling; single line without a language → inline `<code>`. Headings/lists/tables/links/blockquote/hr are styled by hand (required, since preflight resets them). **Math IS rendered** — `remark-math` + `rehype-katex` (`$$...$$` blocks; single-dollar inline math is deliberately off so currency amounts are not mistaken for math). KaTeX CSS is imported in `Markdown.jsx`, fonts are bundled into the Vite build. No syntax highlighting. `formatTs` converts UTC→local.
 - `ServerModelPicker.jsx` — server + model dropdowns (manual).
 - `StatusLight.jsx` — a non-clickable status light (up = green "reachable, model list arriving", down = red). Only on the server rows in Settings.
@@ -244,6 +287,7 @@ servers: id, name, type, host, port, base_url, api_key
          NOTE: the wol_enabled/wol_target columns still exist in the DB (NOT NULL default;
          dropping them needs a migration) but are gone from the schema/API/UI — dead columns.
 chats:   id, user_id (FK users, scoped to the owner), title, pinned, created_at, updated_at   (pinned=True on top, with 🔒)
+         summary, summary_upto_id, context_mode ("compact"|"full")   (see "Conversation compaction")
 messages: id, chat_id, role, content, images, attachments, model_used, server_used, tokens_per_sec, timestamp
           (images: JSON — a list of base64 data-URIs, the user's images; vision)
           (attachments: JSON — [{name, text}], document attachments; MessageOut returns only {name})
@@ -258,7 +302,7 @@ llama.cpp-server and friends be used through one interface.
 
 On a schema change, `database.py::_migrate` adds the missing column to the existing SQLite DB with
 `ALTER TABLE` (the data in the named volume `calivi-data` is preserved). `PATCH /api/chats/{id}`
-updates title and/or pinned.
+updates title, pinned and/or context_mode.
 
 > **⚠️ Adding a model column without an `ALTER TABLE` is invisible to the whole test suite.**
 > `Base.metadata.create_all()` creates missing **tables**, never missing **columns**, and the test
@@ -917,7 +961,7 @@ as an unhandled `IntegrityError` (a 500).
 
 ## Tests
 
-### Frontend — `npm test` (vitest + jsdom, 54 tests)
+### Frontend — `npm test` (vitest + jsdom, 61 tests)
 
 ```bash
 cd frontend && npm install && npm test     # or: npm run test:watch
@@ -926,7 +970,8 @@ cd frontend && npm install && npm test     # or: npm run test:watch
 unaffected). Coverage: `lib/format.test.js`, `hooks/useChatStream.test.jsx` (stream state machine +
 ordering), `components/chat/MessageItem.test.jsx` (render conditions),
 `components/ChatView.lightbox.test.jsx`, `App.mobile.test.jsx` (phone layout: list ↔ chat, back
-button, back gesture; `matchMedia` is mocked since jsdom has none).
+button, back gesture; `matchMedia` is mocked since jsdom has none),
+`components/chat/ContextBar.test.jsx` (compaction bar states + the summary divider).
 
 **Two traps when writing hook tests** (both were hit in this suite):
 1. **`act` blocks must not nest** — if they do, React's internal state is corrupted and *later*
@@ -939,7 +984,7 @@ button, back gesture; `matchMedia` is mocked since jsdom has none).
 Fake timers (`vi.useFakeTimers`) deadlock with RTL's async `act` wrapper; the two tests that verify
 delay behaviour deliberately use **real** timers (~3s).
 
-### Backend — pytest (174 tests)
+### Backend — pytest (197 tests)
 
 `backend/tests/` — pytest + `httpx.ASGITransport` (a real HTTP layer, no live server needed). They
 do not ship in the prod image: the `Dockerfile` installs only `requirements.txt`, and the test
@@ -961,7 +1006,8 @@ python3 -m venv .venv-test && ./.venv-test/bin/pip install -r requirements-dev.t
 parse subprocess: killed on timeout, capped in number), `test_secret_encryption.py` (ciphertext
 in the raw column, legacy plaintext, key rotation), `test_tools_registry.py` (the read-only
 `mutating` gate), `test_tool_loop.py` (the agentic loop's `tool_result.ok` flag — the error-prefix
-contract above).
+contract above), `test_compaction.py` (what reaches the model before/after compaction, full mode,
+edit/delete/fork invalidation, the save race, the column migration).
 
 **Isolation:** `conftest.py` redirects the environment (DB_PATH, CALIVI_SECRET_KEY,
 COOKIE_SECURE=false, config paths) into a tmpdir — **BEFORE `app` is imported**, because
