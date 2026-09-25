@@ -25,6 +25,10 @@ Read this file before upgrading.
 
 ### Fixed
 
+- The stdio bridge image no longer breaks on a fresh build. `mcp-server-time` was pinned but its
+  `mcp` dependency was not, so a rebuild picked up `mcp` 2.x, which renamed `McpError` to
+  `MCPError`: the server died on import and the proxy restarted in a loop with "Connection
+  closed". The server's venv now installs `mcp<2`.
 - Scrolling up to read a long answer while it was still streaming no longer snaps back to the
   bottom on every new token. The chat now follows new output only while you are at the bottom;
   scroll up and it stays where you left it, scroll back down and it follows again. Sending a

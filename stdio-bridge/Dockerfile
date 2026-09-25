@@ -31,8 +31,11 @@ RUN adduser -D -u 65532 bridge
 # `time` is the default because it needs no network at all, so it works under the locked-down
 # `mcp-bridge` network the compose service uses (see docker-compose.yml). It is also the gap it
 # fills that comes up most: a model has no idea what today's date is.
+#
+# Pinning the server is not enough: its own `mcp` requirement is unbounded, and mcp 2.x renamed
+# McpError -> MCPError, so a fresh build crashed on import ("Connection closed" at the proxy).
 RUN python3 -m venv /opt/mcp/time \
- && /opt/mcp/time/bin/pip install --no-cache-dir mcp-server-time==2026.7.10
+ && /opt/mcp/time/bin/pip install --no-cache-dir mcp-server-time==2026.7.10 "mcp<2"
 
 # A server that needs the internet — note this one cannot work until the bridge is given egress,
 # which is a decision the compose file makes you take deliberately:
