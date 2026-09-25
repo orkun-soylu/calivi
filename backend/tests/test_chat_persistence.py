@@ -199,7 +199,7 @@ async def test_web_search_chip_keeps_its_query_and_text(monkeypatch, chat_id):
     assert chip["text"]
 
 
-async def test_repeated_calls_do_not_pile_up_duplicate_chips(monkeypatch, chat_id):
+async def test_exact_repeat_calls_do_not_pile_up_duplicate_chips(monkeypatch, chat_id):
     name = mcp_client.namespaced("context7", "query-docs")
     _register(name)
     try:
@@ -208,7 +208,7 @@ async def test_repeated_calls_do_not_pile_up_duplicate_chips(monkeypatch, chat_i
             chat_id,
             [[{"type": "tool_calls", "calls": [
                 {"id": "c1", "name": name, "arguments": {"q": "a"}},
-                {"id": "c2", "name": name, "arguments": {"q": "b"}},
+                {"id": "c2", "name": name, "arguments": {"q": "a"}},
             ]}],
              [{"type": "content", "text": "answer"}]],
         )
@@ -216,6 +216,35 @@ async def test_repeated_calls_do_not_pile_up_duplicate_chips(monkeypatch, chat_i
         registry._tools.pop(name, None)
 
     assert len(_messages(chat_id)[0].attachments) == 1
+
+
+async def test_same_tool_with_different_arguments_keeps_a_chip_per_call(monkeypatch, chat_id):
+    """#49: the later, narrowing call is often the one the answer relied on — it must stay
+    inspectable, and its chip must be distinguishable from the first."""
+    name = mcp_client.namespaced("context7", "query-docs")
+    _register(name)
+    try:
+        await _run(
+            monkeypatch,
+            chat_id,
+            [[{"type": "tool_calls", "calls": [{"id": "c1", "name": name, "arguments": {}}]}],
+             [{"type": "tool_calls", "calls": [
+                 {"id": "c2", "name": name, "arguments": {"version": "2.17.1"}}]}],
+             [{"type": "content", "text": "answer"}]],
+        )
+    finally:
+        registry._tools.pop(name, None)
+
+    names = [c["name"] for c in _messages(chat_id)[0].attachments]
+    assert names == ["🔧 context7: query-docs", "🔧 context7: query-docs · version=2.17.1"]
+
+
+def test_args_summary_is_compact_and_clipped():
+    from app.routers.chats import MAX_ARGS_LABEL_CHARS, _args_summary
+
+    assert _args_summary({"q": "a", "n": 3, "f": ["x"]}) == 'q=a, n=3, f=["x"]'
+    long = _args_summary({"q": "x" * 200})
+    assert len(long) == MAX_ARGS_LABEL_CHARS and long.endswith("…")
 
 
 async def test_failed_tool_leaves_no_chip(monkeypatch, chat_id):
