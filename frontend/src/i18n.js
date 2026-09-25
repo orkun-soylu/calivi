@@ -60,6 +60,7 @@ const translations = {
     "app.empty": "Sohbet seç veya yeni bir tane başlat",
 
     "chat.placeholder": "Mesaj yaz...",
+    "chat.back": "Sohbetlere dön",
     "chat.stop": "Yanıtı durdur (Esc)",
     "chat.copyAnswer": "Cevabı kopyala",
     "chat.deleteMessage": "Mesajı sil",
@@ -223,6 +224,7 @@ const translations = {
     "app.empty": "Select a chat or start a new one",
 
     "chat.placeholder": "Type a message...",
+    "chat.back": "Back to chats",
     "chat.stop": "Stop response (Esc)",
     "chat.copyAnswer": "Copy answer",
     "chat.deleteMessage": "Delete message",
@@ -386,6 +388,7 @@ const translations = {
     "app.empty": "Wähle einen Chat oder starte einen neuen",
 
     "chat.placeholder": "Nachricht schreiben...",
+    "chat.back": "Zurück zu den Chats",
     "chat.stop": "Antwort stoppen (Esc)",
     "chat.copyAnswer": "Antwort kopieren",
     "chat.deleteMessage": "Nachricht löschen",
@@ -503,6 +506,7 @@ const translations = {
     "app.empty": "Selecciona un chat o inicia uno nuevo",
 
     "chat.placeholder": "Escribe un mensaje...",
+    "chat.back": "Volver a los chats",
     "chat.stop": "Detener respuesta (Esc)",
     "chat.copyAnswer": "Copiar respuesta",
     "chat.deleteMessage": "Eliminar mensaje",
@@ -620,6 +624,7 @@ const translations = {
     "app.empty": "Seleziona una chat o avviane una nuova",
 
     "chat.placeholder": "Scrivi un messaggio...",
+    "chat.back": "Torna alle chat",
     "chat.stop": "Ferma la risposta (Esc)",
     "chat.copyAnswer": "Copia la risposta",
     "chat.deleteMessage": "Elimina messaggio",
@@ -737,6 +742,7 @@ const translations = {
     "app.empty": "Selecione uma conversa ou inicie uma nova",
 
     "chat.placeholder": "Escreva uma mensagem...",
+    "chat.back": "Voltar às conversas",
     "chat.stop": "Parar resposta (Esc)",
     "chat.copyAnswer": "Copiar resposta",
     "chat.deleteMessage": "Excluir mensagem",
@@ -854,6 +860,7 @@ const translations = {
     "app.empty": "Выберите чат или начните новый",
 
     "chat.placeholder": "Напишите сообщение...",
+    "chat.back": "Назад к чатам",
     "chat.stop": "Остановить ответ (Esc)",
     "chat.copyAnswer": "Копировать ответ",
     "chat.deleteMessage": "Удалить сообщение",
@@ -971,6 +978,7 @@ const translations = {
     "app.empty": "チャットを選択するか、新しく開始してください",
 
     "chat.placeholder": "メッセージを入力...",
+    "chat.back": "チャット一覧に戻る",
     "chat.stop": "応答を停止 (Esc)",
     "chat.copyAnswer": "回答をコピー",
     "chat.deleteMessage": "メッセージを削除",
@@ -1088,6 +1096,7 @@ const translations = {
     "app.empty": "选择一个对话或新建一个",
 
     "chat.placeholder": "输入消息...",
+    "chat.back": "返回对话列表",
     "chat.stop": "停止回复 (Esc)",
     "chat.copyAnswer": "复制回答",
     "chat.deleteMessage": "删除消息",

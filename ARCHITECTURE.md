@@ -218,6 +218,7 @@ Both are tested (`useChatStream.test.jsx`) and mutation-verified.
 ## Frontend components (quick map)
 
 - `App.jsx` — state (chats, activeChat, servers) + Sidebar/ChatView/SettingsModal orchestration; switches the active chat after a fork.
+- **Phone layout (#61)** — below Tailwind's `md` (767px, `hooks/useIsMobile.js`) the chat list and the open chat are **separate full-screen views**, WhatsApp-style, instead of side by side: `App.jsx` renders one or the other, `ChatView` gets a back button (`onBack`), `Sidebar` becomes a full-width list with its own header (+ / ⚙), and `SettingsModal` opens full screen instead of as the 816px draggable window. Opening a chat on a phone **pushes a history entry** so the device's back gesture returns to the list rather than leaving the app; the in-app back button goes through `history.back()` for the same reason. Heights use `h-dvh`, not `h-screen` — on mobile browsers `100vh` includes the area behind the URL bar, which hid the composer. Desktop is unchanged. `refreshActiveChat(null)` clears the loaded chat: closing a chat used to leave its detail in state, harmless while every path that nulled the id also cleared it by hand, but the phone layout decides what to show from that detail.
 - `Sidebar.jsx` — resizable by dragging (localStorage `calivi_sidebar_width`); each chat row has a menu icon → a small popup: Rename (inline) / Pin / Copy / Delete. Pinned chats sit on top, prefixed with 🔒.
   **Copy**: renders the chat as plain text into the clipboard (`App.jsx::formatChatForCopy` → title +
   `User:` / `Assistant (model @ server):` blocks, raw markdown content; the detail is fetched with
@@ -912,7 +913,7 @@ as an unhandled `IntegrityError` (a 500).
 
 ## Tests
 
-### Frontend — `npm test` (vitest + jsdom, 43 tests)
+### Frontend — `npm test` (vitest + jsdom, 54 tests)
 
 ```bash
 cd frontend && npm install && npm test     # or: npm run test:watch
@@ -920,7 +921,8 @@ cd frontend && npm install && npm test     # or: npm run test:watch
 `vitest.config.js` is a **separate file** (`vite.config.js` was left untouched so the prod build is
 unaffected). Coverage: `lib/format.test.js`, `hooks/useChatStream.test.jsx` (stream state machine +
 ordering), `components/chat/MessageItem.test.jsx` (render conditions),
-`components/ChatView.lightbox.test.jsx`.
+`components/ChatView.lightbox.test.jsx`, `App.mobile.test.jsx` (phone layout: list ↔ chat, back
+button, back gesture; `matchMedia` is mocked since jsdom has none).
 
 **Two traps when writing hook tests** (both were hit in this suite):
 1. **`act` blocks must not nest** — if they do, React's internal state is corrupted and *later*
