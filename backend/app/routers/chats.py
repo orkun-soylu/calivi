@@ -100,12 +100,30 @@ def resolve_target(db: Session, server_id: int | None, model: str | None) -> tup
 
 
 MAX_DETAIL_CHARS = 20_000  # a Context7 dump is ~4 KB; this is headroom, not a target
+MAX_ARGS_LABEL_CHARS = 60  # the chip is ~220px wide; the full label shows in the output modal
 
 
 def _clip(text: str) -> str:
     if len(text) <= MAX_DETAIL_CHARS:
         return text
     return text[:MAX_DETAIL_CHARS] + f"\n\n… truncated ({len(text) - MAX_DETAIL_CHARS} more characters)"
+
+
+def _args_summary(args: dict) -> str:
+    """`key=value, …` for a chip label, clipped. Strings go in bare, anything else as compact JSON."""
+    parts = [
+        f"{k}={v if isinstance(v, str) else json.dumps(v, ensure_ascii=False, separators=(',', ':'))}"
+        for k, v in args.items()
+    ]
+    summary = ", ".join(parts)
+    if len(summary) > MAX_ARGS_LABEL_CHARS:
+        summary = summary[: MAX_ARGS_LABEL_CHARS - 1] + "…"
+    return summary
+
+
+def _call_key(name: str, args: dict) -> str:
+    """Identity of a tool call for chip dedupe: exact repeats collapse, distinct arguments don't."""
+    return json.dumps([name, args], sort_keys=True, default=str)
 
 
 def _chip_for(name: str, args: dict, result: str) -> dict:
@@ -126,8 +144,12 @@ def _chip_for(name: str, args: dict, result: str) -> dict:
     """
     if name == "web_search":
         return {"name": f"🔍 {args.get('query', '')}".strip(), "text": result, "detail": result}
-    label = mcp_client.display_label(name)
-    return {"name": f"🔧 {label or name}", "detail": _clip(result)}
+    label = f"🔧 {mcp_client.display_label(name) or name}"
+    # The arguments go in the label: without them, two calls to the same tool are
+    # indistinguishable chips and the operator cannot tell which output informed the answer.
+    if args:
+        label += f" · {_args_summary(args)}"
+    return {"name": label, "detail": _clip(result)}
 
 
 def _persist_chips(chat_id: int, chips: list[dict]) -> None:
@@ -191,6 +213,7 @@ def build_stream_response(
         tokens_per_sec = None
         error_msg = None
         tool_chips: list[dict] = []  # tool-usage chips shown after a reload
+        chipped_calls: set[str] = set()  # _call_key of every call that already has a chip
         try:
             max_iter = tools_config.get_max_iterations() if tools_spec else 1
             for i in range(max_iter):
@@ -265,9 +288,12 @@ def build_stream_response(
                     if ok:
                         # Every tool leaves a trace, not just web_search — otherwise a reloaded
                         # chat gives no clue that an MCP server was consulted at all.
-                        chip = _chip_for(call["name"], args, result)
-                        if chip["name"] not in {c["name"] for c in tool_chips}:
-                            tool_chips.append(chip)
+                        # Deduped on name *and* arguments: keying on the label alone kept only
+                        # the first call when the model narrowed a lookup on a second call (#49).
+                        key = _call_key(call["name"], args)
+                        if key not in chipped_calls:
+                            chipped_calls.add(key)
+                            tool_chips.append(_chip_for(call["name"], args, result))
         except Exception as e:
             # Only genuine upstream errors (httpx etc. → Exception). A client abort/disconnect
             # raises CancelledError/GeneratorExit, which are BaseException and do not land here,
