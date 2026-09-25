@@ -9,6 +9,15 @@ Read this file before upgrading.
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-09-26
+
+Long chats and phones. A chat can now be compacted so a long conversation stops re-sending its
+whole history on every turn, and below 768px Calivi switches to a phone layout. The heavy-
+development caveat from 0.1.0 still applies — run it with backups.
+
+> **Upgrading:** three columns are added to `chats` on startup (`summary`, `summary_upto_id`,
+> `context_mode`). Existing chats behave exactly as before until you compact one.
+
 ### Added
 
 - Conversation compaction (#62). A long chat can now be compacted: older messages are
@@ -137,5 +146,6 @@ someone can install and stay on, instead of tracking `main`.
 - **About 700 MB on disk for the whole stack**, web search included — backend 230 MB, frontend
   95.8 MB, SearXNG 372 MB (measured on arm64).
 
-[Unreleased]: https://github.com/orkun-soylu/calivi/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/orkun-soylu/calivi/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/orkun-soylu/calivi/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/orkun-soylu/calivi/releases/tag/v0.1.0
