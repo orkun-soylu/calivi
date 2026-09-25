@@ -34,6 +34,7 @@ export default function MessageList({
   // read the list's own scroll as the user leaving. Only moving above this position is the user.
   const autoTopRef = useRef(0);
   const { streaming, thinking, sending, searchInfo, approval } = stream;
+  const summarisedUpto = chat?.summary && chat.context_mode !== "full" ? chat.summary_upto_id : null;
 
   const onScroll = () => {
     const el = scrollRef.current;
@@ -71,7 +72,7 @@ export default function MessageList({
         onScroll={onScroll}
         className="themed-scroll h-full overflow-y-auto px-3 py-4 md:px-6 md:py-6 space-y-4"
       >
-        {chat?.messages.map((m) =>
+        {chat?.messages.map((m) => [
           m.role === "user" && edit.editingId === m.id ? (
             <MessageEditor
               key={m.id}
@@ -93,8 +94,16 @@ export default function MessageList({
               onImageClick={onImageClick}
               onInspect={onInspect}
             />
-          )
-        )}
+          ),
+          // Where the model's verbatim context starts: everything above is only in the summary.
+          summarisedUpto === m.id && (
+            <div key={`summary-${m.id}`} className="flex items-center gap-3 text-xs text-neutral-500">
+              <div className="h-px flex-1 bg-neutral-800" />
+              <span>{t("compact.divider")}</span>
+              <div className="h-px flex-1 bg-neutral-800" />
+            </div>
+          ),
+        ])}
 
         {pending.user !== null && (
           <div className="flex justify-end">

@@ -101,6 +101,11 @@ class Chat(Base):
     pinned: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime.datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+    # Compaction (compaction.py): a summary standing in for every message up to and including
+    # summary_upto_id. The messages themselves are kept. context_mode "full" ignores the summary.
+    summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    summary_upto_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    context_mode: Mapped[str] = mapped_column(String(10), default="compact")  # "compact" | "full"
 
     messages: Mapped[list["Message"]] = relationship(
         back_populates="chat", cascade="all, delete-orphan", order_by="Message.id"

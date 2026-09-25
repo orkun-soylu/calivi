@@ -1,4 +1,5 @@
 import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
@@ -164,6 +165,7 @@ class ChatOut(BaseModel):
 class ChatUpdate(BaseModel):
     title: str | None = None
     pinned: bool | None = None
+    context_mode: Literal["compact", "full"] | None = None
 
 
 class MessageOut(BaseModel):
@@ -182,6 +184,20 @@ class MessageOut(BaseModel):
 
 class ChatDetailOut(ChatOut):
     messages: list[MessageOut] = []
+    # Compaction (compaction.py). The summary is returned so the user can read what the model
+    # is working from; the estimate is chars/4 of what the current mode would send.
+    summary: str | None = None
+    summary_upto_id: int | None = None
+    context_mode: str = "compact"
+    context_tokens_estimate: int = 0
+    compact_suggest_tokens: int = 0
+    compactable: bool = False
+    compact_suggested: bool = False
+
+
+class CompactIn(BaseModel):
+    server_id: int | None = None
+    model: str | None = None
 
 
 class SendMessageIn(BaseModel):

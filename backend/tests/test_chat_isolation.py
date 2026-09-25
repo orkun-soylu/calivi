@@ -102,3 +102,10 @@ async def test_not_even_an_admin_can_reach_another_users_chat(client, user_clien
 async def test_missing_chat_is_404(client):
     await register(client, "someone")
     assert (await client.get("/api/chats/9999")).status_code == 404
+
+
+async def test_outsider_cannot_compact_the_chat(two_users):
+    """Compaction feeds the whole history to a model of the caller's choosing."""
+    _, outsider, chat_id = two_users
+    resp = await outsider.post(f"/api/chats/{chat_id}/compact", json={"server_id": 1, "model": "m"})
+    assert resp.status_code == 404

@@ -228,6 +228,9 @@ Other variables the backend understands (`backend/app/config.py`): `DB_PATH`,
 `LOGIN_MAX_ATTEMPTS`, `LOGIN_WINDOW_SECONDS`, `REGISTER_MAX_SUCCESS`,
 `REGISTER_WINDOW_SECONDS`, `OLLAMA_CHAT_TIMEOUT` (seconds, default `300` — raise it if you
 send very large prompts, see [ARCHITECTURE](ARCHITECTURE.md#long-prompts-and-the-streaming-timeout)),
+`COMPACT_SUGGEST_TOKENS` (estimated tokens at which a chat suggests compaction, default `16000`)
+and `COMPACT_KEEP_TURNS` (recent turns kept verbatim when compacting, default `4`) — see
+[ARCHITECTURE](ARCHITECTURE.md#conversation-compaction),
 `CALIVI_SECRET_KEY_OLD` (key rotation, above).
 
 > ### ⚠️ Putting it behind HTTPS: set `COOKIE_SECURE=true`

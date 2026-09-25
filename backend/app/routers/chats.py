@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
-from app import auth, models, schemas, llm, tools_config
+from app import auth, compaction, models, schemas, llm, tools_config
 from app.database import get_db, SessionLocal
 from app.system_prompts import get_system_prompt
 from app import approvals
@@ -173,6 +173,7 @@ def _persist_chips(chat_id: int, chips: list[dict]) -> None:
 def build_stream_response(
     chat_id: int, target: dict, model: str, history: list[dict],
     use_tools: bool = False, extra_headers: dict | None = None, user_id: int | None = None,
+    summary: str | None = None,
 ) -> StreamingResponse:
     """Injects the system prompt (and optional tools), returns the NDJSON stream and saves the
     assistant message at the end.
@@ -180,6 +181,9 @@ def build_stream_response(
     `use_tools=True` (the 🔧 toggle) offers the tool layer to the model; if the
     model calls one, the agentic loop runs it, feeds the result back into context, and the
     model produces the final answer.
+
+    `summary` is the chat's compaction summary when it is in compact mode (`history` then holds
+    only the messages after it); it goes into the system layer, after the persona prompt.
     """
     server_name = target["name"]
 
@@ -206,6 +210,8 @@ def build_stream_response(
         persona_prompt = get_system_prompt(model)
         if persona_prompt:
             system_parts.append(persona_prompt)
+        if summary:
+            system_parts.append(f"{compaction.SUMMARY_CONTEXT_HEADER}\n\n{summary}")
         if system_parts:
             messages = [{"role": "system", "content": "\n\n".join(system_parts)}, *messages]
 
@@ -335,17 +341,31 @@ def build_stream_response(
     return StreamingResponse(generate(), media_type="application/x-ndjson", headers=extra_headers)
 
 
-def _history_of(db: Session, chat_id: int) -> list[dict]:
-    rows = (
-        db.query(models.Message)
-        .filter(models.Message.chat_id == chat_id)
-        .order_by(models.Message.id)
-        .all()
-    )
-    return [
+def _context_of(db: Session, chat_id: int) -> tuple[list[dict], str | None]:
+    """(messages to send verbatim, summary or None) under the chat's context mode."""
+    chat = db.get(models.Chat, chat_id)
+    db.refresh(chat)  # the relationship may be stale after the bulk deletes in edit/delete
+    rows = compaction.active_messages(chat)
+    history = [
         {"role": m.role, "content": m.content, "images": m.images or [], "attachments": m.attachments or []}
         for m in rows
     ]
+    return history, compaction.active_summary(chat)
+
+
+def _drop_summary_if_covers(db: Session, chat_id: int, message_id: int) -> None:
+    """A summary that covers a message which is being changed or removed no longer describes the
+    chat: it would keep feeding the model what the user just took back. Drop it; the chat falls
+    back to its full history until the user compacts again."""
+    chat = db.get(models.Chat, chat_id)
+    if chat.summary_upto_id is not None and message_id <= chat.summary_upto_id:
+        chat.summary = None
+        chat.summary_upto_id = None
+
+
+def _detail(chat: models.Chat) -> schemas.ChatDetailOut:
+    out = schemas.ChatDetailOut.model_validate(chat)
+    return out.model_copy(update=compaction.status(chat))
 
 
 def _inject_attachments(messages: list[dict]) -> list[dict]:
@@ -385,6 +405,8 @@ def update_chat(
         chat.title = payload.title
     if payload.pinned is not None:
         chat.pinned = payload.pinned
+    if payload.context_mode is not None:
+        chat.context_mode = payload.context_mode
     db.commit()
     db.refresh(chat)
     return chat
@@ -409,7 +431,7 @@ def get_chat(
     user: models.User = Depends(auth.get_current_user),
     db: Session = Depends(get_db),
 ):
-    return _owned_chat(db, chat_id, user)
+    return _detail(_owned_chat(db, chat_id, user))
 
 
 @router.delete("/{chat_id}", status_code=204)
@@ -435,7 +457,7 @@ async def send_message(
     target, model = resolve_target(db, payload.server_id, payload.model)
 
     atts = [a.model_dump() for a in payload.attachments]
-    history = _history_of(db, chat.id)
+    history, summary = _context_of(db, chat.id)
     db.add(
         models.Message(
             chat_id=chat.id, role="user", content=payload.content,
@@ -447,7 +469,9 @@ async def send_message(
     db.commit()
     history.append({"role": "user", "content": payload.content, "images": payload.images, "attachments": atts})
 
-    return build_stream_response(chat.id, target, model, history, use_tools=payload.use_tools, user_id=user.id)
+    return build_stream_response(
+        chat.id, target, model, history, use_tools=payload.use_tools, user_id=user.id, summary=summary
+    )
 
 
 @router.delete("/{chat_id}/messages/{message_id}", status_code=204)
@@ -462,6 +486,7 @@ def delete_message(
     msg = db.get(models.Message, message_id)
     if not msg or msg.chat_id != chat_id:
         raise HTTPException(404, "Message not found in this chat")
+    _drop_summary_if_covers(db, chat_id, message_id)
     db.delete(msg)
     db.query(models.Chat).filter(models.Chat.id == chat_id).update({"updated_at": models.utcnow()})
     db.commit()
@@ -483,6 +508,7 @@ async def edit_message(
 
     target, model = resolve_target(db, payload.server_id, payload.model)
 
+    _drop_summary_if_covers(db, chat_id, message_id)
     msg.content = payload.content
     if payload.images is not None:  # None → existing images are kept
         msg.images = payload.images or None
@@ -491,8 +517,10 @@ async def edit_message(
     ).delete()
     db.commit()
 
-    history = _history_of(db, chat_id)
-    return build_stream_response(chat_id, target, model, history, use_tools=payload.use_tools, user_id=user.id)
+    history, summary = _context_of(db, chat_id)
+    return build_stream_response(
+        chat_id, target, model, history, use_tools=payload.use_tools, user_id=user.id, summary=summary
+    )
 
 
 @router.post("/{chat_id}/fork")
@@ -503,14 +531,14 @@ async def fork_chat(
     db: Session = Depends(get_db),
 ):
     """Forks a new chat from history (everything before message_id) with an edited prompt and a fresh reply."""
-    _owned_chat(db, chat_id, user)
+    chat = _owned_chat(db, chat_id, user)
     msg = db.get(models.Message, payload.message_id)
     if not msg or msg.chat_id != chat_id or msg.role != "user":
         raise HTTPException(404, "User message not found in this chat")
 
     target, model = resolve_target(db, payload.server_id, payload.model)
 
-    new_chat = models.Chat(title=payload.content[:60], user_id=user.id)
+    new_chat = models.Chat(title=payload.content[:60], user_id=user.id, context_mode=chat.context_mode)
     db.add(new_chat)
     db.commit()
     db.refresh(new_chat)
@@ -521,13 +549,20 @@ async def fork_chat(
         .order_by(models.Message.id)
         .all()
     )
+    copied: dict[int, int] = {}  # old message id → its copy's id
     for m in prior:
-        db.add(
-            models.Message(
-                chat_id=new_chat.id, role=m.role, content=m.content, images=m.images,
-                attachments=m.attachments, model_used=m.model_used, server_used=m.server_used,
-            )
+        copy = models.Message(
+            chat_id=new_chat.id, role=m.role, content=m.content, images=m.images,
+            attachments=m.attachments, model_used=m.model_used, server_used=m.server_used,
         )
+        db.add(copy)
+        db.flush()
+        copied[m.id] = copy.id
+    # The summary travels with the fork only if everything it covers came along — a fork taken
+    # from inside the summarised range would otherwise inherit a summary of its own future.
+    if chat.summary and chat.summary_upto_id in copied:
+        new_chat.summary = chat.summary
+        new_chat.summary_upto_id = copied[chat.summary_upto_id]
     db.add(
         models.Message(
             chat_id=new_chat.id, role="user", content=payload.content,
@@ -536,10 +571,10 @@ async def fork_chat(
     )
     db.commit()
 
-    history = _history_of(db, new_chat.id)
+    history, summary = _context_of(db, new_chat.id)
     return build_stream_response(
         new_chat.id, target, model, history,
-        use_tools=payload.use_tools, user_id=user.id,
+        use_tools=payload.use_tools, user_id=user.id, summary=summary,
         extra_headers={"X-Calivi-Chat-Id": str(new_chat.id)},
     )
 
@@ -564,3 +599,61 @@ def respond_to_approval(
         raise HTTPException(404, "Chat not found")
     if not approvals.resolve(approval_id, chat_id, user.id, payload.approved):
         raise HTTPException(404, "Approval not found")
+
+
+@router.post("/{chat_id}/compact")
+async def compact_chat(
+    chat_id: int,
+    payload: schemas.CompactIn,
+    user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Folds everything before the last few turns into the chat's summary (see compaction.py).
+
+    Streams NDJSON like a reply does — a long chat on a local model can take minutes to
+    summarise, and a silent request would be dropped by the proxy. The summary is only saved if
+    the chat has not been compacted or rewritten underneath it in the meantime.
+    """
+    chat = _owned_chat(db, chat_id, user)
+    target, model = resolve_target(db, payload.server_id, payload.model)
+    upto = compaction.cutoff_id(chat)
+    if upto is None:
+        raise HTTPException(400, "Nothing to compact yet")
+    request = compaction.summary_request(chat, upto)
+    base_upto = chat.summary_upto_id
+
+    async def generate():
+        text = ""
+        error_msg = None
+        try:
+            async for piece in llm.stream_chat(target, model, request):
+                if piece["type"] == "content":
+                    text += piece["text"]
+                if piece["type"] in ("content", "thinking"):
+                    yield json.dumps(piece) + "\n"
+        except Exception as e:
+            error_msg = _humanize_error(e)
+        if not error_msg and not text.strip():
+            error_msg = "The model returned an empty summary."
+        if error_msg:
+            yield json.dumps({"type": "error", "message": error_msg}) + "\n"
+            return
+        save_db = SessionLocal()
+        try:
+            fresh = save_db.get(models.Chat, chat_id)
+            if (
+                fresh is None
+                or fresh.summary_upto_id != base_upto
+                or save_db.get(models.Message, upto) is None
+            ):
+                yield json.dumps({"type": "error", "message": "The chat changed while it was being summarised; try again."}) + "\n"
+                return
+            fresh.summary = text.strip()
+            fresh.summary_upto_id = upto
+            fresh.context_mode = "compact"  # compacting is asking for the compacted context
+            save_db.commit()
+        finally:
+            save_db.close()
+        yield json.dumps({"type": "compacted", "summary_upto_id": upto}) + "\n"
+
+    return StreamingResponse(generate(), media_type="application/x-ndjson")
