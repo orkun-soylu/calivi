@@ -25,6 +25,10 @@ Read this file before upgrading.
 
 ### Fixed
 
+- When a model called the same MCP tool more than once in one answer with different arguments,
+  only the first call left a chip, so the output of the later call — often the one the answer
+  relied on — could not be opened after a reload. Each distinct call now keeps its own chip, and
+  MCP chip labels show a short summary of the arguments. Exact repeats still collapse into one.
 - The stdio bridge image no longer breaks on a fresh build. `mcp-server-time` was pinned but its
   `mcp` dependency was not, so a rebuild picked up `mcp` 2.x, which renamed `McpError` to
   `MCPError`: the server died on import and the proxy restarted in a loop with "Connection

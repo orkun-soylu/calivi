@@ -588,7 +588,11 @@ tool is still called `web_search` — that is a tool name, and it is accurate.
    is only added when at least one tool turn ran (`i > 0`) — with `max_iterations: 1` there are
    no results to point at.
 5. **Reload chips:** every **successful** tool call writes a chip into the last user message's
-   `attachments` (`_chip_for` → `_persist_chips`), deduplicated by label, so it survives a reload.
+   `attachments` (`_chip_for` → `_persist_chips`), so it survives a reload. Deduplicated on
+   **(tool name, arguments)**, not on the label: an MCP label used to carry no arguments, so a
+   second call that narrowed a lookup — often the one the answer relied on — was silently dropped
+   (#49). MCP chip labels now end in a clipped argument summary (`🔧 server: tool · version=2.17.1`)
+   so distinct calls are distinguishable; exact repeats still collapse.
    Tool turns themselves are **not persisted** as messages (the final answer carries the context)
    → history reconstruction and the DB schema did not change.
    - `web_search` → `🔍 <query>` **with its result text**, which is how a search stays in context
