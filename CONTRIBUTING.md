@@ -144,6 +144,10 @@ map, tool loop, security notes and "don't fall into this again" warnings all liv
 - [ ] `CHANGELOG.md` updated under `## [Unreleased]` if the change is user-visible
 - [ ] No secrets: no `.env`, API keys, tokens or real hosts/IPs committed
 
+The three test/build lines are also run by CI (`.github/workflows/tests.yml`) on every pull
+request, and a pull request is merged only when that run is green. Run them locally anyway: CI
+tells you *that* something broke, a local run is where you find out why.
+
 For behavioural changes, verify your work by **actually running it** — don't rely on
 tests alone. The app comes up with `docker compose up -d --build`.
 
