@@ -1,0 +1,72 @@
+Install and start Calivi (https://github.com/orkun-soylu/calivi), a self-hosted chat interface for Ollama and OpenAI-compatible servers, on this machine.
+
+Work autonomously. Do not hand me a tutorial or stop after listing commands: run them, check the result of each phase before moving to the next, and fix what you can. Stop and ask me only where this prompt says to, or when continuing would destroy data.
+
+Ground rules — they apply to every phase:
+- Never print, log, paste or commit a secret. That includes CALIVI_SECRET_KEY and anything in `.env`.
+- Preserve what is already here. If Calivi is already installed, keep its checkout, its `.env`, its `config/` files and its Docker volume. Do not run `docker compose down -v`, delete volumes, or `git reset`/`git clean` a checkout that has local changes.
+- Do not create the first Calivi account yourself. The first person to sign up becomes the permanent super admin; that has to be me.
+- Do not reconfigure other software on this machine (Ollama, a reverse proxy, the firewall). If something outside Calivi needs changing, tell me what and why in the handoff.
+- Use POSIX shell. On Windows, work inside WSL2 with Docker Desktop's WSL integration enabled.
+
+## Phase 1 — Inspect
+
+Report briefly, then continue:
+- OS and architecture.
+- `docker --version` and `docker compose version` (Compose v2, the plugin — not `docker-compose` v1). If the Docker daemon is not reachable, say whether it is missing, stopped, or a permissions problem (user not in the `docker` group).
+- Whether port 8090 is free.
+- Whether Calivi already exists: a `calivi` checkout (look in the current directory and in `~`), containers named `calivi-backend` / `calivi-frontend` / `calivi-searxng`, and a Docker volume whose name ends in `calivi-data` (`docker volume ls`).
+- Whether an Ollama server answers on this machine: `curl -s http://127.0.0.1:11434/api/tags`.
+
+## Phase 2 — Prerequisites
+
+Calivi needs only Docker Engine (or Docker Desktop) with the Compose v2 plugin, plus git. Install whatever is missing with the OS's package manager or Docker's official instructions. If installing Docker needs a password or a reboot/re-login (for the `docker` group), stop and tell me exactly what to run.
+
+## Phase 3 — Get the code
+
+- No checkout: `git clone https://github.com/orkun-soylu/calivi.git` and `cd calivi`.
+- A checkout exists: use it as is. Do not pull or switch branches unless I asked for an upgrade — an upgrade can migrate the database, and the changelog asks for a backup first.
+
+## Phase 4 — Configure `.env`
+
+Work in the project root. Compose reads `.env` from there automatically.
+
+- If `.env` exists, keep every line in it. Only add what is missing below.
+- Port: if 8090 is taken (and not by Calivi itself), add `CALIVI_PORT=<a free port>`.
+- CALIVI_SECRET_KEY signs sessions AND encrypts the secrets stored in the database. Decide by these cases, and never overwrite a key that is already set:
+    * `.env` already sets it → leave it alone.
+    * No `calivi-data` volume exists yet (fresh install) → generate one with `openssl rand -hex 32` and write it straight into `.env` without echoing it (e.g. `printf 'CALIVI_SECRET_KEY=%s\n' "$(openssl rand -hex 32)" >> .env`), then `chmod 600 .env`.
+    * A `calivi-data` volume exists but no key is set → do NOT add one. The existing install keeps its key inside the volume, and a new key would make every stored credential unreadable. Mention in the handoff that the README section "Set CALIVI_SECRET_KEY if you back up the data volume" explains how to move it out safely.
+- COOKIE_SECURE stays at its default (`false`): this setup serves plain HTTP, and `true` over HTTP makes login fail silently. If I told you Calivi will sit behind an HTTPS reverse proxy, set `COOKIE_SECURE=true` instead.
+- Leave the optional stdio MCP bridge off. It is opt-in and runs third-party code.
+
+## Phase 5 — Launch
+
+- `docker compose up -d --build` from the project root. The first build downloads and compiles for several minutes; that is normal.
+- If the build or start fails, read the error and the logs (`docker compose logs --tail=100`), fix the cause, and try again. Do not work around a failure by editing Calivi's source.
+
+## Phase 6 — Verify
+
+All of these must pass. Use the port from Phase 4 in place of 8090.
+1. `docker compose ps` shows `calivi-backend`, `calivi-frontend` and `calivi-searxng` running, none restarting.
+2. `curl -fsS http://127.0.0.1:8090/api/health` returns `{"status":"ok"}`. Allow up to a minute after start; a 502 in the first seconds only means the backend is still booting.
+3. `curl -fsS http://127.0.0.1:8090/` returns the HTML of the web app.
+4. `docker compose logs calivi-backend --tail=50` contains no traceback.
+5. The machine's LAN address that I should open from other devices, if it has one.
+
+## Phase 7 — Model servers (report only)
+
+Calivi talks to model servers over the network from inside a container, so `127.0.0.1` in the server form means the container itself, not this machine. Do not add servers yourself — that needs the admin account, which is mine to create. Instead, work out what I should type:
+- If Ollama answered in Phase 1, give me this machine's LAN IP and port 11434 for the Ollama server form. If Ollama listens only on 127.0.0.1 (check with `ss -ltn` or equivalent), the container cannot reach it: say that Ollama has to be started with `OLLAMA_HOST=0.0.0.0`, and that this exposes it to the LAN.
+- If there is no Ollama, say that an OpenAI-compatible provider can be added by base URL and API key instead.
+
+## Phase 8 — Handoff
+
+Finish with a compact summary, nothing else:
+- Install path, and the URLs: `http://localhost:<port>` and the LAN URL.
+- Next step for me: open the URL and sign up **now** — until the first account exists, anyone who can reach the port can claim the admin account. Afterwards registration can be closed under Settings → General.
+- The server to add under Settings → Servers (from Phase 7), or why none was found.
+- Where the data lives: the `calivi-data` Docker volume. Say whether CALIVI_SECRET_KEY is in `.env` (so a backup of `.env` must be kept separately from volume backups) or inside the volume.
+- Everyday commands: `docker compose logs -f`, `docker compose restart`, `docker compose down` (without `-v`), and upgrading with `git pull && docker compose up -d --build` after a backup.
+- Anything that did not work, what you tried, and what I need to do about it.
+- Calivi is under heavy development: keep backups.

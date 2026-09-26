@@ -97,6 +97,11 @@ docker compose up -d --build
 
 Open **http://localhost:8090** (or the host's LAN address: `http://192.168.x.x:8090`).
 
+Or let a coding agent do it: paste the [setup prompt](https://calivi.ai/prompt)
+([raw](docs/setup-prompt.txt)) into Claude Code, Codex or similar. It inspects the machine,
+installs what is missing, writes `.env`, starts the stack and verifies it — without touching an
+existing install's data or key, and leaving the admin account for you to create.
+
 > **The first person to sign up becomes the admin.** Create the first account from the
 > registration screen — it is the **super admin** (id 1) and cannot be deleted or
 > demoted. Later sign-ups become regular users; you can close registration entirely
