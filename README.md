@@ -37,31 +37,24 @@ llama.cpp-server — all from the same chat window.
 
 > ### ⚠️ Heavy development — use at your own risk
 >
-> Calivi works today and it is what I use daily, but it is under **heavy development**.
-> Things break between commits, defaults change, and security holes get found and closed
-> as the code moves. There is no stable release channel, no versioned upgrade path, and no
-> guarantee that today's database survives tomorrow's migration untouched.
->
-> If you run it: **watch the commits, update often, and keep your own backups.** Read the
-> diff before you pull. **Use at your own risk.**
+> Calivi is what I use daily, but it is at `0.x`: defaults change, the database schema moves,
+> and security holes get found and closed as the code does. Read the [CHANGELOG](CHANGELOG.md)
+> before upgrading, and **keep your own backups.**
 
 ---
 
 ## Highlights
 
-- **Multi-server, manual selection** — You choose the server and model from the top bar;
-  no automatic routing. Only reachable (`up`) servers appear in the picker.
-- **Two server types** — `ollama` (native `/api/chat`) and `openai` (OpenAI-compatible
-  `/v1/chat/completions`). One interface drives both.
+- **Multi-server, manual selection** — You choose the server and model from the top bar; no
+  automatic routing. `ollama` (native `/api/chat`) and `openai` (`/v1/chat/completions`)
+  servers side by side; only reachable ones appear in the picker.
 - **Streaming with reasoning** — Responses stream in; reasoning models' thinking tokens
   are shown in a separate box. Interrupt with the **Stop** button or **Esc** (whatever
   was generated so far is kept).
 - **Multi-user** — httpOnly cookie + JWT sessions, admin/user roles. Each user sees only
   their own chats. Registration can be closed by an admin.
-- **Vision** — Send images to vision-capable models, including paste-from-clipboard and a
-  full-screen viewer (lightbox).
-- **Document attachments** — PDF / docx / txt / code / csv / json are extracted as
-  **text** and handed to the model (lossless text, not OCR).
+- **Vision and documents** — Images (paste from clipboard works) go to vision-capable models;
+  PDF / docx / txt / code / csv / json are extracted as **text** and handed to the model.
 - **Tools (🔧)** — One toggle in the composer offers the tool layer to the model, which then
   calls tools *on its own initiative*; which tool ran is visible in the conversation and
   survives a reload. Bundled SearXNG provides web search.
@@ -69,19 +62,20 @@ llama.cpp-server — all from the same chat window.
   (Context7, GitHub, Exa…) and their tools become available to the model alongside the built-in
   ones. HTTP servers directly; stdio servers through a bundled, sandboxed bridge container.
 - **Approval before anything changes** — Read-only tools run on their own; a tool that can change
-  something is **off until you enable it**, and then it asks you before every single run. Silence
-  is a denial, never consent.
+  something is **off until an admin enables it**, and can be set to ask before every run.
 - **Secrets encrypted at rest** — MCP tokens and provider API keys are encrypted in the database,
   so a copy of it (a backup, a stolen volume) does not hand over your credentials.
-- **Message editing** — Edit a message and either **Update** (regenerate from that point,
-  optionally on a different model) or **New chat** (branch while keeping history).
-- **Every answer accounted for** — Each reply carries the model and the server that produced it
-  and the tokens/sec it ran at, stored with the message so they survive a reload — a chat you
-  came back to still tells you what answered, where, and how fast. Copy any single answer, or
-  the whole conversation, to the clipboard in one click; delete a message to walk the chat back.
-- **Markdown + math** — Code blocks with copy buttons, tables, KaTeX.
-- **9 languages** — TR, EN, DE, ES, IT, PT, RU, JA, ZH.
-- **Light/dark theme** with a selectable accent color.
+- **Long chats** — Compact a long conversation on demand: older turns are summarised by a model
+  you pick, so the whole history is not re-sent on every turn. The messages stay in the chat, and
+  "View summary" shows exactly what the model is working from.
+- **Message editing** — Edit a message and either **Update** (regenerate from there, optionally on
+  a different model) or **New chat** (branch while keeping history).
+- **Every answer accounted for** — Each reply keeps the model, the server and the tokens/sec it
+  ran at, across reloads. Copy one answer or the whole chat in one click.
+- **Phone layout** — Below 768px the chat list and the chat become separate full-screen views,
+  with the back gesture working as you would expect.
+- **Markdown + math**, **9 languages** (TR, EN, DE, ES, IT, PT, RU, JA, ZH), **light/dark theme**
+  with a selectable accent color.
 
 ---
 
@@ -106,6 +100,9 @@ existing install's data or key, and leaving the admin account for you to create.
 > registration screen — it is the **super admin** (id 1) and cannot be deleted or
 > demoted. Later sign-ups become regular users; you can close registration entirely
 > under Settings → General.
+
+**Updating:** read the [CHANGELOG](CHANGELOG.md) first — it flags schema changes — then
+`git pull && docker compose up -d --build`. Migrations run on startup.
 
 ### Adding a server
 
@@ -162,35 +159,25 @@ http://calivi-mcp-bridge:8096/servers/time/mcp
 The example ships `mcp-server-time`, which answers the question models are worst at — what the
 date is right now.
 
-**Servers are installed into the image, pinned** (`stdio-bridge/Dockerfile`), each in its own
-virtualenv. Do not put `npx -y <package>` in the config: that downloads and runs whatever the
-registry serves at the moment of the call, which is the thing the bridge is here to avoid.
+**Servers are installed into the image, pinned** (`stdio-bridge/Dockerfile`). Do not put
+`npx -y <package>` in the config: that runs whatever the registry serves at call time.
 
-> **⚠️ The bridge runs code Calivi does not control.** It is therefore locked down by default: its
-> own `internal: true` network (**no internet, no LAN**), non-root, read-only filesystem, all
-> capabilities dropped, no published port and no authentication of its own.
->
-> A server that needs the internet — `mcp-server-fetch`, for instance — **will not work** until you
-> remove `internal: true` from the `mcp-bridge` network. That grants it the internet *and* your
-> LAN; Docker routes both the same way, and separating them needs a `DOCKER-USER` firewall rule.
-> Decide it deliberately.
+> **⚠️ The bridge runs code Calivi does not control,** so it is locked down: an `internal: true`
+> network (**no internet, no LAN**), non-root, read-only filesystem, no capabilities, no published
+> port. A server that needs the internet (`mcp-server-fetch`) **will not work** until you remove
+> `internal: true` from the `mcp-bridge` network — which opens your LAN too, unless you add a
+> `DOCKER-USER` firewall rule. Decide it deliberately.
 
-If a bridged server shows **no tools**, it is almost always the read-only gate: a server that does
-not set `readOnlyHint` has its tools default to `off`, and you enable them per tool in Settings.
-`mcp-server-time` sets it; `mcp-server-fetch` does not.
-
-> **⚠️ Only read-only tools are offered by default.** A tool is offered on its own only if the
-> server marks it read-only; anything else starts **off**. You can switch a tool on per tool in
-> the MCP tab — `auto` to let it run, or **`approve`** to have it stop and ask you before every
-> run — so a mutating tool is always a deliberate act, never a discovery.
+> **⚠️ Only read-only tools are offered by default.** A tool runs on its own only if the server
+> marks it read-only (`readOnlyHint`); anything else starts **off** — which is also why a bridged
+> server can show **no tools** (`mcp-server-fetch` sets no hint). Switch tools on per tool in the
+> MCP tab: `auto` to let it run, or **`approve`** to have it ask before every run. Silence is a
+> denial, never consent.
 >
-> That mark is the *server's own claim* — treat it as a filter, not a sandbox. **Give MCP servers
-> least-privilege credentials**: a fine-grained, read-only GitHub token scoped to the
-> repositories you actually want, not a broad one. The GitHub preset points at the `/readonly`
-> endpoint so the restriction is enforced by GitHub as well.
->
-> Adding an MCP server is admin-only, and its tools become available to **every user** of the
-> instance.
+> That mark is the *server's own claim* — a filter, not a sandbox. **Give MCP servers
+> least-privilege credentials** (e.g. a fine-grained, read-only GitHub token; the GitHub preset
+> uses the `/readonly` endpoint). Adding an MCP server is admin-only, and its tools become
+> available to **every user** of the instance.
 
 ### Configuration (environment variables)
 
@@ -205,47 +192,30 @@ CALIVI_SECRET_KEY=...   # signs sessions AND encrypts stored secrets — see the
 ```
 
 > ### Set `CALIVI_SECRET_KEY` if you back up the data volume
-> Unset, the backend generates and stores the key at `/data/secret_key` — the same volume as
-> `calivi.db`. A copy of that volume then contains both your data *and* the key, so whoever
-> holds it can mint a valid session for any user, admin included, **and** decrypt the MCP
-> tokens and provider API keys stored in the database. Setting the variable stops the key
-> from being written there at all:
+> Unset, the key is generated into `/data/secret_key`, next to `calivi.db` — so a copy of the
+> volume lets its holder sign in as anyone *and* decrypt the stored MCP tokens and API keys.
+> Generate one with `openssl rand -hex 32` and put it in `.env`.
 >
-> ```bash
-> openssl rand -hex 32   # put the output in .env, then: docker compose up -d
-> ```
->
-> **Changing an existing key** signs everyone out once *and* makes every stored secret
-> unreadable, because the same key encrypts them. To change it without losing them, hand the
-> old one over for one boot:
->
-> ```bash
-> CALIVI_SECRET_KEY=<the new key>
-> CALIVI_SECRET_KEY_OLD=<the previous key>
-> ```
->
-> On startup every stored secret is re-encrypted under the new key; remove
-> `CALIVI_SECRET_KEY_OLD` afterwards. Skip this and the secrets simply have to be re-entered
-> in Settings — nothing else breaks, and the app still starts.
+> **Changing it** signs everyone out and makes stored secrets unreadable. To keep them, start
+> once with the previous key as `CALIVI_SECRET_KEY_OLD`: every secret is re-encrypted under the
+> new key, then remove the variable. Skip this and the secrets just have to be re-entered.
 
-Other variables the backend understands (`backend/app/config.py`): `DB_PATH`,
-`SYSTEM_PROMPTS_PATH`, `TOOLS_CONFIG_PATH`, `SEARXNG_URL`, `CORS_ORIGINS`,
-`LOGIN_MAX_ATTEMPTS`, `LOGIN_WINDOW_SECONDS`, `REGISTER_MAX_SUCCESS`,
-`REGISTER_WINDOW_SECONDS`, `OLLAMA_CHAT_TIMEOUT` (seconds, default `300` — raise it if you
-send very large prompts, see [ARCHITECTURE](ARCHITECTURE.md#long-prompts-and-the-streaming-timeout)),
-`COMPACT_SUGGEST_TOKENS` (estimated tokens at which a chat suggests compaction, default `16000`)
-and `COMPACT_KEEP_TURNS` (recent turns kept verbatim when compacting, default `4`) — see
-[ARCHITECTURE](ARCHITECTURE.md#conversation-compaction),
-`CALIVI_SECRET_KEY_OLD` (key rotation, above).
+Other variables (`backend/app/config.py`):
 
-> ### ⚠️ Putting it behind HTTPS: set `COOKIE_SECURE=true`
-> This Compose file serves plain HTTP, so the default is `false`. If you put Calivi
-> behind a TLS-terminating reverse proxy (Traefik, Caddy, nginx…), **set it to `true`** —
-> otherwise the session cookie is sent without the `Secure` flag.
->
-> The opposite is a trap too: with `true` over plain HTTP the browser refuses to send the
-> cookie and **login fails silently**. Most browsers treat `http://localhost` as
-> privileged, so this can work on localhost and then break from a LAN address.
+| Variable | Default | |
+|---|---|---|
+| `OLLAMA_CHAT_TIMEOUT` | `300` | Seconds of stream silence allowed — raise it for very large prompts ([why](ARCHITECTURE.md#long-prompts-and-the-streaming-timeout)) |
+| `COMPACT_SUGGEST_TOKENS` / `COMPACT_KEEP_TURNS` | `16000` / `4` | When a chat suggests [compaction](ARCHITECTURE.md#conversation-compaction), and how many recent turns stay verbatim |
+| `LOGIN_MAX_ATTEMPTS` / `LOGIN_WINDOW_SECONDS` | `5` / `900` | Per-account login rate limit |
+| `REGISTER_MAX_SUCCESS` / `REGISTER_WINDOW_SECONDS` | `10` / `3600` | Sign-up rate limit |
+| `CORS_ORIGINS` | `http://localhost:5173` | Only needed for the separate dev server |
+| `DB_PATH`, `SEARXNG_URL`, `*_PATH` | | Data and config locations — see `config.py` |
+
+> ### ⚠️ Behind HTTPS, set `COOKIE_SECURE=true`
+> The default is `false` because Compose serves plain HTTP. Behind a TLS proxy (Traefik, Caddy,
+> nginx…) set it to `true`, or the session cookie goes out without the `Secure` flag. The reverse
+> is a trap too: `true` over plain HTTP makes **login fail silently** — it may still work on
+> `http://localhost`, which browsers treat as secure, and then break from a LAN address.
 
 ---
 
@@ -258,6 +228,7 @@ request — **no restart needed**. Most are also editable from the Settings UI.
 |---|---|
 | `config/system_prompts.yml` | Per-model system prompts (the `default` key is the fallback) — **not in git**, see below |
 | `config/tools.yml` | Tool (function-calling) layer: on/off, loop cap, `web_search` options |
+| `config/search.yml` | Web search: query-generation prompt, result count |
 | `config/vision_models.yml` | Manual overrides for vision detection (`force_vision` / `force_text`) |
 | `searxng/settings.yml` | Bundled SearXNG. No port is exposed; change `secret_key` if you expose it publicly |
 
@@ -336,8 +307,7 @@ exposing it directly to the internet, know that:
 - The frontend is served with a strict Content-Security-Policy; remote images in model
   output are not fetched (a data-exfiltration vector).
 - Login attempts are rate-limited per account (default: 5 attempts / 15 minutes).
-- Tools that can change state are **off by default**. An admin has to enable them, and even
-  then every single run waits for a person to approve it; silence counts as a denial.
+- Tools that can change state are **off by default** (see [MCP](#adding-an-mcp-server)).
 
 ---
 
