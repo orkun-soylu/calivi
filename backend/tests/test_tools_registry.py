@@ -122,3 +122,114 @@ async def test_unknown_name_gives_no_hint_when_ambiguous_or_absent(reg):
     reg.register(_tool(name="mcp__b__search", source="mcp:b"))
     assert "Did you mean" not in await reg.execute("search", {})
     assert "Did you mean" not in await reg.execute("nothing_like_it", {})
+
+
+# --- Per-call approval (`needs_approval`) ---------------------------------------------------
+# A shell tool cannot be "always mutating" (every `ls` would prompt, and approval decays into
+# reflexive clicking) nor "never" — the decision depends on the command. These pin the gate.
+
+
+def _classified(needs_approval, mutating=False):
+    ran = []
+
+    async def handler(args):
+        ran.append(args)
+        return "ran"
+
+    tool = _tool(name="shell", handler=handler, mutating=mutating)
+    tool.needs_approval = needs_approval
+    return tool, ran
+
+
+async def test_per_call_risky_args_are_refused_without_approval(reg):
+    tool, ran = _classified(lambda args: args.get("cmd") == "rm -rf /")
+    reg.register(tool)
+
+    assert (await reg.execute("shell", {"cmd": "rm -rf /"})).startswith("ERROR:")
+    assert ran == []
+    assert await reg.execute("shell", {"cmd": "rm -rf /"}, approved=True) == "ran"
+
+
+async def test_per_call_harmless_args_run_without_approval(reg):
+    tool, ran = _classified(lambda args: args.get("cmd") == "rm -rf /")
+    reg.register(tool)
+
+    assert await reg.execute("shell", {"cmd": "ls"}) == "ran"
+    assert ran == [{"cmd": "ls"}]
+
+
+async def test_a_classifier_that_blows_up_asks(reg):
+    """Fail-safe: a classifier that cannot decide must not grant."""
+
+    def broken(args):
+        raise KeyError("cmd")
+
+    tool, ran = _classified(broken)
+    reg.register(tool)
+
+    assert (await reg.execute("shell", {})).startswith("ERROR:")
+    assert ran == []
+
+
+async def test_mutating_wins_over_a_permissive_classifier(reg):
+    tool, ran = _classified(lambda args: False, mutating=True)
+    reg.register(tool)
+
+    assert (await reg.execute("shell", {"cmd": "ls"})).startswith("ERROR:")
+    assert ran == []
+
+
+# --- Privileged tools -----------------------------------------------------------------------
+# Host tools (the appliance's own shell) belong to the instance owner. For anybody else they
+# must not exist: not offered, not runnable, not even hinted at.
+
+
+def _privileged(name="host_shell"):
+    ran = []
+
+    async def handler(args):
+        ran.append(args)
+        return "ran"
+
+    tool = _tool(name=name, handler=handler)
+    tool.privileged = True
+    return tool, ran
+
+
+async def test_privileged_tool_is_not_offered_to_others(reg):
+    tool, _ = _privileged()
+    reg.register(tool)
+    reg.register(_tool(name="public"))
+
+    assert [s["function"]["name"] for s in reg.specs()] == ["public"]
+    assert [s["function"]["name"] for s in reg.specs(["host_shell", "public"])] == ["public"]
+    assert {s["function"]["name"] for s in reg.specs(privileged=True)} == {"host_shell", "public"}
+
+
+async def test_privileged_tool_is_refused_for_others(reg):
+    """A model can name a tool it was never offered — the registry is the boundary."""
+    tool, ran = _privileged()
+    reg.register(tool)
+
+    result = await reg.execute("host_shell", {})
+    assert result.startswith("ERROR:")
+    assert "no tool named" in result  # indistinguishable from a tool that does not exist
+    assert ran == []
+    assert await reg.execute("host_shell", {}, privileged=True) == "ran"
+
+
+async def test_privileged_tool_is_not_leaked_by_the_name_hint(reg):
+    tool, _ = _privileged(name="mcp__host__shell")
+    reg.register(tool)
+
+    assert "mcp__host__shell" not in await reg.execute("shell", {})
+    assert "mcp__host__shell" in await reg.execute("shell", {}, privileged=True)
+
+
+async def test_lookup_hides_privileged_tools(reg):
+    tool, _ = _privileged()
+    reg.register(tool)
+
+    assert reg.lookup("host_shell") is None
+    assert reg.lookup("host_shell", privileged=True) is tool
+    assert reg.get("host_shell") is tool  # the raw accessor stays raw

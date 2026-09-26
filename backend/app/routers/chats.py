@@ -11,6 +11,7 @@ from app.system_prompts import get_system_prompt
 from app import approvals
 from app.config import APPROVAL_HEARTBEAT, APPROVAL_TIMEOUT
 from app.tools import ERROR_PREFIX, mcp_client, registry
+from app.routers.users import SUPER_ADMIN_ID
 
 router = APIRouter(prefix="/api/chats", tags=["chats"])
 
@@ -186,6 +187,9 @@ def build_stream_response(
     only the messages after it); it goes into the system layer, after the persona prompt.
     """
     server_name = target["name"]
+    # Privileged tools (the host's own shell, on an appliance install) belong to the instance
+    # owner alone — not to every admin, and never to a caller the loop cannot identify.
+    privileged = user_id == SUPER_ADMIN_ID
 
     async def generate():
         messages = _inject_attachments(history)
@@ -196,7 +200,7 @@ def build_stream_response(
         tools_spec = None
         if use_tools and tools_config.is_enabled():
             enabled = [n for n in registry.names() if tools_config.tool_enabled(n)]
-            tools_spec = registry.specs(enabled) or None
+            tools_spec = registry.specs(enabled, privileged=privileged) or None
         # Tool output will be untrusted, so keep the guard in place from the first turn.
         if tools_spec:
             has_untrusted = True
@@ -250,13 +254,14 @@ def build_stream_response(
                     args = call.get("arguments") or {}
                     yield json.dumps({"type": "tool_call", "name": call["name"], "args": args}) + "\n"
 
-                    # Human-in-the-loop: a tool marked `mutating` needs an explicit yes before
-                    # the registry will run it. The wait yields pings, because no bytes flow
-                    # down the stream while a person decides and proxies time out on idle
-                    # connections (Traefik's default is 180s).
+                    # Human-in-the-loop: a `mutating` tool — or one whose `needs_approval`
+                    # says so for these arguments — needs an explicit yes before the registry
+                    # will run it. The wait yields pings, because no bytes flow down the stream
+                    # while a person decides and proxies time out on idle connections
+                    # (Traefik's default is 180s).
                     approved = False
-                    tool = registry.get(call["name"])
-                    if tool is not None and tool.mutating and user_id is not None:
+                    tool = registry.lookup(call["name"], privileged=privileged)
+                    if tool is not None and tool.requires_approval(args) and user_id is not None:
                         approval_id = approvals.create(chat_id, user_id, call["name"], args)
                         try:
                             yield json.dumps({
@@ -279,7 +284,9 @@ def build_stream_response(
                         }) + "\n"
 
                     try:
-                        result = await registry.execute(call["name"], args, approved=approved)
+                        result = await registry.execute(
+                            call["name"], args, approved=approved, privileged=privileged
+                        )
                         ok = not result.startswith(ERROR_PREFIX)
                     except Exception:
                         # A tool failure must not kill the stream: the model gets an error string
