@@ -262,93 +262,6 @@
 
   /* ---- features ---- */
 
-  /* Settings window — a mockup, like .app above. Placeholder data on purpose: the real
-     screens carry LAN addresses, account names and personal system prompts. */
-  .stg { font-family: var(--font-mono); border: 1px solid var(--line); border-radius: var(--radius);
-         overflow: hidden; background: var(--surface); box-shadow: var(--shadow); margin-top: 30px; }
-  .stg-tabs { display: flex; flex-wrap: wrap; gap: 2px; padding: 10px 12px; background: var(--surface-2);
-              border-bottom: 1px solid var(--line-soft); }
-  .stg-tab { font: inherit; font-size: 12px; color: var(--muted); background: none; border: 0;
-             padding: 6px 11px; border-radius: 8px; cursor: pointer; white-space: nowrap; }
-  .stg-tab[aria-selected="true"] { background: var(--surface); color: var(--ink); }
-  /* Sized to the tallest pane (MCP, ~540px). Left to fit content the section would jump by
-     350px every 3 seconds as the tabs rotate, dragging the rest of the page with it. The real
-     Settings window is fixed-size too, so short tabs ending in whitespace is faithful. */
-  .stg-body { min-height: 545px; padding: 18px 20px; }
-  .stg-pane { display: none; }
-  .stg-pane[data-on] { display: block; animation: stgin .35s ease both; }
-  @keyframes stgin { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
-
-  .stg-hint { font-size: 11.5px; color: var(--muted); margin: 0 0 14px; line-height: 1.55; }
-  .stg-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 11px 0;
-             border-bottom: 1px solid var(--line-soft); }
-  .stg-row:last-child { border-bottom: 0; }
-  .stg-row .t { font-size: 12.5px; color: var(--ink); }
-  .stg-row .d { font-size: 11px; color: var(--muted); margin-top: 2px; }
-  .stg-pill { display: inline-flex; gap: 2px; background: var(--surface-2); border-radius: 8px; padding: 3px; }
-  .stg-pill span { font-size: 11.5px; padding: 4px 10px; border-radius: 6px; color: var(--muted); }
-  .stg-pill span.on { background: var(--surface); color: var(--ink); }
-  .stg-dots { display: flex; gap: 6px; }
-  .stg-dots i { flex: none; width: 15px; height: 15px; aspect-ratio: 1; border-radius: 999px; display: block; }
-  /* NOT `.sel` — that class already exists on this page for the model-picker mockup and brings
-     `padding: 7px 11px` plus a 1px border with it. Under border-box that forced the swatch to
-     24x16 and no amount of width/aspect-ratio/border-radius could win, because padding and
-     border already exceeded the 15px. Measured, after three failed guesses. */
-  .stg-dots i.cur { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--ink); }
-  .stg-sw { width: 38px; height: 21px; border-radius: 999px; background: var(--accent); position: relative; }
-  .stg-sw::after { content: ""; position: absolute; top: 3px; right: 3px; width: 15px; height: 15px;
-                   border-radius: 50%; background: #fff; }
-  .stg-sel { font-size: 11.5px; color: var(--ink); background: var(--surface-2); border: 1px solid var(--line);
-             border-radius: 8px; padding: 5px 10px; }
-
-  .stg-item { display: flex; align-items: center; gap: 9px; background: var(--surface-2); border-radius: 8px;
-              padding: 9px 11px; font-size: 12px; color: var(--ink); margin-bottom: 6px; }
-  .stg-item .u { width: 8px; height: 8px; border-radius: 50%; background: var(--green); flex: none; }
-  .stg-item .u.dn { background: #d0453c; }
-  /* min-width:0 is what lets a flex item shrink below its content; without it the long
-     GitHub URL pushed the tool-count badge outside the window on a phone. */
-  .stg-item .m { color: var(--muted); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .stg-item .r { margin-left: auto; flex: none; font-size: 10.5px; color: var(--muted); background: var(--surface); border-radius: 5px; padding: 2px 7px; }
-  .stg-item .r.adm { color: #fff; background: var(--accent); border-radius: 5px; padding: 2px 7px; }
-  .stg-code { background: var(--code-bg); color: var(--code-ink); border-radius: 9px; padding: 13px 15px;
-              font-size: 11.5px; line-height: 1.65; overflow-x: auto; white-space: pre; margin: 0; }
-  .stg-code .c { color: #7d8697; }
-  .stg-tool { display: flex; align-items: center; gap: 9px; font-size: 11.5px; color: var(--muted); padding: 4px 0; }
-  .stg-tool .mode { font-size: 10.5px; border: 1px solid var(--line); border-radius: 6px; padding: 2px 7px; color: var(--ink); }
-  .stg-about h4 { margin: 0 0 10px; font-size: 15px; color: var(--ink); font-family: var(--font-sans); }
-  .stg-about p { margin: 0 0 12px; font-size: 12.5px; color: var(--muted); line-height: 1.7; max-width: 62ch; }
-  .stg-about .foot { font-size: 11.5px; color: var(--muted); }
-  /* "New server" / "New MCP server" forms. Without them the tabs read as lists and the way
-     you actually add a server is invisible — which is the point of showing Settings at all. */
-  .stg-form { margin-top: 15px; }
-  .stg-form .lbl { font-size: 11px; color: var(--muted); margin-bottom: 8px; }
-  .stg-fields { display: flex; flex-direction: column; gap: 7px; }
-  .stg-fr { display: flex; gap: 7px; }
-  .stg-in { flex: 1; min-width: 0; font-size: 11.5px; color: var(--muted); background: var(--surface-2);
-            border: 1px solid var(--line); border-radius: 8px; padding: 8px 11px;
-            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .stg-in.k { flex: none; color: var(--ink); display: flex; align-items: center; gap: 8px; }
-  .stg-in .car { color: var(--muted); margin-left: auto; }
-  .stg-in.ta { white-space: normal; min-height: 44px; }
-  .stg-btn { margin-top: 3px; background: var(--accent); color: #fff; border-radius: 8px;
-             padding: 9px; text-align: center; font-size: 12px; }
-  .stg-chip { font-size: 10.5px; background: var(--surface-2); border: 1px solid var(--line);
-              border-radius: 6px; padding: 3px 8px; color: var(--ink); }
-  /* An expanded user row. .stg-item is a centred flex row, so the open variant switches to
-     block and carries its own header line; the inner fields drop to --surface so they read as
-     inset against the card's --surface-2. */
-  .stg-item.open { display: block; }
-  .stg-item.open .top { display: flex; align-items: center; gap: 9px; }
-  .stg-item.open .stg-in { background: var(--surface); }
-  .stg-mini { font-size: 11px; color: var(--ink); background: var(--surface); border: 1px solid var(--line);
-              border-radius: 8px; padding: 7px 12px; white-space: nowrap; }
-  .stg-danger { margin-left: auto; font-size: 11.5px; color: #e0645c; }
-
-  .stg-check { display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--ink); }
-  .stg-check i { width: 13px; height: 13px; border-radius: 3px; background: var(--accent); display: block; flex: none; }
-
-  @media (max-width: 720px) { .stg-tabs { gap: 0; } .stg-tab { padding: 6px 8px; font-size: 11px; } }
-
   .features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; margin-top: 32px; }
   .feat { background: var(--surface); padding: 24px 22px; }
   .feat .fl { font-family: var(--font-mono); font-size: 0.7rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); }
@@ -367,19 +280,24 @@
   .raw-cut { padding: 10px 14px; font-size: 11px; color: var(--muted); border-top: 1px solid var(--line-soft); }
 
   /* ---- install ---- */
-  .install-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; align-items: center; margin-top: 30px; }
+  .ways { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 30px; }
+  /* min-width: 0 — a grid item defaults to its content width, and the git clone line would widen the page on phones. */
+  .way { min-width: 0; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 24px 22px; display: flex; flex-direction: column; }
+  .way .fl { font-family: var(--font-mono); font-size: 0.7rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); }
+  .way h3 { font-size: 1.12rem; margin: 12px 0 7px; letter-spacing: -0.01em; }
+  .way p { margin: 0; color: var(--muted); font-size: 0.92rem; }
+  .way-btns { display: flex; flex-wrap: wrap; gap: 10px; margin-top: auto; padding-top: 20px; }
+  .way .term { margin-top: auto; }
+  /* Wrapped, not scrolled: a command someone will copy should never look cut off on a phone. */
+  .way .term pre { margin-top: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+  #copy-prompt[data-done] { background: var(--green); }
+  .then { color: var(--muted); font-size: 0.92rem; margin: 22px 0 0; max-width: 68ch; }
+  .then b { color: var(--ink); }
+  .then code { font-family: var(--font-mono); font-size: 0.85em; background: var(--surface-2); padding: 1px 5px; border-radius: 4px; color: var(--ink); }
   .term { background: var(--code-bg); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); }
-  .term-top { display: flex; align-items: center; gap: 7px; padding: 10px 13px; border-bottom: 1px solid rgba(255,255,255,0.07); }
-  .term-top .tl { width: 10px; height: 10px; border-radius: 50%; background: #3a3f4b; }
-  .term-top .lbl { font-family: var(--font-mono); font-size: 11px; color: #6b7280; margin-left: 6px; }
   .term pre { margin: 0; padding: 16px 16px 18px; font-family: var(--font-mono); font-size: 12.5px; line-height: 1.75; color: #e7e9ee; overflow-x: auto; }
   .term .p { color: #6aa8f2; } .term .c { color: #6b7280; } .term .g { color: #7ee0a5; }
-  .steps { display: flex; flex-direction: column; gap: 18px; }
-  .step { display: flex; gap: 14px; }
-  .step .n { flex: none; width: 26px; height: 26px; border-radius: 7px; background: var(--surface-2); border: 1px solid var(--line); display: grid; place-items: center; font-family: var(--font-mono); font-size: 12px; color: var(--accent); font-weight: 600; }
-  .step h4 { margin: 2px 0 3px; font-size: 0.98rem; }
-  .step p { margin: 0; color: var(--muted); font-size: 0.9rem; }
-  .step code, .feat code, .raw-cut code { font-family: var(--font-mono); font-size: 0.85em; background: var(--surface-2); padding: 1px 5px; border-radius: 4px; color: var(--ink); }
+  .feat code, .raw-cut code { font-family: var(--font-mono); font-size: 0.85em; background: var(--surface-2); padding: 1px 5px; border-radius: 4px; color: var(--ink); }
 
   /* ---- footer ---- */
   footer { border-top: 1px solid var(--line-soft); padding: 34px 0 46px; margin-top: 20px; }
@@ -393,9 +311,7 @@
   @media (max-width: 900px) {
     .hero-grid { grid-template-columns: 1fr; gap: 34px; }
     .features { grid-template-columns: 1fr 1fr; }
-    /* Three cards in two columns would leave a bare half-cell — #features has six, #receipts has three. */
-    #receipts .feat:last-child { grid-column: 1 / -1; }
-    .install-grid { grid-template-columns: 1fr; gap: 26px; }
+    .ways { grid-template-columns: 1fr; }
     .app-body { grid-template-columns: 1fr; }
     .side { flex-direction: row; align-items: center; gap: 8px; overflow-x: auto; }
     .side .grp, .side .who { display: none; }
@@ -421,7 +337,6 @@
   <div class="wrap bar-inner">
     <a href="#top" class="wordmark"><span class="dot"></span>calivi</a>
     <div class="bar-spacer"></div>
-    <a class="navlink hide-sm" href="#tools">Tools</a>
     <a class="navlink hide-sm" href="#receipts">Transparency</a>
     <a class="navlink hide-sm" href="#features">Features</a>
     <a class="navlink hide-sm" href="#start">Get&nbsp;started</a>
@@ -608,181 +523,14 @@ stamp=$(<span class="k">date</span> +<span class="s">"%Y-%m-%d_%H-%M-%S"</span>)
   </div>
 </section>
 
-<section id="tools">
-  <div class="wrap">
-    <span class="eyebrow">Tools &amp; MCP</span>
-    <h2>Give the model instruments — and keep the keys.</h2>
-    <p class="sec-lede">One toggle offers the tool layer; the model decides what to call. Bundled web search
-      comes built in, and any remote <b>MCP</b> server plugs in beside it. Read-only tools run freely,
-      state-changing ones ask you first.</p>
-
-    <div class="stg">
-      <div class="stg-tabs" role="tablist" aria-label="Settings tabs">
-        <button class="stg-tab" role="tab" aria-selected="true"  data-i="0">General</button>
-        <button class="stg-tab" role="tab" aria-selected="false" data-i="1">Servers</button>
-        <button class="stg-tab" role="tab" aria-selected="false" data-i="2">MCP</button>
-        <button class="stg-tab" role="tab" aria-selected="false" data-i="3">System Prompts</button>
-        <button class="stg-tab" role="tab" aria-selected="false" data-i="4">Tools</button>
-        <button class="stg-tab" role="tab" aria-selected="false" data-i="5">Users</button>
-        <button class="stg-tab" role="tab" aria-selected="false" data-i="6">About</button>
-      </div>
-      <div class="stg-body">
-
-        <div class="stg-pane" data-p="0" data-on role="tabpanel">
-          <div class="stg-row"><div><div class="t">Theme</div><div class="d">Light / dark appearance. Defaults to your system preference.</div></div>
-            <div class="stg-pill"><span class="on">Light</span><span>Dark</span></div></div>
-          <div class="stg-row"><div><div class="t">Accent color</div><div class="d">Color of buttons, links and selected items.</div></div>
-            <div class="stg-dots"><i class="cur" style="background:#3584e4"></i><i style="background:#1f9a94"></i><i style="background:#3a944a"></i><i style="background:#d9a107"></i><i style="background:#e06a1b"></i><i style="background:#d0453c"></i><i style="background:#d16ba5"></i><i style="background:#8e5bd0"></i><i style="background:#6b7b8c"></i></div></div>
-          <div class="stg-row"><div><div class="t">Interface language</div><div class="d">Nine languages, switched live.</div></div>
-            <div class="stg-sel">English</div></div>
-          <div class="stg-row"><div><div class="t">Registration open</div><div class="d">When off, new user sign-up is blocked (existing users unaffected).</div></div>
-            <div class="stg-sw"></div></div>
-        </div>
-
-        <div class="stg-pane" data-p="1" role="tabpanel">
-          <div class="stg-item"><i class="u"></i>local-gpu <span class="m">— 192.168.1.50:11434 · local ollama</span></div>
-          <div class="stg-item"><i class="u"></i>workstation <span class="m">— 192.168.1.51:11434 · local ollama</span></div>
-          <div class="stg-item"><i class="u"></i>openrouter <span class="m">— https://openrouter.ai/api/v1 · openai api</span></div>
-          <div class="stg-item"><i class="u dn"></i>lab-box <span class="m">— 192.168.1.52:11434 · local ollama</span></div>
-          <p class="stg-hint" style="margin:12px 0 0">A green light means the server answered and its model list arrived. Red servers are hidden from the chat picker.</p>
-          <div class="stg-form">
-            <div class="lbl">New server</div>
-            <div class="stg-fields">
-              <div class="stg-fr">
-                <div class="stg-in k" style="width:190px">OpenAI-compatible <span class="car">&#8964;</span></div>
-                <div class="stg-in">Name (e.g. local-gpu)</div>
-              </div>
-              <div class="stg-in">Base URL (https://api.openai.com/v1)</div>
-              <div class="stg-in">API Key (optional)</div>
-              <div class="stg-btn">+ Add Server</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="stg-pane" data-p="2" role="tabpanel">
-          <p class="stg-hint">MCP servers over Streamable HTTP or the older HTTP+SSE. stdio servers run in a sandboxed bridge container.</p>
-          <div class="stg-item"><i class="u"></i>context7 <span class="m">— https://mcp.context7.com/mcp</span><span class="r">2 tools</span></div>
-          <div class="stg-item"><i class="u"></i>github <span class="m">— https://api.githubcopilot.com/mcp/readonly</span><span class="r">14 tools</span></div>
-          <div style="margin-top:10px">
-            <div class="stg-tool"><span class="mode">Automatic</span> 🔧 mcp__context7__query-docs</div>
-            <div class="stg-tool"><span class="mode">Ask first</span> ⚠️ mcp__github__create_issue</div>
-          </div>
-          <div class="stg-form">
-            <div class="lbl">New MCP server</div>
-            <div class="stg-fr" style="margin-bottom:8px; align-items:center">
-              <span class="lbl" style="margin:0">Preset:</span>
-              <span class="stg-chip">context7</span><span class="stg-chip">github</span><span class="stg-chip">exa</span>
-            </div>
-            <div class="stg-fields">
-              <div class="stg-fr">
-                <div class="stg-in k" style="width:104px">HTTP <span class="car">&#8964;</span></div>
-                <div class="stg-in">Name (e.g. context7)</div>
-              </div>
-              <div class="stg-in">https://mcp.example.com/mcp</div>
-              <div class="stg-fr">
-                <div class="stg-in k" style="width:132px">Authorization</div>
-                <div class="stg-in k" style="width:82px">Bearer</div>
-                <div class="stg-in">Token (optional)</div>
-              </div>
-              <div class="stg-in ta">Extra headers as JSON, e.g. {"X-MCP-Readonly": "true"}</div>
-              <div class="stg-check"><i></i> Enabled</div>
-              <div class="stg-btn">+ Add MCP Server</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="stg-pane" data-p="3" role="tabpanel">
-          <p class="stg-hint">Per-model system (initial) prompts. Key = exact model name, 'default' = fallback.</p>
-          <pre class="stg-code"><span class="c"># hot-reloaded — edit and the next message uses it</span>
-default: |
-  You are a careful, concise assistant. Answer the
-  question that was asked. Say when you are unsure.
-
-"qwen3:32b": |
-  A reasoning model. Take multi-step problems slowly
-  and show the steps that matter.</pre>
-        </div>
-
-        <div class="stg-pane" data-p="4" role="tabpanel">
-          <p class="stg-hint">Tool layer settings. <b>enabled</b>: master switch. <b>max_iterations</b>: agentic loop cap.
-            MCP tools are switched on and off individually in the MCP tab.</p>
-          <pre class="stg-code"><span class="c"># read on every request — no restart</span>
-enabled: true
-max_iterations: 8
-tools:
-  web_search:
-    enabled: true
-    num_results: 5</pre>
-        </div>
-
-        <div class="stg-pane" data-p="5" role="tabpanel">
-          <div class="stg-item"><span class="m">#0001</span> alice <span class="m">(you)</span><span class="r adm">super admin</span></div>
-          <div class="stg-item open">
-            <div class="top"><span class="m">#0002</span> bob<span class="r">user</span></div>
-            <div class="stg-fr" style="margin-top:10px">
-              <div class="stg-in">bob@example.com</div>
-              <div class="stg-in" style="flex:none; width:170px">bob</div>
-              <div class="stg-btn" style="margin:0; padding:8px 18px">Save</div>
-            </div>
-            <div class="stg-fr" style="margin-top:9px; align-items:center">
-              <span class="stg-mini">Make admin</span>
-              <span class="stg-mini">Block</span>
-              <span class="stg-danger">Delete</span>
-            </div>
-          </div>
-          <div class="stg-item"><span class="m">#0003</span> carol<span class="r">user</span></div>
-          <p class="stg-hint" style="margin:12px 0 0">Everyone sees only their own chats. The first account is the super admin and cannot be demoted or deleted.</p>
-        </div>
-
-        <div class="stg-pane stg-about" data-p="6" role="tabpanel">
-          <h4>Calivi</h4>
-          <p>A self-hosted, multi-user chat app that connects to Ollama and OpenAI-compatible servers from one
-            interface. Server and model selection is manual. Images and documents, a tool layer with web search
-            and MCP servers, and approval before anything changes state.</p>
-          <p class="foot">FastAPI + React · self-hosted · github.com/orkun-soylu/calivi</p>
-        </div>
-
-      </div>
-    </div>
-    <p class="scrub">// mockup with placeholder data — advances every 3s, click a tab to stop</p>
-  </div>
-</section>
-
 <section id="receipts">
   <div class="wrap">
     <span class="eyebrow">Transparency</span>
     <h2>Tools don't make a model honest.<br />They make it checkable.</h2>
-    <p class="sec-lede">A documentation or search tool returns the passages that matched one query — never a
-      complete reference. A model can read a partial excerpt and confidently report that the part it did not
-      receive does not exist. Calivi does not claim to fix that. It shows you what the model actually got.</p>
-
-    <div class="features">
-      <div class="feat">
-        <div class="fl">What we measured</div>
-        <h3>A confident wrong answer</h3>
-        <p>Asked about Pydantic v2 validator modes, a model sent one broad query to Context7, got back an
-          excerpt in which the word <code>wrap</code> never appears, and reported that the mode does not
-          exist — while closing with “this is from the current documentation”. A re-worded query returns
-          the exact sentence it needed. The documentation was fine; one retrieval was treated as exhaustive.</p>
-      </div>
-      <div class="feat">
-        <div class="fl">The fix that failed</div>
-        <h3>Measured, then dropped</h3>
-        <p>We wrote a system-layer instruction telling the model to re-query when something looked
-          uncovered, and measured it over five runs per arm. It was <b>worse</b>: the false claim went from
-          0/5 to 2/5, and one run exhausted the iteration cap without producing an answer. Telling a model
-          to “say plainly when something is not covered” appears to invite the confident claim of absence
-          that was the bug. It was not shipped.</p>
-      </div>
-      <div class="feat">
-        <div class="fl">What shipped instead</div>
-        <h3>The receipts, kept</h3>
-        <p>The failure is intermittent — 0/5 without the guard — so it is variance, not a defect a prompt
-          can remove. The model cannot be made reliable here, but the operator can be given what it saw:
-          every tool call is clickable and opens the raw output, stored with the message so it survives a
-          reload.</p>
-      </div>
-    </div>
+    <p class="sec-lede">A search or documentation tool returns what matched one query, never the whole
+      reference — and a model can confidently call what it did not receive nonexistent. A prompt could not fix
+      that; <a href="https://github.com/orkun-soylu/calivi/blob/main/ARCHITECTURE.md#tool-function-calling-layer--phase-1">we measured it making things worse</a>.
+      So every tool call opens the raw output the model actually got, stored with the message.</p>
 
     <div class="raw">
       <div class="raw-chip">🔧 context7: query-docs <span class="ok">✓</span><span class="open">raw output ▾</span></div>
@@ -811,32 +559,32 @@ Source: https://github.com/pydantic/pydantic/blob/main/pydantic/functional_valid
       <div class="feat">
         <span class="fl">Routing</span>
         <h3>Manual, always</h3>
-        <p>Choose the server and model from the top bar for every message. Only servers that answered their last probe appear, so a box that is asleep or unreachable cannot be picked by mistake.</p>
+        <p>Pick the server and model for every message. Servers that are asleep or unreachable are hidden, so they cannot be picked by mistake.</p>
       </div>
       <div class="feat">
         <span class="fl">Backends</span>
         <h3>One UI, any server</h3>
-        <p>Native Ollama and any OpenAI-compatible API — OpenRouter, LM Studio, vLLM, llama.cpp — side by side through one interface.</p>
+        <p>Native Ollama and any OpenAI-compatible API — OpenRouter, LM Studio, vLLM, llama.cpp — side by side.</p>
       </div>
       <div class="feat">
         <span class="fl">Streaming</span>
         <h3>With reasoning</h3>
-        <p>Answers stream as they generate; reasoning models show their thinking in a separate pane. Stop any response with Esc.</p>
+        <p>Answers stream as they generate; reasoning shows in its own pane. Esc stops any response.</p>
       </div>
       <div class="feat">
         <span class="fl">Context</span>
         <h3>Vision &amp; documents</h3>
-        <p>Paste images to vision models. Attach PDFs, docx or code — extracted as lossless text, not OCR — on any model.</p>
+        <p>Paste images to vision models; attach PDFs, docx or code as lossless text on any model.</p>
       </div>
       <div class="feat">
         <span class="fl">Tools</span>
         <h3>Web search and MCP</h3>
-        <p>A bundled SearXNG, plus any <b>MCP</b> server — Context7, GitHub, Exa over HTTP, or an stdio server in the sandboxed bridge container. The model calls them on its own initiative, and you see which tool ran, right in the conversation.</p>
+        <p>Bundled web search plus any <b>MCP</b> server. Read-only tools run freely; anything that changes state asks you first.</p>
       </div>
       <div class="feat">
         <span class="fl">Access &amp; secrets</span>
         <h3>Multi-user</h3>
-        <p>Cookie sessions, admin and user roles, each person scoped to their own chats. Registration you can close anytime. API keys and MCP tokens are encrypted in the database, so a copy of it is not a copy of your credentials.</p>
+        <p>Roles, private chats, registration you can close. API keys and MCP tokens are encrypted in the database.</p>
       </div>
     </div>
   </div>
@@ -845,33 +593,36 @@ Source: https://github.com/pydantic/pydantic/blob/main/pydantic/functional_valid
 <section id="start">
   <div class="wrap">
     <span class="eyebrow">Get started</span>
-    <h2>Running in one command.</h2>
-    <div class="install-grid">
-      <div class="term">
-        <div class="term-top"><span class="tl"></span><span class="tl"></span><span class="tl"></span><span class="lbl">bash</span></div>
-        <pre><span class="c"># clone and bring it up</span>
-<span class="p">$</span> git clone https://github.com/orkun-soylu/calivi.git
-<span class="p">$</span> cd calivi
-<span class="p">$</span> docker compose up -d --build
-
-<span class="g">✓</span> calivi running on http://localhost:8090</pre>
+    <h2>Two ways in. Both take a few minutes.</h2>
+    <div class="ways">
+      <div class="way">
+        <span class="fl">Easiest</span>
+        <h3>Let your coding agent do it</h3>
+        <p>Paste one prompt into Claude Code, Codex or any coding agent on the machine that should host
+          Calivi. It checks the machine, installs what is missing, starts Calivi, verifies it and hands
+          you the URL.</p>
+        <div class="way-btns">
+          <button class="btn btn-primary" id="copy-prompt" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"></rect><path d="M5 15V5a2 2 0 0 1 2-2h10"></path></svg>
+            <span id="copy-prompt-label">Copy setup prompt</span>
+          </button>
+          <a class="btn btn-ghost" href="/prompt">Read it first</a>
+        </div>
       </div>
-      <div class="steps">
-        <div class="step">
-          <span class="n">1</span>
-          <div><h4>Bring up the stack</h4><p>Backend, frontend and a bundled SearXNG. Needs only Docker &amp; Compose — data lives in SQLite. All three come to <b>about 700&nbsp;MB</b> on disk, web search included.</p></div>
-        </div>
-        <div class="step">
-          <span class="n">2</span>
-          <div><h4>Create the first account</h4><p>The first sign-up becomes the <b>admin</b>. Add your servers under Settings — Ollama by host, OpenAI-compatible by base URL.</p></div>
-        </div>
-        <div class="step">
-          <span class="n">3</span>
-          <div><h4>Put a model to work</h4><p>Pick a server and model from the top bar and start chatting. Behind HTTPS? Set <code>COOKIE_SECURE=true</code>.</p></div>
+      <div class="way">
+        <span class="fl">By hand</span>
+        <h3>Three commands</h3>
+        <p>Needs only Docker with Compose.</p>
+        <div class="term">
+          <pre><span class="p">$</span> git clone https://github.com/orkun-soylu/calivi.git
+<span class="p">$</span> cd calivi
+<span class="p">$</span> docker compose up -d --build</pre>
         </div>
       </div>
     </div>
-    <p class="microcopy">Using a coding agent? Hand it the <a href="/prompt">setup prompt</a> — it installs, configures and verifies Calivi for you.</p>
+    <p class="then"><b>Then</b> open <code>http://localhost:8090</code> and sign up right away — the first
+      account becomes the admin. Add a model server under Settings → Servers, pick it from the top bar,
+      and chat. Settings, backups and HTTPS are in the <a href="https://github.com/orkun-soylu/calivi#installation">README</a>.</p>
   </div>
 </section>
 
@@ -902,37 +653,37 @@ Source: https://github.com/pydantic/pydantic/blob/main/pydantic/functional_valid
       try { localStorage.setItem("calivi_theme", next); } catch (e) {}
     });
 
-    // Settings mockup: walk the tabs so the whole surface is visible without interaction.
-    var tabs = [].slice.call(document.querySelectorAll(".stg-tab"));
-    var panes = [].slice.call(document.querySelectorAll(".stg-pane"));
-    if (tabs.length && panes.length) {
-      // Auto-advance is motion; honour the same preference the page already respects.
-      var reduced = matchMedia("(prefers-reduced-motion: reduce)");
-      var at = 0, timer = null;
-      function show(i) {
-        at = i;
-        tabs.forEach(function (t, n) { t.setAttribute("aria-selected", n === i ? "true" : "false"); });
-        panes.forEach(function (pn, n) {
-          if (n === i) pn.setAttribute("data-on", "");
-          else pn.removeAttribute("data-on");
-        });
-      }
-      function stop() { if (timer) { clearInterval(timer); timer = null; } }
-      function start() { stop(); timer = setInterval(function () { show((at + 1) % tabs.length); }, 3000); }
-
-      tabs.forEach(function (t, n) {
-        // Clicking takes over: a reader who is looking at something should not be moved off it.
-        t.addEventListener("click", function () { stop(); show(n); });
-      });
-      var box = document.querySelector(".stg");
-      box.addEventListener("mouseenter", stop);
-      box.addEventListener("mouseleave", function () { if (!reduced.matches) start(); });
-
-      // React if the preference changes rather than only reading it once.
-      function apply() { reduced.matches ? stop() : start(); }
-      reduced.addEventListener ? reduced.addEventListener("change", apply) : reduced.addListener(apply);
-      apply();
+    // Copies the same file /prompt shows and an agent can fetch — one copy of the text.
+    // navigator.clipboard needs a secure context and a user gesture; the textarea path covers the rest.
+    var cbtn = document.getElementById("copy-prompt");
+    var clabel = document.getElementById("copy-prompt-label");
+    function fallbackCopy(t) {
+      var ta = document.createElement("textarea");
+      ta.value = t; ta.setAttribute("readonly", ""); ta.style.position = "fixed"; ta.style.opacity = "0";
+      document.body.appendChild(ta); ta.select();
+      var ok = false;
+      try { ok = document.execCommand("copy"); } catch (e) {}
+      document.body.removeChild(ta);
+      if (!ok) throw new Error("copy failed");
     }
+    // Fetched up front and kept as a string, so the click writes to the clipboard synchronously:
+    // Safari refuses a clipboard write that happens after an await inside the handler.
+    var promptText = null;
+    fetch("setup-prompt.txt", { cache: "no-cache" })
+      .then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); })
+      .then(function (t) { promptText = t; }, function () {});
+    function done() {
+      cbtn.setAttribute("data-done", ""); clabel.textContent = "Copied — paste it into your agent";
+      setTimeout(function () { cbtn.removeAttribute("data-done"); clabel.textContent = "Copy setup prompt"; }, 2500);
+    }
+    cbtn.addEventListener("click", function () {
+      // Not loaded (offline, blocked) or no way to copy: the prompt page shows the text to select.
+      if (promptText === null) { location.href = "/prompt"; return; }
+      var t = promptText;
+      var p = navigator.clipboard ? navigator.clipboard.writeText(t).catch(function () { fallbackCopy(t); })
+                                  : new Promise(function (ok) { fallbackCopy(t); ok(); });
+      p.then(done, function () { location.href = "/prompt"; });
+    });
   })();
 </script>
 
