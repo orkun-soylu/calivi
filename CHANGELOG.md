@@ -9,6 +9,13 @@ Read this file before upgrading.
 
 ## [Unreleased]
 
+### Added
+
+- **Setup prompt for coding agents** — [calivi.ai/prompt](https://calivi.ai/prompt) carries one
+  prompt (`docs/setup-prompt.txt`) that has Claude Code, Codex or any coding agent install,
+  configure and verify Calivi, then hand back the URL. It preserves an existing install's
+  `.env`, volume and secret key, and leaves the first (admin) sign-up to you.
+
 ## [0.2.0] — 2026-09-26
 
 Long chats and phones. A chat can now be compacted so a long conversation stops re-sending its

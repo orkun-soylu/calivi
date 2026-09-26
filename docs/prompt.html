@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Calivi — setup prompt for your coding agent</title>
+<meta name="description" content="One prompt that has a coding agent install, configure and verify Calivi on your machine. Copy it, paste it into Claude Code, Codex or any coding agent." />
+<link rel="canonical" href="https://calivi.ai/prompt" />
+<meta name="theme-color" content="#121317" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%233584e4'/%3E%3Ccircle cx='16' cy='16' r='6' fill='white'/%3E%3C/svg%3E" />
+<script>
+  /* Same key as the landing page, so the theme chosen there carries over. */
+  try {
+    var t = localStorage.getItem("calivi_theme");
+    if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
+  } catch (e) {}
+</script>
+<style>
+  /* Tokens copied from index.html — keep the two in step. */
+  :root {
+    color-scheme: dark;
+    --accent: #4a90e8; --accent-bright: #6aa8f2; --green: #3a944a;
+    --ground: #121317; --surface: #181a20; --line: #292d36; --line-soft: #23262e;
+    --ink: #e7e9ee; --muted: #949aa6; --code-bg: #0c0d10;
+    --maxw: 820px;
+    --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Code", Menlo, Consolas, monospace;
+  }
+  :root[data-theme="light"] {
+    color-scheme: light;
+    --ground: #e9ecf1; --surface: #ffffff; --line: #d9dee6; --line-soft: #e6e9ef;
+    --ink: #191c22; --muted: #555c67; --code-bg: #0f1116; --accent: #3584e4; --accent-bright: #5a9bf0;
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --ground: #121317; --surface: #181a20; --line: #292d36; --line-soft: #23262e;
+    --ink: #e7e9ee; --muted: #949aa6; --code-bg: #0c0d10; --accent: #4a90e8; --accent-bright: #6aa8f2;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--ground); color: var(--ink);
+    font-family: var(--font-sans); line-height: 1.6; -webkit-font-smoothing: antialiased;
+  }
+  .wrap { width: 100%; max-width: var(--maxw); margin: 0 auto; padding: 0 16px; }
+  a { color: inherit; }
+  code { font-family: var(--font-mono); font-size: 0.9em; }
+
+  header.bar { border-bottom: 1px solid var(--line-soft); }
+  .bar-inner { display: flex; align-items: center; gap: 16px; height: 60px; }
+  .wordmark {
+    font-family: var(--font-mono); font-weight: 600; font-size: 1.08rem; letter-spacing: -0.01em;
+    display: flex; align-items: center; gap: 9px; text-decoration: none;
+  }
+  .wordmark .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
+  .bar-spacer { flex: 1; }
+  .navlink { text-decoration: none; color: var(--muted); font-size: 0.9rem; padding: 6px 4px; }
+  .navlink:hover { color: var(--ink); }
+  .icon-btn {
+    display: inline-grid; place-items: center; width: 36px; height: 36px;
+    border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); cursor: pointer; padding: 0;
+  }
+  .icon-btn svg { width: 17px; height: 17px; display: block; }
+
+  main.wrap { padding-top: 48px; padding-bottom: 64px; }
+  .eyebrow { font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+  h1 { font-size: clamp(1.9rem, 5vw, 2.5rem); line-height: 1.1; letter-spacing: -0.02em; font-weight: 700; margin: 12px 0 0; text-wrap: balance; }
+  .lede { color: var(--muted); font-size: 1.06rem; margin: 16px 0 0; max-width: 40em; }
+  .alt { color: var(--muted); font-size: 0.92rem; margin: 12px 0 0; overflow-wrap: anywhere; }
+  .alt code { color: var(--ink); }
+
+  .prompt { margin-top: 32px; background: var(--code-bg); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .prompt-top {
+    display: flex; align-items: center; gap: 12px; padding: 10px 12px 10px 16px;
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+  }
+  .prompt-top .lbl { font-family: var(--font-mono); font-size: 12px; color: #8a909c; flex: 1; }
+  .copy {
+    display: inline-flex; align-items: center; gap: 8px;
+    font: 600 0.9rem var(--font-sans); padding: 8px 14px; border-radius: 8px; cursor: pointer;
+    background: var(--accent); color: #fff; border: 0;
+  }
+  .copy:hover { background: var(--accent-bright); }
+  .copy:disabled { opacity: 0.5; cursor: default; }
+  .copy[data-done] { background: var(--green); }
+  .copy svg { width: 15px; height: 15px; }
+  /* pre-wrap, not a horizontal scroller: on a phone the reader has to be able to read the
+     whole prompt before pasting it into an agent that will run commands on their machine. */
+  .prompt pre {
+    margin: 0; padding: 16px; font-family: var(--font-mono); font-size: 12.5px; line-height: 1.7;
+    color: #e7e9ee; white-space: pre-wrap; overflow-wrap: anywhere;
+  }
+
+  .notes { margin-top: 28px; color: var(--muted); font-size: 0.92rem; }
+  .notes li { margin: 6px 0; }
+  .notes b { color: var(--ink); font-weight: 600; }
+</style>
+</head>
+<body>
+
+<header class="bar">
+  <div class="wrap bar-inner">
+    <a href="/" class="wordmark"><span class="dot"></span>calivi</a>
+    <div class="bar-spacer"></div>
+    <a class="navlink" href="https://github.com/orkun-soylu/calivi">GitHub</a>
+    <button class="icon-btn" id="theme" aria-label="Toggle theme" title="Toggle light / dark">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19"></path></svg>
+    </button>
+  </div>
+</header>
+
+<main class="wrap">
+  <span class="eyebrow">Setup prompt</span>
+  <h1>Let your coding agent install Calivi.</h1>
+  <p class="lede">
+    Copy the prompt below and paste it into Claude Code, Codex or any coding agent running on the
+    machine that should host Calivi. It checks the machine, installs what is missing, starts the
+    stack, verifies it and hands back the URL — leaving the admin account for you to create.
+  </p>
+  <p class="alt">Or point the agent at the file: <code>Follow the instructions at https://calivi.ai/setup-prompt.txt</code></p>
+
+  <div class="prompt">
+    <div class="prompt-top">
+      <span class="lbl">setup-prompt.txt</span>
+      <button class="copy" id="copy" disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"></rect><path d="M5 15V5a2 2 0 0 1 2-2h10"></path></svg>
+        <span id="copy-label">Copy prompt</span>
+      </button>
+    </div>
+    <!-- Filled from setup-prompt.txt, the single copy of the text: an agent told to fetch the URL
+         and a reader copying from here must get the same instructions. -->
+    <pre id="text">Loading… If this does not change, open <a href="setup-prompt.txt">setup-prompt.txt</a> directly.</pre>
+  </div>
+
+  <ul class="notes">
+    <li><b>Read it before you run it.</b> The agent will execute commands on your machine; the prompt is short enough to check.</li>
+    <li>It never overwrites an existing install's data, <code>.env</code> or secret key, and does not upgrade unless you ask.</li>
+    <li>Prefer doing it by hand? The <a href="/#start">three commands</a> are on the front page.</li>
+  </ul>
+</main>
+
+<script>
+  (function () {
+    var root = document.documentElement;
+    document.getElementById("theme").addEventListener("click", function () {
+      var next = (root.dataset.theme || "dark") === "dark" ? "light" : "dark";
+      root.dataset.theme = next;
+      try { localStorage.setItem("calivi_theme", next); } catch (e) {}
+    });
+
+    var pre = document.getElementById("text");
+    var btn = document.getElementById("copy");
+    var label = document.getElementById("copy-label");
+    var prompt = "";
+
+    fetch("setup-prompt.txt", { cache: "no-cache" })
+      .then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); })
+      .then(function (t) { prompt = t; pre.textContent = t; btn.disabled = false; })
+      .catch(function () { /* keep the fallback link that is already on screen */ });
+
+    // navigator.clipboard exists only in secure contexts; the textarea path covers the rest.
+    function fallbackCopy(t) {
+      var ta = document.createElement("textarea");
+      ta.value = t; ta.setAttribute("readonly", ""); ta.style.position = "fixed"; ta.style.opacity = "0";
+      document.body.appendChild(ta); ta.select();
+      var ok = false;
+      try { ok = document.execCommand("copy"); } catch (e) {}
+      document.body.removeChild(ta);
+      return ok ? Promise.resolve() : Promise.reject();
+    }
+
+    btn.addEventListener("click", function () {
+      var p = navigator.clipboard ? navigator.clipboard.writeText(prompt).catch(function () { return fallbackCopy(prompt); })
+                                  : fallbackCopy(prompt);
+      p.then(function () {
+        btn.setAttribute("data-done", ""); label.textContent = "Copied";
+        setTimeout(function () { btn.removeAttribute("data-done"); label.textContent = "Copy prompt"; }, 2000);
+      }, function () { label.textContent = "Select and copy manually"; });
+    });
+  })();
+</script>
+
+</body>
+</html>
