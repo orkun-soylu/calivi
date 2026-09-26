@@ -137,8 +137,8 @@ def _encrypt_existing_secrets(conn):
                     new = crypto.cipher().rotate(value).decode("ascii")
                 except InvalidToken:
                     log.warning(
-                        "%s.%s id=%s decrypts under neither the current nor the old key; "
-                        "leaving it alone. It has to be re-entered.", table, col, row_id,
+                        "A stored credential in %s (id=%s) decrypts under neither the current "
+                        "nor the old key; leaving it alone. It has to be re-entered.", table, row_id,
                     )
                     continue
             else:

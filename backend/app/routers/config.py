@@ -24,6 +24,7 @@ FILES = {
 # Factory defaults: baked into the image, read-only (separate from the mounted /config).
 # The "Default" button restores from here if a user wipes the content by accident.
 DEFAULTS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "defaults")
+DEFAULT_FILES = {name: os.path.join(DEFAULTS_DIR, f"{name}.yml") for name in FILES}
 
 
 class ConfigIn(BaseModel):
@@ -46,10 +47,11 @@ def get_config(name: str):
 @router.get("/{name}/default")
 def get_config_default(name: str):
     """Returns the factory-default content for that config (baked into the image, immutable)."""
-    if name not in FILES:
+    path = DEFAULT_FILES.get(name)
+    if not path:
         raise HTTPException(404, "Unknown config")
     try:
-        with open(os.path.join(DEFAULTS_DIR, f"{name}.yml"), encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             content = f.read()
     except FileNotFoundError:
         content = ""
