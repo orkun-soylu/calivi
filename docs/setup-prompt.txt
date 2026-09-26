@@ -33,15 +33,16 @@ Work in the project root. Compose reads `.env` from there automatically.
 
 - If `.env` exists, keep every line in it. Only add what is missing below.
 - Port: if 8090 is taken (and not by Calivi itself), add `CALIVI_PORT=<a free port>`.
-- CALIVI_SECRET_KEY signs sessions AND encrypts the secrets stored in the database. Decide by these cases, and never overwrite a key that is already set:
-    * `.env` already sets it → leave it alone.
+- CALIVI_SECRET_KEY signs sessions AND encrypts the secrets stored in the database. It lives in one of two places: in `.env`, or — when `.env` does not set it — in a file the backend generated at `/data/secret_key` inside the `calivi-data` volume. An existing install always has a key; an empty variable does not mean it runs without one. Decide by these cases, and never replace a key that exists:
+    * `.env` sets it → leave it alone.
     * No `calivi-data` volume exists yet (fresh install) → generate one with `openssl rand -hex 32` and write it straight into `.env` without echoing it (e.g. `printf 'CALIVI_SECRET_KEY=%s\n' "$(openssl rand -hex 32)" >> .env`), then `chmod 600 .env`.
-    * A `calivi-data` volume exists but no key is set → do NOT add one. The existing install keeps its key inside the volume, and a new key would make every stored credential unreadable. Mention in the handoff that the README section "Set CALIVI_SECRET_KEY if you back up the data volume" explains how to move it out safely.
+    * A `calivi-data` volume exists and `.env` does not set it (also when there is no `.env` at all) → do NOT add a key. The key is in the volume; once the backend runs, confirm with `docker exec calivi-backend test -f /data/secret_key && echo present`. A new key would make every stored credential unreadable, so do not suggest generating one either: moving the key out of the volume is done with the README section "Set CALIVI_SECRET_KEY if you back up the data volume", which carries the old key over.
 - COOKIE_SECURE stays at its default (`false`): this setup serves plain HTTP, and `true` over HTTP makes login fail silently. If I told you Calivi will sit behind an HTTPS reverse proxy, set `COOKIE_SECURE=true` instead.
 - Leave the optional stdio MCP bridge off. It is opt-in and runs third-party code.
 
 ## Phase 5 — Launch
 
+- If Calivi is already running from this checkout, do not rebuild or restart it; go to Phase 6.
 - `docker compose up -d --build` from the project root. The first build downloads and compiles for several minutes; that is normal.
 - If the build or start fails, read the error and the logs (`docker compose logs --tail=100`), fix the cause, and try again. Do not work around a failure by editing Calivi's source.
 
@@ -66,7 +67,7 @@ Finish with a compact summary, nothing else:
 - Install path, and the URLs: `http://localhost:<port>` and the LAN URL.
 - Next step for me: open the URL and sign up **now** — until the first account exists, anyone who can reach the port can claim the admin account. Afterwards registration can be closed under Settings → General.
 - The server to add under Settings → Servers (from Phase 7), or why none was found.
-- Where the data lives: the `calivi-data` Docker volume. Say whether CALIVI_SECRET_KEY is in `.env` (so a backup of `.env` must be kept separately from volume backups) or inside the volume.
+- Where the data lives: the `calivi-data` Docker volume. Say where CALIVI_SECRET_KEY is, as measured in Phase 4: in `.env` (so `.env` must be backed up separately from the volume, and never lost), or in the volume at `/data/secret_key` (so a volume backup carries both the data and the key that unlocks it — point me to the README section named in Phase 4).
 - Everyday commands: `docker compose logs -f`, `docker compose restart`, `docker compose down` (without `-v`), and upgrading with `git pull && docker compose up -d --build` after a backup.
 - Anything that did not work, what you tried, and what I need to do about it.
 - Calivi is under heavy development: keep backups.
