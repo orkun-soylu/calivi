@@ -107,7 +107,7 @@ def _migrate():
 
 
 # (table, column) pairs whose values are bearer credentials for someone else's system.
-_SECRET_COLUMNS = (("mcp_servers", "secret"), ("servers", "api_key"))
+_ENCRYPTED_COLUMNS = (("mcp_servers", "secret"), ("servers", "api_key"))
 
 
 def _encrypt_existing_secrets(conn):
@@ -119,7 +119,7 @@ def _encrypt_existing_secrets(conn):
     """
     from app import crypto
 
-    for table, col in _SECRET_COLUMNS:
+    for table, col in _ENCRYPTED_COLUMNS:
         cols = [row[1] for row in conn.exec_driver_sql(f"PRAGMA table_info({table})").fetchall()]
         if col not in cols:  # empty for a table that does not exist yet
             continue
@@ -137,8 +137,8 @@ def _encrypt_existing_secrets(conn):
                     new = crypto.cipher().rotate(value).decode("ascii")
                 except InvalidToken:
                     log.warning(
-                        "%s.%s id=%s decrypts under neither the current nor the old key; "
-                        "leaving it alone. It has to be re-entered.", table, col, row_id,
+                        "A stored credential in %s (id=%s) decrypts under neither the current "
+                        "nor the old key; leaving it alone. It has to be re-entered.", table, row_id,
                     )
                     continue
             else:
