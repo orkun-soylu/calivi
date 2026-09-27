@@ -65,6 +65,11 @@ llama.cpp-server — all from the same chat window.
   something is **off until an admin enables it**, and can be set to ask before every run.
 - **Secrets encrypted at rest** — MCP tokens and provider API keys are encrypted in the database,
   so a copy of it (a backup, a stolen volume) does not hand over your credentials.
+- **Replies run in the background** — A reply keeps going when you close the tab, switch chats or
+  lose the connection; come back and it picks up where it is, live. Stop still stops it.
+- **Agent mode** — A chat can show a reply as the steps it took: every tool call as a row you open
+  to see its arguments and its output, with the model's words in between. The steps are kept with
+  the reply and given back to the model on the next turn, so it knows what it already ran.
 - **Long chats** — Compact a long conversation on demand: older turns are summarised by a model
   you pick, so the whole history is not re-sent on every turn. The messages stay in the chat, and
   "View summary" shows exactly what the model is working from.
@@ -106,11 +111,36 @@ existing install's data or key, and leaving the admin account for you to create.
 
 ### calivi-vm — a VM the model can operate
 
-A Proxmox image that boots straight into Calivi on port 80 and lets the chat model **run
-commands on that VM**: bash plus file read, write and edit, like a terminal coding agent, behind
-approval cards for anything destructive. The first account claims the machine with a setup code
-shown on the VM console, and it also becomes the VM's sudo-capable Linux account. See
-[`appliance/README.md`](appliance/README.md).
+Calivi can also run natively on a machine and **operate it**: the chat model gets bash plus file
+read, write and edit on that machine, like a terminal coding agent, as the machine owner's
+account. Harmless commands run on their own; anything destructive (`rm`, `systemctl stop`,
+writes under `/etc`, piping into a shell…) waits for an approval card, a few things are refused
+outright, and 🛡 makes every call ask. Chats there start in agent mode.
+
+The first account claims the machine with a setup code shown on its console, and becomes the
+machine's sudo-capable Linux user. Only that account gets the host tools.
+
+Two ways to get it:
+
+- **Proxmox image** — `calivi-vm-X.Y.Z.qcow2` from the [latest release](https://github.com/orkun-soylu/calivi/releases/latest),
+  with `proxmox-create.sh` next to it: Debian 13, Calivi on port 80, ready for GPU passthrough.
+- **Debian 13, Ubuntu 24.04 LTS or 26.04 LTS** — the `calivi` package, one build per
+  distribution, from the release:
+
+  ```bash
+  sudo apt install ./calivi_X.Y.Z-1+deb13_amd64.deb    # or +ubuntu24.04 / +ubuntu26.04
+  ```
+
+  Install it on a machine or VM meant for this: its owner's model will have a root-capable shell
+  there.
+
+Either way the machine then **updates itself**: the package adds the signed APT repository
+[apt.calivi.ai](https://apt.calivi.ai), so `apt upgrade` brings new versions, and an upgrade that
+lands while a reply is running restarts Calivi only once the reply is done. Every package is
+installed and tested in a VM of its own distribution before it is published, and a release is
+published only when all three pass.
+
+Details, security notes and the build: [`appliance/README.md`](appliance/README.md).
 
 ### Adding a server
 

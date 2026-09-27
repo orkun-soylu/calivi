@@ -296,7 +296,15 @@
   .then code { font-family: var(--font-mono); font-size: 0.85em; background: var(--surface-2); padding: 1px 5px; border-radius: 4px; color: var(--ink); }
   .term { background: var(--code-bg); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); }
   .term pre { margin: 0; padding: 16px 16px 18px; font-family: var(--font-mono); font-size: 12.5px; line-height: 1.75; color: #e7e9ee; overflow-x: auto; }
-  .term .p { color: #6aa8f2; } .term .c { color: #6b7280; } .term .g { color: #7ee0a5; }
+  .term .p { color: #6aa8f2; } .term .c { color: #6b7280; } .term .g { color: #7ee0a5; } .term .a { color: #f2c46a; }
+  #vm .term { margin-top: 30px; }
+  /* The timeline mockup is a list of rows, not a command to copy: wrap rather than scroll. */
+  #vm .term pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+  /* A fixed status column: ✓ comes from a fallback font whose width is not the mono cell's. */
+  #vm .st { display: inline-block; width: 2.6ch; }
+  .way-wide { grid-column: 1 / -1; }
+  .way-wide .term { margin-top: 16px; }
+  .way code { font-family: var(--font-mono); font-size: 0.85em; background: var(--surface-2); padding: 1px 5px; border-radius: 4px; color: var(--ink); }
   .feat code, .raw-cut code { font-family: var(--font-mono); font-size: 0.85em; background: var(--surface-2); padding: 1px 5px; border-radius: 4px; color: var(--ink); }
 
   /* ---- footer ---- */
@@ -339,6 +347,7 @@
     <div class="bar-spacer"></div>
     <a class="navlink hide-sm" href="#receipts">Transparency</a>
     <a class="navlink hide-sm" href="#features">Features</a>
+    <a class="navlink hide-sm" href="#vm">calivi-vm</a>
     <a class="navlink hide-sm" href="#start">Get&nbsp;started</a>
     <a class="navlink" href="https://github.com/orkun-soylu/calivi">GitHub</a>
     <button class="icon-btn" id="theme" aria-label="Toggle theme" title="Toggle light / dark">
@@ -590,10 +599,47 @@ Source: https://github.com/pydantic/pydantic/blob/main/pydantic/functional_valid
   </div>
 </section>
 
+<section id="vm">
+  <div class="wrap">
+    <span class="eyebrow">calivi-vm</span>
+    <h2>A machine the model can operate.</h2>
+    <p class="sec-lede">Give Calivi a VM of its own and the model gets a shell there — bash and file edits,
+      as the owner's account, like a terminal coding agent. The UI stays the chat window.</p>
+
+    <div class="term">
+      <pre><span class="c">agent mode · every step opens to its output</span>
+<span class="st g">✓</span>bash       <span class="p">df -h /home &amp;&amp; free -h</span>
+<span class="st g">✓</span>bash       <span class="p">du -sh ~/models/* | sort -h</span>
+<span class="st g">✓</span>read_file  <span class="p">~/models/README</span>
+<span class="st a">?</span>bash       <span class="p">rm -rf ~/models/old-q4</span>
+<span class="st"></span>           <span class="a">waiting for your approval — Approve · Deny</span></pre>
+    </div>
+    <p class="scrub">// mockup with placeholder data — not a real session</p>
+
+    <div class="features">
+      <div class="feat">
+        <span class="fl">Agent mode</span>
+        <h3>Every step, on the record</h3>
+        <p>Each command is a row you can open to its output. The steps are kept with the reply and handed back to the model next turn, so it knows what it already ran.</p>
+      </div>
+      <div class="feat">
+        <span class="fl">Guardrails</span>
+        <h3>Asks before it breaks things</h3>
+        <p>Harmless commands just run. <code>rm</code>, stopping services, writing under <code>/etc</code> wait for your approval; a few things are refused outright. 🛡 makes every call ask.</p>
+      </div>
+      <div class="feat">
+        <span class="fl">Updates</span>
+        <h3>Keeps itself current</h3>
+        <p>New versions arrive with <code>apt upgrade</code> from a signed repository, and never cut a reply that is still running. Each package is tested in a VM of its distribution first.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
 <section id="start">
   <div class="wrap">
     <span class="eyebrow">Get started</span>
-    <h2>Two ways in. Both take a few minutes.</h2>
+    <h2>Three ways in. Each takes a few minutes.</h2>
     <div class="ways">
       <div class="way">
         <span class="fl">Easiest</span>
@@ -619,8 +665,24 @@ Source: https://github.com/pydantic/pydantic/blob/main/pydantic/functional_valid
 <span class="p">$</span> docker compose up -d --build</pre>
         </div>
       </div>
+      <div class="way way-wide">
+        <span class="fl">As a VM</span>
+        <h3>calivi-vm</h3>
+        <p>A Proxmox image, or the <code>calivi</code> package for Debian 13, Ubuntu 24.04 LTS or 26.04 LTS —
+          on a machine meant for it: its owner's model gets a root-capable shell there. Calivi serves on
+          port 80; the first account claims the machine with the setup code shown on its console.</p>
+        <div class="term">
+          <pre><span class="c"># the package, downloaded from the latest release</span>
+<span class="p">$</span> sudo apt install ./calivi_X.Y.Z-1+deb13_amd64.deb   <span class="c"># or +ubuntu24.04 / +ubuntu26.04</span></pre>
+        </div>
+        <div class="way-btns">
+          <a class="btn btn-primary" href="https://github.com/orkun-soylu/calivi/releases/latest">Latest release</a>
+          <a class="btn btn-ghost" href="https://github.com/orkun-soylu/calivi/blob/main/appliance/README.md">calivi-vm guide</a>
+          <a class="btn btn-ghost" href="https://apt.calivi.ai">apt.calivi.ai</a>
+        </div>
+      </div>
     </div>
-    <p class="then"><b>Then</b> open <code>http://localhost:8090</code> and sign up right away — the first
+    <p class="then"><b>Then</b>, with Docker, open <code>http://localhost:8090</code> and sign up right away — the first
       account becomes the admin. Add a model server under Settings → Servers, pick it from the top bar,
       and chat. Settings, backups and HTTPS are in the <a href="https://github.com/orkun-soylu/calivi#installation">README</a>.</p>
   </div>
