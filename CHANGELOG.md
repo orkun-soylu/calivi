@@ -9,6 +9,12 @@ Read this file before upgrading.
 
 ## [Unreleased]
 
+### Changed
+
+- The calivi-vm image is built by CI from the release's own Debian 13 package, booted and tested
+  (first boot as Proxmox does it, claim, APT source, a host-tool call, the deferred restart), and
+  attached to the release only if that passed — like the packages.
+
 ## [0.6.2] — 2026-09-27
 
 Calivi updates itself. Releases are published to a signed APT repository, https://apt.calivi.ai,

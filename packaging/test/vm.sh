@@ -4,6 +4,9 @@
 #   packaging/test/vm.sh start trixie|noble|resolute <dir>   boot it, wait until SSH and cloud-init are done
 #   packaging/test/vm.sh stop <dir>
 #
+#   IMAGE=<qcow2>          boot this image (the calivi-vm image) instead of the distribution's
+#   PACKAGE_UPGRADE=true   upgrade packages on first boot, as Proxmox's cloud-init does
+#
 # QEMU user networking, so nothing needs root beyond /dev/kvm: the guest's SSH and :80 are
 # forwarded to 127.0.0.1:2222 and :8080, and the guest reaches the runner's 127.0.0.1 as
 # 10.0.2.2 (the fake model server). The base image is cached in <dir>; the VM writes to an
@@ -28,9 +31,13 @@ case $distro in
 esac
 
 mkdir -p "$dir"
-base="$dir/$distro-base.qcow2"
-[ -s "$base" ] || curl -fsSL --retry 3 -o "$base" "$url"
-qemu-img create -q -f qcow2 -F qcow2 -b "$base" "$dir/disk.qcow2" 12G
+if [ -n "${IMAGE:-}" ]; then
+    base=$(realpath "$IMAGE")
+else
+    base="$dir/$distro-base.qcow2"
+    [ -s "$base" ] || curl -fsSL --retry 3 -o "$base" "$url"
+fi
+qemu-img create -q -f qcow2 -F qcow2 -b "$base" "$dir/disk.qcow2" 32G
 
 [ -f "$dir/id_ed25519" ] || ssh-keygen -q -t ed25519 -N "" -C calivi-ci -f "$dir/id_ed25519"
 cat > "$dir/user-data" <<EOF
@@ -40,8 +47,8 @@ users:
     sudo: ALL=(ALL) NOPASSWD:ALL
     shell: /bin/bash
     ssh_authorized_keys: ["$(cat "$dir/id_ed25519.pub")"]
-package_update: false
-package_upgrade: false
+package_update: ${PACKAGE_UPGRADE:-false}
+package_upgrade: ${PACKAGE_UPGRADE:-false}
 EOF
 printf 'instance-id: calivi-ci\nlocal-hostname: calivi-ci\n' > "$dir/meta-data"
 cloud-localds "$dir/seed.iso" "$dir/user-data" "$dir/meta-data"
