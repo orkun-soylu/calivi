@@ -8,6 +8,11 @@ class RegisterIn(BaseModel):
     email: str
     username: str
     password: str
+    # Appliance only (host_bootstrap.py): the first registration claims the machine.
+    setup_code: str | None = None
+    hostname: str | None = None
+    timezone: str | None = None
+    ssh_key: str | None = None
 
 
 class LoginIn(BaseModel):
@@ -42,6 +47,7 @@ class UserUpdate(BaseModel):
 
 class AuthConfigOut(BaseModel):
     registration_enabled: bool
+    host_setup: bool = False  # the next registration claims this machine (needs the setup code)
 
 
 class SettingsUpdate(BaseModel):

@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app import auth, config, models, schemas
+from app import auth, config, host_bootstrap, models, schemas
 from app.config import (
     LOGIN_MAX_ATTEMPTS,
     LOGIN_WINDOW_SECONDS,
@@ -40,7 +40,10 @@ def _get_settings(db: Session) -> models.Setting:
 @router.get("/config", response_model=schemas.AuthConfigOut)
 def auth_config(db: Session = Depends(get_db)):
     """Unauthenticated: lets the login screen show or hide the signup tab."""
-    return schemas.AuthConfigOut(registration_enabled=_get_settings(db).registration_enabled)
+    return schemas.AuthConfigOut(
+        registration_enabled=_get_settings(db).registration_enabled,
+        host_setup=host_bootstrap.required(db.query(models.User).count()),
+    )
 
 
 def _me(user: models.User) -> schemas.MeOut:
@@ -79,6 +82,24 @@ def register(payload: schemas.RegisterIn, response: Response, db: Session = Depe
     if db.query(models.User).filter(models.User.username == username).first():
         raise HTTPException(409, "That username is already taken")
 
+    # Appliance: the first registration claims the machine. Code first — nobody learns anything
+    # about the other fields without it — then the root helper; the Calivi user is written
+    # only if that succeeded.
+    claims_host = host_bootstrap.required(user_count)
+    if claims_host:
+        try:
+            host_bootstrap.check_setup_code(payload.setup_code)
+            host_bootstrap.validate(username, (payload.hostname or "").strip() or None)
+            host_bootstrap.run_helper({
+                "username": username,
+                "password": payload.password,
+                "hostname": (payload.hostname or "").strip() or None,
+                "timezone": (payload.timezone or "").strip() or None,
+                "ssh_key": (payload.ssh_key or "").strip() or None,
+            })
+        except host_bootstrap.BootstrapError as e:
+            raise HTTPException(e.status, e.message)
+
     user = models.User(
         email=email,
         username=username,
@@ -94,6 +115,11 @@ def register(payload: schemas.RegisterIn, response: Response, db: Session = Depe
         db.rollback()
         raise HTTPException(409, "That email or username is already registered")
     db.refresh(user)
+    if claims_host:
+        # Registration was open only so the owner could arrive. On a machine where the super
+        # admin holds a root shell, more accounts are the owner's decision to make.
+        _get_settings(db).registration_enabled = False
+        db.commit()
     register_limiter.record("global")
     auth.set_session_cookie(response, user.id)
     return _me(user)
