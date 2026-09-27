@@ -290,6 +290,10 @@ def test_migrate_adds_the_compaction_columns_to_an_old_chats_table():
             "INSERT INTO chats (id, title, created_at, updated_at) VALUES (1, 'old', '2026-01-01', '2026-01-01')"
         )
         conn.commit()
+        # This connection goes back to the pool: leaving the pragma off disabled foreign keys
+        # for whichever later test drew it (a background-turns test relying on the FK failed
+        # only in the full suite, depending on order).
+        conn.exec_driver_sql("PRAGMA foreign_keys=ON")
 
     _migrate()
 

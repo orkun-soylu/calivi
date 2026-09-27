@@ -53,6 +53,24 @@ export default function ChatView({ chat, servers, hostTools, onMessageSent, onFo
     if (!supportsVision) setImages([]);
   }, [supportsVision]);
 
+  // Background turns (#85). Switching to another chat stops *following* a reply — it keeps
+  // running on the server — and opening a chat whose reply is still running re-attaches to it:
+  // after a reload, on another device, or on coming back. The replay brings a pending approval
+  // card back with it. `beforeClear` reloads the chat before the stream state clears, so the
+  // reloaded detail (active_turn now false) is what the next render sees — no second attach.
+  useEffect(() => {
+    if (stream.sending && stream.followedChatId() !== chat?.id) stream.detach();
+  }, [chat?.id]);
+
+  useEffect(() => {
+    if (!chat?.active_turn || stream.sending) return;
+    const id = chat.id;
+    stream.run(({ signal, onPiece }) => api.followTurn(id, { signal }, onPiece), {
+      chatId: id,
+      beforeClear: () => onMessageSent(),
+    });
+  }, [chat?.id, chat?.active_turn, stream.sending]);
+
   // While the lightbox is open Esc closes it — and does NOT stop the stream.
   // useChatStream also binds Escape on window (to cancel the stream). Pressing Esc with the
   // lightbox open used to cancel the in-flight answer; the user lost the generation while
@@ -121,6 +139,7 @@ export default function ChatView({ chat, servers, hostTools, onMessageSent, onFo
           onPiece
         ),
       {
+        chatId: chat.id,
         // Clear the streaming bubble only AFTER the new message lands in the list (no empty gap).
         beforeClear: async () => {
           await onMessageSent();
@@ -163,7 +182,7 @@ export default function ChatView({ chat, servers, hostTools, onMessageSent, onFo
     await stream.run(
       ({ signal, onPiece }) =>
         api.editMessage(chat.id, mid, { content, ...editTarget, useTools, askEveryTool, signal }, onPiece),
-      { afterClear: () => onMessageSent() }
+      { chatId: chat.id, afterClear: () => onMessageSent() }
     );
   }
 
@@ -177,7 +196,11 @@ export default function ChatView({ chat, servers, hostTools, onMessageSent, onFo
         api.forkChat(
           chat.id,
           { messageId: mid, content, ...editTarget, useTools, askEveryTool, signal },
-          (newId) => onForked(newId),
+          (newId) => {
+            // Follow the new chat *before* switching to it, so the switch does not detach.
+            stream.setChatId(newId);
+            onForked(newId);
+          },
           onPiece
         ),
       { afterClear: () => onMessageSent() }

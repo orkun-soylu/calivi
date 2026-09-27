@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app import auth, models, schemas
+from app import auth, models, schemas, turns
 from app.database import get_db
 
 router = APIRouter(prefix="/api", tags=["users"])
@@ -10,7 +10,7 @@ router = APIRouter(prefix="/api", tags=["users"])
 SUPER_ADMIN_ID = 1  # id==1 is the super admin, untouchable
 
 
-def _delete_user_chats(db: Session, user_id: int) -> None:
+def _delete_user_chats(db: Session, user_id: int) -> list[int]:
     """Deletes the user's chats AND their messages.
 
     A bulk delete does not trigger the ORM cascade, so messages are removed explicitly to
@@ -18,8 +18,12 @@ def _delete_user_chats(db: Session, user_id: int) -> None:
     cascades at DB level — this is the belt-and-braces half).
     """
     chat_ids = select(models.Chat.id).where(models.Chat.user_id == user_id)
+    running = [cid for (cid,) in db.execute(chat_ids).all() if turns.is_active(cid)]
     db.query(models.Message).filter(models.Message.chat_id.in_(chat_ids)).delete(synchronize_session=False)
     db.query(models.Chat).filter(models.Chat.user_id == user_id).delete(synchronize_session=False)
+    # Stop their running replies — after the caller commits, their final saves find the chats
+    # gone (see chats.delete_chat for the ordering).
+    return running
 
 
 @router.get("/users", response_model=list[schemas.UserOut])
@@ -65,9 +69,11 @@ def delete_me(
     """Self-service: deletes the user's own account and all their chats. Not the super admin (id 1)."""
     if user.id == SUPER_ADMIN_ID:
         raise HTTPException(403, "The super admin cannot be deleted")
-    _delete_user_chats(db, user.id)
+    running = _delete_user_chats(db, user.id)
     db.delete(user)
     db.commit()
+    for chat_id in running:
+        turns.cancel(chat_id)
     auth.clear_session_cookie(response)  # end the session
 
 
@@ -124,9 +130,11 @@ def delete_user(
     user = db.get(models.User, user_id)
     if not user:
         raise HTTPException(404, "User not found")
-    _delete_user_chats(db, user_id)
+    running = _delete_user_chats(db, user_id)
     db.delete(user)
     db.commit()
+    for chat_id in running:
+        turns.cancel(chat_id)
 
 
 @router.get("/settings", response_model=schemas.AuthConfigOut)

@@ -5,8 +5,9 @@ generator mid-stream and waiting for a decision that arrives on a *different* re
 module is that rendezvous: the loop creates a pending entry and awaits its event, and
 `POST /api/chats/{chat_id}/approvals/{id}` resolves it.
 
-**In-process and deliberately so.** A pending approval lives in memory, so a closed tab or a
-backend restart loses it and the message has to be retried. The durable alternative (persisting
+**In-process and deliberately so.** A pending approval lives in memory, so a backend restart
+loses it and the message has to be retried. (A closed tab does not: the turn runs on in the
+background and the card comes back on re-attach — see turns.py.) The durable alternative (persisting
 the half-finished tool turn and resuming in a new request) would mean persisting tool turns as
 messages, which the data model deliberately avoids — see ARCHITECTURE.md. A decision that is
 made in seconds does not justify changing the data model.
@@ -43,8 +44,8 @@ def get(approval_id: str) -> Pending | None:
 
 
 def discard(approval_id: str) -> None:
-    """Always call this when the waiting loop leaves, including on an abort — a stream killed by
-    a closed tab raises CancelledError (a BaseException), and without this the entry leaks."""
+    """Always call this when the waiting loop leaves, including on a cancel — Stop (or deleting
+    the chat) raises CancelledError (a BaseException), and without this the entry leaks."""
     _pending.pop(approval_id, None)
 
 

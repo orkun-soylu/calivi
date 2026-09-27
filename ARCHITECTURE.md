@@ -844,8 +844,9 @@ loop: … tool_call ──► approval_request ──► (ping, ping, …) ─�
                             └── browser shows the card ── POST ──────┘
 ```
 
-**In-process, deliberately.** A pending approval lives in memory, so a closed tab or a restart
-loses it and the message is retried. The durable alternative — persist the half-finished tool
+**In-process, deliberately.** A pending approval lives in memory, so a restart loses it and the
+message is retried. (A closed tab no longer does: the turn keeps running in the background and
+the card comes back when the chat is reopened — see *Background turns*.) The durable alternative — persist the half-finished tool
 turn, resume in a new request — would require **persisting tool turns as messages**, which the
 data model deliberately avoids (see the tool-layer section). A decision made in seconds does not
 justify changing the data model.
@@ -870,9 +871,10 @@ justify changing the data model.
    > not a response already in flight (that is `writeTimeout`, unlimited by default). Do not
    > remove the pings on the strength of a Traefik timeout change — nginx is what would drop
    > you, and the client would be next.
-4. **Cleanup in a `finally`.** A closed tab raises `CancelledError`, a `BaseException` that skips
-   `except Exception` — without `approvals.discard` in a `finally` the process accumulates
-   pending entries forever.
+4. **Cleanup in a `finally`.** Stop (or deleting the chat) cancels the turn, which raises
+   `CancelledError`, a `BaseException` that skips `except Exception` — without
+   `approvals.discard` in a `finally` the process accumulates pending entries forever. Before
+   background turns a closed tab took this path; now only an explicit cancel does.
 
 **Ownership is checked twice.** The endpoint verifies the chat belongs to the caller, and
 `approvals.resolve` independently verifies the approval was created for this user *and* this
@@ -1101,7 +1103,7 @@ as an unhandled `IntegrityError` (a 500).
 
 ## Tests
 
-### Frontend — `npm test` (vitest + jsdom, 66 tests)
+### Frontend — `npm test` (vitest + jsdom, 73 tests)
 
 ```bash
 cd frontend && npm install && npm test     # or: npm run test:watch
@@ -1124,7 +1126,7 @@ button, back gesture; `matchMedia` is mocked since jsdom has none),
 Fake timers (`vi.useFakeTimers`) deadlock with RTL's async `act` wrapper; the two tests that verify
 delay behaviour deliberately use **real** timers (~3s).
 
-### Backend — pytest (329 tests)
+### Backend — pytest (341 tests)
 
 `backend/tests/` — pytest + `httpx.ASGITransport` (a real HTTP layer, no live server needed). They
 do not ship in the prod image: the `Dockerfile` installs only `requirements.txt`, and the test
@@ -1150,7 +1152,9 @@ the registry the right caller: id 1 only, no approval card for a hidden tool),
 `test_host_tools.py` (the shell policy in both directions, real bash in a temporary home, the
 file tools), `test_ask_every_tool.py` (strict mode from all three streaming endpoints, and
 `/me`'s `host_tools`), `test_host_bootstrap.py` (the appliance's first registration: setup code,
-ordering, registration closing), `test_bootstrap_helper.py` (the root helper's validation —
+ordering, registration closing), `test_turns.py` (background turns: a closed tab does not stop the reply, re-attach replays,
+Stop saves the partial, one turn per chat with the history left untouched, deletion,
+ownership), `test_bootstrap_helper.py` (the root helper's validation —
 planning only, nothing is executed), `test_tool_loop.py` (the agentic loop's `tool_result.ok` flag — the error-prefix
 contract above), `test_compaction.py` (what reaches the model before/after compaction, full mode,
 edit/delete/fork invalidation, the save race, the column migration).
@@ -1168,6 +1172,54 @@ caught by mutation testing (breaking `_owned_chat` broke only 4 of 9 tests). The
 creates a real server and a real message → ownership is the only source of the 404 (7 tests break
 under the same mutation). **When adding a new guard test, deliberately break the guard and confirm
 the test actually fails.**
+
+## Background turns (`turns.py`)
+
+A reply used to live inside its HTTP request: a closed tab, a reload, a dropped connection or a
+chat switch on a phone cancelled the agentic loop half-way, and Stop *was* a disconnect. Fine
+for chat, not for calivi-vm, where one message can be minutes of tool calls (#85).
+
+- **The loop is a background task; the response only follows it.** `build_stream_response`
+  hands its generator to `turns.start`, which runs it as an `asyncio` task and appends each
+  NDJSON line to the turn's log. Every HTTP response — the one that started the turn, or
+  `GET /api/chats/{id}/turn` later — is a **follower** (`turns.follow`): it replays the log
+  from the start, then streams live lines until the turn ends. Followers come and go; the task
+  never notices them.
+- **Stop is explicit**: `POST /api/chats/{id}/turn/cancel` cancels the task. The generator's
+  `finally` saves the partial reply exactly as an abort used to. The frontend's `stop()` (Stop,
+  Esc) calls it; `detach()` (switching chats) only drops the connection.
+- **Re-attach.** `ChatDetailOut.active_turn` tells the UI a reply is running; `ChatView` then
+  follows it — after a reload, on another device, on switching back — and the replay brings a
+  pending approval card with it. `beforeClear` reloads the chat *before* the stream state
+  clears, so the next render sees `active_turn: false` and does not attach twice. A fork
+  learns its new chat's id from a header mid-stream and follows it before switching, so the
+  switch does not detach.
+- **One turn per chat.** `send`, `edit`, `delete message` and `compact` return 409 while one
+  runs, **before** touching anything. The edit guard is not redundant with `turns.start`
+  refusing a second turn: by the time `start` runs, an unguarded edit has already rewritten the
+  message and truncated the history underneath the running reply (a mutation test caught
+  exactly this — the status code alone was still 409).
+- **Heartbeat in the follower**, not only during approvals: a long `apt install` or a large
+  prefill is silent too, and nginx drops a response after 300s without bytes.
+- **Deleting a chat (or a user) cancels its turn — after the commit.** The delete endpoints run
+  in a worker thread while the turn runs on the loop; cancelling *first* let the final save see
+  the chat, then insert after the delete and fail its foreign key. Cancelling after the commit
+  makes the save find the chat gone; an `IntegrityError` around the insert covers the window
+  that remains when a reply finishes naturally at the same moment. (Each of the two layers
+  alone is invisible to the tests; the catch is tested on its own by simulating the race.)
+  `cancel` uses `call_soon_threadsafe` because of that thread.
+- **Not `return` in the generator's `finally`.** The save's "chat gone" branch is a condition,
+  not an early return: a `return` in a `finally` swallows the in-flight `CancelledError`.
+- **In memory, deliberately** — the call made for approvals: a restart loses an in-flight
+  turn (the user message stays, no reply is saved), as a crash always did. Single process, as
+  approvals already assume.
+
+Verified in a browser (headless Chromium against a live backend and a cloud model):
+- reloading mid-reply brought the Stop button back, the text kept growing, and exactly one reply
+  was saved;
+- Stop saved the partial reply, cut mid-sentence;
+- switching to another chat left the reply running (no Stop button there), switching back
+  followed it again, and it finished as one saved reply.
 
 ## Long prompts and the streaming timeout
 

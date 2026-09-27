@@ -3,12 +3,13 @@ import json
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app import auth, compaction, models, schemas, llm, tools_config
 from app.database import get_db, SessionLocal
 from app.system_prompts import get_system_prompt
-from app import approvals
+from app import approvals, turns
 from app.config import APPROVAL_HEARTBEAT, APPROVAL_TIMEOUT
 from app.tools import ERROR_PREFIX, mcp_client, registry
 from app.routers.users import SUPER_ADMIN_ID
@@ -279,8 +280,8 @@ def build_stream_response(
                                     continue
                                 approved = decision
                         finally:
-                            # A closed tab raises CancelledError (a BaseException), so this has
-                            # to be in a finally or the pending entry leaks.
+                            # Stop raises CancelledError (a BaseException), so this has to be in
+                            # a finally or the pending entry leaks.
                             approvals.discard(approval_id)
                         yield json.dumps({
                             "type": "approval_result", "name": call["name"], "approved": approved,
@@ -312,9 +313,9 @@ def build_stream_response(
                             chipped_calls.add(key)
                             tool_chips.append(_chip_for(call["name"], args, result))
         except Exception as e:
-            # Only genuine upstream errors (httpx etc. → Exception). A client abort/disconnect
-            # raises CancelledError/GeneratorExit, which are BaseException and do not land here,
-            # so abort behaviour is preserved.
+            # Only genuine upstream errors (httpx etc. → Exception). Stop cancels the turn's task
+            # (CancelledError, a BaseException), which does not land here, so a stopped reply is
+            # saved as-is rather than marked as an error.
             error_msg = _humanize_error(e)
             yield json.dumps({"type": "error", "message": error_msg}) + "\n"
         finally:
@@ -334,22 +335,45 @@ def build_stream_response(
             if content_to_save.strip():
                 save_db = SessionLocal()
                 try:
-                    save_db.add(
-                        models.Message(
-                            chat_id=chat_id,
-                            role="assistant",
-                            content=content_to_save,
-                            model_used=model,
-                            server_used=server_name,
-                            tokens_per_sec=tokens_per_sec,
+                    # The chat may have been deleted while this turn ran (the delete cancels it,
+                    # and this finally is where the cancellation lands): nothing to attach to.
+                    # Not an early `return` — in a finally that would swallow the cancellation.
+                    if save_db.get(models.Chat, chat_id) is not None:
+                        save_db.add(
+                            models.Message(
+                                chat_id=chat_id,
+                                role="assistant",
+                                content=content_to_save,
+                                model_used=model,
+                                server_used=server_name,
+                                tokens_per_sec=tokens_per_sec,
+                            )
                         )
-                    )
-                    save_db.query(models.Chat).filter(models.Chat.id == chat_id).update({"updated_at": models.utcnow()})
-                    save_db.commit()
+                        save_db.query(models.Chat).filter(models.Chat.id == chat_id).update({"updated_at": models.utcnow()})
+                        save_db.commit()
+                except IntegrityError:
+                    # The chat went between the check and the insert (a delete in another
+                    # thread). The reply has nowhere to go; that is not an error.
+                    save_db.rollback()
                 finally:
                     save_db.close()
 
-    return StreamingResponse(generate(), media_type="application/x-ndjson", headers=extra_headers)
+    # The loop runs as a background task (turns.py): this response only follows it, so a
+    # closed tab or a dropped connection no longer stops the reply (#85).
+    try:
+        turn = turns.start(chat_id, user_id, generate())
+    except turns.Busy:
+        raise HTTPException(409, BUSY_MESSAGE)
+    return StreamingResponse(turns.follow(turn), media_type="application/x-ndjson", headers=extra_headers)
+
+
+BUSY_MESSAGE = "This chat is still answering. Stop it or wait for it to finish."
+
+
+def _ensure_idle(chat_id: int) -> None:
+    """One turn per chat: anything that changes the history waits until the reply is done."""
+    if turns.is_active(chat_id):
+        raise HTTPException(409, BUSY_MESSAGE)
 
 
 def _context_of(db: Session, chat_id: int) -> tuple[list[dict], str | None]:
@@ -375,8 +399,9 @@ def _drop_summary_if_covers(db: Session, chat_id: int, message_id: int) -> None:
 
 
 def _detail(chat: models.Chat) -> schemas.ChatDetailOut:
+    """Chat detail, including whether a reply is still running (the UI re-attaches to it)."""
     out = schemas.ChatDetailOut.model_validate(chat)
-    return out.model_copy(update=compaction.status(chat))
+    return out.model_copy(update={**compaction.status(chat), "active_turn": turns.is_active(chat.id)})
 
 
 def _inject_attachments(messages: list[dict]) -> list[dict]:
@@ -454,6 +479,10 @@ def delete_chat(
     chat = _owned_chat(db, chat_id, user)
     db.delete(chat)
     db.commit()
+    # After the commit, so the reply's final save finds the chat already gone and skips it.
+    # This endpoint runs in a worker thread while the turn runs on the loop — cancelling
+    # first let the save check "chat exists", then insert after the delete: a FK failure.
+    turns.cancel(chat_id)
 
 
 @router.post("/{chat_id}/messages")
@@ -464,6 +493,7 @@ async def send_message(
     db: Session = Depends(get_db),
 ):
     chat = _owned_chat(db, chat_id, user)
+    _ensure_idle(chat.id)  # before the user message is saved, not after
 
     target, model = resolve_target(db, payload.server_id, payload.model)
 
@@ -495,6 +525,7 @@ def delete_message(
 ):
     """Deletes a single message (user or assistant). Other messages and their order are kept."""
     _owned_chat(db, chat_id, user)
+    _ensure_idle(chat_id)
     msg = db.get(models.Message, message_id)
     if not msg or msg.chat_id != chat_id:
         raise HTTPException(404, "Message not found in this chat")
@@ -514,6 +545,7 @@ async def edit_message(
 ):
     """Edits a user message / reroutes it to another model: update content, truncate after it, regenerate."""
     _owned_chat(db, chat_id, user)
+    _ensure_idle(chat_id)
     msg = db.get(models.Message, message_id)
     if not msg or msg.chat_id != chat_id or msg.role != "user":
         raise HTTPException(404, "User message not found in this chat")
@@ -593,6 +625,33 @@ async def fork_chat(
     )
 
 
+@router.get("/{chat_id}/turn")
+async def follow_turn(
+    chat_id: int,
+    user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Re-attaches to a running reply: everything it has streamed so far, then what comes next.
+    404 once it has finished — its message is in the chat by then."""
+    _owned_chat(db, chat_id, user)
+    turn = turns.get(chat_id)
+    if turn is None:
+        raise HTTPException(404, "No reply is running in this chat")
+    return StreamingResponse(turns.follow(turn), media_type="application/x-ndjson")
+
+
+@router.post("/{chat_id}/turn/cancel", status_code=204)
+def cancel_turn(
+    chat_id: int,
+    user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Stop. The reply so far is saved, as it always was on a stop."""
+    _owned_chat(db, chat_id, user)
+    if not turns.cancel(chat_id):
+        raise HTTPException(404, "No reply is running in this chat")
+
+
 @router.post("/{chat_id}/approvals/{approval_id}", status_code=204)
 def respond_to_approval(
     chat_id: int,
@@ -629,6 +688,7 @@ async def compact_chat(
     the chat has not been compacted or rewritten underneath it in the meantime.
     """
     chat = _owned_chat(db, chat_id, user)
+    _ensure_idle(chat_id)
     target, model = resolve_target(db, payload.server_id, payload.model)
     upto = compaction.cutoff_id(chat)
     if upto is None:

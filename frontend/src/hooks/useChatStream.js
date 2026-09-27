@@ -1,6 +1,14 @@
 import { useEffect, useRef, useState } from "react";
+import { api } from "../api.js";
 
 /** All state for one NDJSON stream turn: live text, thinking, tool/search events, cancellation.
+ *
+ * A reply runs on the server as a background task (#85); this hook only *follows* it. So there
+ * are two different ways to leave a stream:
+ *   - `stop()` — Stop / Esc: asks the server to cancel the reply. The stream then ends by
+ *     itself once the partial reply is saved.
+ *   - `detach()` — the user switched chats: stop following. The reply keeps running, and
+ *     opening the chat again re-attaches to it.
  *
  * send / edit / fork all share the same skeleton (reset state → AbortController →
  * stream → clear). The ONLY difference between them is the `finally` ordering, and that
@@ -16,9 +24,22 @@ export function useChatStream() {
   const [searchInfo, setSearchInfo] = useState(null); // last search/tool event of the active stream
   const [approval, setApproval] = useState(null); // pending tool approval, or null
   const abortRef = useRef(null);
+  const chatIdRef = useRef(null); // the chat whose reply is being followed
 
   function stop() {
+    // Without a chat id (a fork before its new chat is known) there is nothing to cancel by
+    // name; dropping the connection is the best available, and the fork's reply runs on.
+    if (chatIdRef.current != null) api.cancelTurn(chatIdRef.current).catch(() => {});
+    else abortRef.current?.abort();
+  }
+
+  function detach() {
     abortRef.current?.abort();
+  }
+
+  /** A fork learns its new chat's id from a response header, mid-stream. */
+  function setChatId(id) {
+    chatIdRef.current = id;
   }
 
   // Esc → stop the active stream.
@@ -70,17 +91,19 @@ export function useChatStream() {
   }
 
   /** `call({ signal, onPiece })` runs the stream; errors, cancellation and cleanup are handled here. */
-  async function run(call, { beforeClear, afterClear } = {}) {
+  async function run(call, { chatId = null, beforeClear, afterClear } = {}) {
     setSending(true);
     clear();
     const ctrl = new AbortController();
     abortRef.current = ctrl;
+    chatIdRef.current = chatId;
     try {
       await call({ signal: ctrl.signal, onPiece });
     } catch (e) {
       await handleStreamError(e);
     } finally {
       abortRef.current = null;
+      chatIdRef.current = null;
       if (beforeClear) await beforeClear();
       setSending(false);
       clear();
@@ -94,5 +117,8 @@ export function useChatStream() {
     setTimeout(() => setStreaming(""), 2500);
   }
 
-  return { streaming, thinking, sending, searchInfo, approval, run, stop, flashError };
+  return {
+    streaming, thinking, sending, searchInfo, approval, run, stop, detach, setChatId, flashError,
+    followedChatId: () => chatIdRef.current,
+  };
 }

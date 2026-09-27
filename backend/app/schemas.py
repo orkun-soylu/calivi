@@ -205,6 +205,7 @@ class ChatDetailOut(ChatOut):
     compact_suggest_tokens: int = 0
     compactable: bool = False
     compact_suggested: bool = False
+    active_turn: bool = False  # a reply is still running; the UI re-attaches (GET …/turn)
 
 
 class CompactIn(BaseModel):
