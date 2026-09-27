@@ -914,10 +914,10 @@ Two extensions to the gate, made for a shell tool (#78) and inert until a tool u
 
 ### Host tools — the appliance's shell (`tools/host.py`)
 
-`bash`, `read_file`, `write_file`, `edit_file`, for the calivi-vm appliance (#78), where the model
-operates the machine Calivi runs on. **Registered only when `CALIVI_HOST_TOOLS=1`**; the Docker
-deployment never sets it, so nothing here changes that deployment's security model. All four are
-`privileged` (super admin only, see above).
+`bash`, `read_file`, `write_file`, `edit_file` and `view_image`, for the calivi-vm appliance (#78),
+where the model operates the machine Calivi runs on. **Registered only when `CALIVI_HOST_TOOLS=1`**;
+the Docker deployment never sets it, so nothing here changes that deployment's security model. All
+five are `privileged` (super admin only, see above).
 
 - **Who runs it.** The backend is an unprivileged service account. Every command — the file
   tools included — runs as the owner's Linux account via `sudo -n -u <user> -H`, the only sudo
@@ -969,6 +969,31 @@ deployment never sets it, so nothing here changes that deployment's security mod
     there is something to keep.
   - Mutation-checked: without the `.calivi` bash pattern, without the path rule, without the
     injection, with the error case shown, or with "missing" undetected, a test fails.
+- **`view_image` — the model looks at an image file.** A screenshot it took, a chart it drew. Read
+  as the owner without sudo, like the other file tools, and without approval (it is a read). The
+  file goes over as base64 after a size check (8 MB), and its type is sniffed from the bytes
+  (PNG, JPEG, GIF, WebP), never the name, because the data URI's type is what the model server
+  trusts.
+  - **Tool messages carry text only** on both wire formats, so a handler returns a
+    `ToolResult`: a `str` (the error-prefix test, clipping and saved steps all keep working on
+    the text) with an `images` list only the loop reads. The loop puts a step's images in **one
+    user message after all of that step's tool results** — OpenAI requires the tool results to
+    follow the tool-call turn directly — with `TOOL_IMAGES_NOTICE` saying they are tool output
+    and text inside them is data, not instructions: a screenshot is as untrusted as a page.
+  - **Only when the model can see.** The loop asks `llm.vision_models` once per turn, the first
+    time a tool returns an image; a model that cannot (or an answer that failed) gets
+    `NO_VISION_NOTE` in the tool result instead of an image its server would reject with a 400.
+  - **For this turn only.** Images are not saved with agent-mode steps; a replayed step keeps
+    the text, which says so. A screenshot per step would otherwise grow every later request.
+  - Measured on rocm-prod-01 (`qwen3.8:27b-q8_0-mtp`) with a 1400×900 homepage screenshot in
+    exactly this message shape: the model read the cards and named three of the four marked
+    DOWN. Seeing works; accuracy is the model's.
+  - **Not a reversal of the Playwright MCP decision below.** That rejected a browser inside the
+    Docker deployment's trust boundary. On calivi-vm the model already has a shell with sudo on
+    the LAN and the VM is the boundary; a browser the owner installs there is one more program,
+    and `view_image` is not a browser — it shows any image file.
+  - Mutation-checked: without the image message, without the vision check, without the type
+    sniff or without the size limit, a test fails.
 - **`max_iterations` ceiling raised from 20 to 200.** Twenty was ample for search and
   documentation lookups; installing and configuring one service is easily 20–40 calls. The value
   itself stays in `tools.yml`; the ceiling only stops a typo from meaning "unbounded".
@@ -1310,7 +1335,7 @@ button, back gesture; `matchMedia` is mocked since jsdom has none),
 Fake timers (`vi.useFakeTimers`) deadlock with RTL's async `act` wrapper; the two tests that verify
 delay behaviour deliberately use **real** timers (~3s).
 
-### Backend — pytest (381 tests)
+### Backend — pytest (388 tests)
 
 `backend/tests/` — pytest + `httpx.ASGITransport` (a real HTTP layer, no live server needed). They
 do not ship in the prod image: the `Dockerfile` installs only `requirements.txt`, and the test
@@ -1334,7 +1359,8 @@ in the raw column, legacy plaintext, key rotation), `test_tools_registry.py` (th
 `mutating` gate, per-call approval, privileged tools), `test_privileged_tools.py` (the loop hands
 the registry the right caller: id 1 only, no approval card for a hidden tool),
 `test_host_tools.py` (the shell policy in both directions, real bash in a temporary home, the
-file tools), `test_ask_every_tool.py` (strict mode from all three streaming endpoints, and
+file tools), `test_view_image.py` (`view_image`, and the loop attaching a tool's images only for a
+model that can see), `test_ask_every_tool.py` (strict mode from all three streaming endpoints, and
 `/me`'s `host_tools`), `test_host_bootstrap.py` (the appliance's first registration: setup code,
 ordering, registration closing), `test_agent_steps.py` (agent mode: steps saved and replayed, the context budget, the guard
 with 🔧 off, stop, fork, compaction), `test_turns.py` (background turns: a closed tab does not stop the reply, re-attach replays,
