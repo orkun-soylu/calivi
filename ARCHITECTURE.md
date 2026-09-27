@@ -947,6 +947,28 @@ deployment never sets it, so nothing here changes that deployment's security mod
   shell would not), resolve relative paths against home, and ask before writing outside it. That
   check is lexical — a symlink in home can point out — which is acceptable because the write still
   carries only the account's own permissions.
+- **Machine notes (#110).** `~/.calivi/AGENTS.md` in the owner's home is what a later chat needs
+  to know about this machine: what runs where, the owner's decisions and rules, pitfalls and
+  their fixes. It is the counterpart of a coding agent's `AGENTS.md`/`CLAUDE.md`.
+  - **Read at the start of every turn that offers the host tools** (so only the owner's, only on
+    calivi-vm), through `_run`, i.e. as the owner via sudo, since the home is `0700`. The notes
+    go into the system layer as a labelled block with instructions on what belongs there (and
+    never secrets), capped at 12,000 characters with a "condense it" note. A missing file gets
+    a block inviting the model to start one. A read that fails (no owner yet, sudo refused, not a
+    file) drops the block; it never fails the turn.
+  - **Every change asks the owner**, although the file is inside home: notes an injection got
+    written would be read back into every later chat. `write_file`/`edit_file` under `~/.calivi`
+    always get the card, which shows the change, and `bash` asks for any command that names
+    `.calivi`, reads included, since the notes are in context already. The same seatbelt caveat
+    applies: a command can name the path without spelling it. So the block tells the model the
+    notes are what the owner has accepted, to follow the owner's rules in them, and that they
+    are not the user's words for this turn.
+  - **Seeded at claim:** the bootstrap helper writes a skeleton (hostname, owner, date, empty
+    *Services* / *Owner's rules* / *Learned*), `0600` in a `0700` directory, before the claim
+    marker. Machines claimed earlier get theirs from the model, with approval, the first time
+    there is something to keep.
+  - Mutation-checked: without the `.calivi` bash pattern, without the path rule, without the
+    injection, with the error case shown, or with "missing" undetected, a test fails.
 - **`max_iterations` ceiling raised from 20 to 200.** Twenty was ample for search and
   documentation lookups; installing and configuring one service is easily 20–40 calls. The value
   itself stays in `tools.yml`; the ceiling only stops a typo from meaning "unbounded".
@@ -1288,7 +1310,7 @@ button, back gesture; `matchMedia` is mocked since jsdom has none),
 Fake timers (`vi.useFakeTimers`) deadlock with RTL's async `act` wrapper; the two tests that verify
 delay behaviour deliberately use **real** timers (~3s).
 
-### Backend — pytest (356 tests)
+### Backend — pytest (381 tests)
 
 `backend/tests/` — pytest + `httpx.ASGITransport` (a real HTTP layer, no live server needed). They
 do not ship in the prod image: the `Dockerfile` installs only `requirements.txt`, and the test

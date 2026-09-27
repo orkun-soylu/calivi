@@ -6,6 +6,8 @@ The last user message is the script:
     RUN: <command>   → the first reply is a `bash` tool call with that command; once the tool
                        result is in, the reply is "ran: " + the first line of that result
     SLOW: <seconds>  → the reply streams one word a second for that long, then "finished"
+    NOTES?           → "notes: " + the first line of the machine notes in the system layer
+                       (#110), or "notes: none"
     anything else    → "ok"
 
     fake_model.py [port]     (default 8099, bound to 127.0.0.1 — a QEMU user-network guest
@@ -63,6 +65,11 @@ class Handler(BaseHTTPRequestHandler):
             self._text("ran: " + line)
         elif script.startswith("RUN:") and req.get("tools"):
             self._tool_call("bash", {"command": script[4:].strip()})
+        elif script == "NOTES?":
+            system = next((m.get("content") or "" for m in messages if m.get("role") == "system"), "")
+            marker = "----- ~/.calivi/AGENTS.md -----\n"
+            first = system.split(marker, 1)[1].splitlines()[0] if marker in system else "none"
+            self._text("notes: " + first)
         elif script.startswith("SLOW:"):
             for i in range(int(script[5:].strip())):
                 self._chunk({"content": f"w{i} "})

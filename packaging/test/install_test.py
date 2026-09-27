@@ -195,6 +195,10 @@ def claim():
     check(ssh("sudo -n true", user=OWNER, ok=False).returncode == 0, f"{OWNER} logs in with the key and sudoes without a password")
     check(ssh("hostname").stdout.strip() == "calivi-ci-owned", "the hostname was set")
     check(ssh("sudo cat /etc/calivi/host-user").stdout.strip() == OWNER, "/etc/calivi/host-user names the owner")
+    notes = ssh(f"sudo stat -c '%U %a' /home/{OWNER}/.calivi /home/{OWNER}/.calivi/AGENTS.md", ok=False).stdout.split()
+    # With --previous, the previous release did the claim; 0.6.2 and older seed no notes.
+    if not args.previous or notes:
+        check(notes == [OWNER, "700", OWNER, "600"], "the machine notes were seeded, the owner's alone", notes)
     wait("the setup code is deleted", lambda: ssh("sudo test -e /etc/calivi/setup-code", ok=False).returncode != 0)
     print("  ok  the setup code is deleted")
 
@@ -285,6 +289,12 @@ def host_tool():
     check("approval_request" not in types, "a harmless command needs no approval")
     check(f"ran: proof:{OWNER}:calivi-ci-owned" in text_of(events), "it ran as the owner, on this machine", text_of(events))
     check(ssh("stat -c %U /tmp/calivi-ci-proof").stdout.strip() == OWNER, "the file it created belongs to the owner")
+    # #110: the turn read the owner's notes (through sudo, as the owner) into its system layer.
+    text = text_of(send(args.chat_id, "NOTES?"))
+    if ssh(f"sudo test -f /home/{OWNER}/.calivi/AGENTS.md", ok=False).returncode == 0:
+        check(text == "notes: # calivi-ci-owned", "the machine notes reach the model", text)
+    else:  # claimed by a release that predates them
+        check(text == "notes: none", "no notes file yet: the model is told so", text)
 
 
 def deferred_restart():

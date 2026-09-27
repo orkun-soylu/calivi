@@ -57,6 +57,12 @@ network access or stop services wait for your approval. 🛡 next to 🔧 makes 
 wait. Commands time out after 120 s. For longer work the model runs the job detached and
 checks on it later.
 
+**Machine notes.** `~/.calivi/AGENTS.md` in your home is the machine's memory: what runs where,
+your rules ("no reboots during the day"), what went wrong before and how it was fixed. The model
+reads it at the start of every chat and keeps it up to date. Each change it makes asks you first,
+and the approval card shows the change. You can edit the file yourself too. It starts as a short
+skeleton when you claim the machine.
+
 The approval rules catch the model's *mistakes*; they are not a sandbox. The account has
 sudo, so the VM itself is the boundary. Snapshot it before large changes.
 

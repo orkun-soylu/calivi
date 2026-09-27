@@ -5,6 +5,7 @@ calls `execute` — this suite must be safe to run with every guard in it broken
 runs as root on the VM and trusts nothing the backend sends, so each field is checked here
 for what it lets through, not only for what it accepts.
 """
+import datetime
 import importlib.util
 from pathlib import Path
 
@@ -24,6 +25,7 @@ def plan(**req):
         {**base, **req},
         user_exists=lambda name: name == "taken",
         zone_exists=lambda zone: zone in {"Europe/Istanbul", "UTC"},
+        today=datetime.date(2026, 9, 27),
     )
 
 
@@ -46,7 +48,8 @@ def test_minimal_plan():
     assert w["/etc/sudoers.d/90-calivi-owner"][3] == 0o440
     # The marker the backend reads comes last, so a half-finished run never looks finished.
     assert p[-1] == ("write", helper.HOST_USER_FILE, "owner\n", 0o644, None)
-    assert not any(a[0] in ("hostnamectl", "timedatectl", "install") for a in runs(p))
+    assert not any(a[0] in ("hostnamectl", "timedatectl") for a in runs(p))
+    assert not any(a[-1].endswith("/.ssh") for a in runs(p))
     assert helper.CLOUD_HOSTNAME_CFG not in w
 
 
@@ -111,3 +114,17 @@ def test_bad_optional_fields_are_refused(field, value):
 
 def test_empty_optionals_are_skipped():
     assert plan(hostname="", timezone="", ssh_key="") == plan()
+
+
+def test_the_machine_notes_are_seeded():
+    """#110: the owner's ~/.calivi/AGENTS.md, owner-only, written before the claim marker."""
+    p = plan(hostname="calivi-vm")
+    assert ["install", "-d", "-m", "700", "-o", "owner", "-g", "owner", "/home/owner/.calivi"] in runs(p)
+    notes = writes(p)["/home/owner/.calivi/AGENTS.md"]
+    assert notes[3] == 0o600 and notes[4] == "owner"
+    assert notes[2].startswith("# calivi-vm\n")
+    assert "- Owner: owner (passwordless sudo)" in notes[2] and "2026-09-27" in notes[2]
+    assert "## Owner's rules" in notes[2]
+    order = [s[1] for s in p]
+    assert order.index("/home/owner/.calivi/AGENTS.md") < order.index(helper.HOST_USER_FILE)
+    assert "# This machine\n" in writes(plan())["/home/owner/.calivi/AGENTS.md"][2]

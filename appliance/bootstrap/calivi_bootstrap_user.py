@@ -23,6 +23,7 @@ appliance* in ARCHITECTURE.md.
 runs as root and re-validates all of them. Planning is a pure function (`build_plan`) so the
 validation can be tested without executing anything; `execute` is only ever run on the VM.
 """
+import datetime
 import json
 import os
 import re
@@ -61,7 +62,28 @@ def _probe_zone_exists(zone: str) -> bool:
     return path.startswith(ZONEINFO + "/") and os.path.isfile(path)
 
 
-def build_plan(req: dict, user_exists=_probe_user_exists, zone_exists=_probe_zone_exists) -> list:
+def notes_template(username: str, hostname: str | None, today: datetime.date) -> str:
+    """The first ~/.calivi/AGENTS.md (#110): a skeleton the model fills in as it learns."""
+    return (
+        f"# {hostname or 'This machine'}\n"
+        "\n"
+        "Notes that Calivi's model reads at the start of every chat on this machine and keeps up\n"
+        "to date (it asks you before each change). Edit them freely; keep them short.\n"
+        "\n"
+        "## Machine\n"
+        f"- Owner: {username} (passwordless sudo)\n"
+        f"- Claimed: {today.isoformat()}, from the calivi-vm setup\n"
+        "\n"
+        "## Services\n"
+        "\n"
+        "## Owner's rules\n"
+        "\n"
+        "## Learned\n"
+    )
+
+
+def build_plan(req: dict, user_exists=_probe_user_exists, zone_exists=_probe_zone_exists,
+               today: datetime.date | None = None) -> list:
     """Validates the request and returns the steps to apply, without applying any.
 
     A step is ("run", argv, stdin | None) or ("write", path, content, mode, owner | None).
@@ -128,6 +150,14 @@ def build_plan(req: dict, user_exists=_probe_user_exists, zone_exists=_probe_zon
         ]
     if timezone:
         plan.append(("run", ["timedatectl", "set-timezone", timezone], None))
+    # The machine notes (#110), owner-only like the rest of the home.
+    plan += [
+        ("run", ["install", "-d", "-m", "700", "-o", username, "-g", username,
+                 f"{home}/.calivi"], None),
+        ("write", f"{home}/.calivi/AGENTS.md",
+         notes_template(username, hostname, today or datetime.date.today()), 0o600, username),
+    ]
+    # Last: this file is what marks the machine as claimed.
     plan.append(("write", HOST_USER_FILE, username + "\n", 0o644, None))
     return plan
 

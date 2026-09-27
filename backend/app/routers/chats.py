@@ -11,7 +11,7 @@ from app.database import get_db, SessionLocal
 from app.system_prompts import get_system_prompt
 from app import approvals, turns
 from app.config import APPROVAL_HEARTBEAT, APPROVAL_TIMEOUT
-from app.tools import ERROR_PREFIX, mcp_client, registry
+from app.tools import ERROR_PREFIX, host, mcp_client, registry
 from app.routers.users import SUPER_ADMIN_ID
 
 router = APIRouter(prefix="/api/chats", tags=["chats"])
@@ -223,6 +223,12 @@ def build_stream_response(
         persona_prompt = get_system_prompt(model)
         if persona_prompt:
             system_parts.append(persona_prompt)
+        # calivi-vm: the machine notes (#110), whenever this turn can operate the machine. Only
+        # the owner is ever offered the host tools, so only the owner's turns read them.
+        if privileged and host.offered(tools_spec):
+            notes = await host.notes_system_part()
+            if notes:
+                system_parts.append(notes)
         if summary:
             system_parts.append(f"{compaction.SUMMARY_CONTEXT_HEADER}\n\n{summary}")
         if system_parts:
