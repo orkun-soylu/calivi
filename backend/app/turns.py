@@ -21,9 +21,11 @@ runs on the event loop.
 """
 import asyncio
 import json
+import os
 from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 
+from app import config
 from app.config import APPROVAL_HEARTBEAT
 
 PING = json.dumps({"type": "ping"}) + "\n"
@@ -71,6 +73,7 @@ def start(chat_id: int, user_id: int | None, lines: AsyncIterator[str]) -> Turn:
         raise Busy(chat_id)
     turn = Turn(chat_id=chat_id, user_id=user_id, loop=asyncio.get_running_loop())
     _turns[chat_id] = turn
+    _mark_busy()
 
     async def run() -> None:
         try:
@@ -83,6 +86,8 @@ def start(chat_id: int, user_id: int | None, lines: AsyncIterator[str]) -> Turn:
             turn.done = True
             if _turns.get(chat_id) is turn:
                 del _turns[chat_id]
+            if not _turns:
+                _mark_idle()
             turn._wake()
 
     turn.task = asyncio.create_task(run(), name=f"turn-{chat_id}")
@@ -107,6 +112,27 @@ async def follow(turn: Turn, heartbeat: float = APPROVAL_HEARTBEAT) -> AsyncIter
             await asyncio.wait_for(waiter.wait(), heartbeat)
         except TimeoutError:
             yield PING
+
+
+def _mark_busy() -> None:
+    """`CALIVI_BUSY_FILE` exists while any turn runs: an upgrade waits for it before restarting
+    the service (#95). Best effort — a marker that cannot be written must never stop a reply."""
+    if not config.BUSY_FILE:
+        return
+    try:
+        with open(config.BUSY_FILE, "w", encoding="utf-8") as f:
+            f.write(" ".join(str(c) for c in _turns) + "\n")
+    except OSError:
+        pass
+
+
+def _mark_idle() -> None:
+    if not config.BUSY_FILE:
+        return
+    try:
+        os.unlink(config.BUSY_FILE)
+    except OSError:
+        pass
 
 
 def cancel(chat_id: int) -> bool:

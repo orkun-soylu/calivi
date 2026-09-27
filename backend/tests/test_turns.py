@@ -259,3 +259,73 @@ async def test_a_pending_approval_survives_a_closed_tab_and_goes_on_stop(owned, 
         assert approvals._pending == {}
     finally:
         registry._tools.pop("turn_test_tool", None)
+
+
+# --- The busy marker (#95) ------------------------------------------------------------------
+
+
+async def test_the_busy_file_exists_only_while_a_reply_runs(owned, gate, monkeypatch, tmp_path):
+    from app import config
+
+    busy = tmp_path / "busy"
+    monkeypatch.setattr(config, "BUSY_FILE", str(busy))
+    _, chat_id = owned
+    resp, turn = _start(chat_id)
+    await _first_line(resp)
+    assert busy.exists()
+    gate.set()
+    await turn.task
+    assert not busy.exists()
+
+
+async def test_busy_stays_until_the_last_reply_ends(admin, monkeypatch, tmp_path):
+    """Two chats answering: the first one finishing must not clear the marker."""
+    from app import config
+
+    busy = tmp_path / "busy"
+    monkeypatch.setattr(config, "BUSY_FILE", str(busy))
+    gates = {}
+
+    async def stream_chat(target, model, messages, tools=None):
+        yield {"type": "content", "text": "x"}
+        await gates[messages[-1]["content"]].wait()
+
+    monkeypatch.setattr(llm, "stream_chat", stream_chat)
+    ids = [(await admin.post("/api/chats", json={})).json()["id"] for _ in range(2)]
+    started = []
+    for i, cid in enumerate(ids):
+        gates[f"c{i}"] = asyncio.Event()
+        resp = build_stream_response(cid, TARGET, "m", [{"role": "user", "content": f"c{i}"}], user_id=1)
+        await _first_line(resp)
+        started.append(turns.get(cid))
+    gates["c0"].set()
+    await started[0].task
+    assert busy.exists()
+    gates["c1"].set()
+    await started[1].task
+    assert not busy.exists()
+
+
+async def test_no_busy_file_unless_configured(owned, gate, monkeypatch, tmp_path):
+    from app import config
+
+    monkeypatch.setattr(config, "BUSY_FILE", "")
+    monkeypatch.chdir(tmp_path)
+    _, chat_id = owned
+    resp, turn = _start(chat_id)
+    await _first_line(resp)
+    gate.set()
+    await turn.task
+    assert list(tmp_path.iterdir()) == []
+
+
+async def test_an_unwritable_marker_never_stops_a_reply(owned, gate, monkeypatch, tmp_path):
+    from app import config
+
+    monkeypatch.setattr(config, "BUSY_FILE", str(tmp_path / "missing-dir" / "busy"))
+    _, chat_id = owned
+    resp, turn = _start(chat_id)
+    assert (await _first_line(resp))["text"] == "first "
+    gate.set()
+    await turn.task
+    assert _replies(chat_id) == ["first second"]
