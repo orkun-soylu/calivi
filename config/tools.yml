@@ -1,6 +1,6 @@
 # Tool layer config — hot-reloaded (read on every request).
 # enabled: the master switch. When off, no tools are offered even if 🔍 is on.
-# max_iterations: upper bound on the agentic loop (call tool → run → repeat), 1-20.
+# max_iterations: upper bound on the agentic loop (call tool → run → repeat), 1-200.
 # tools.<name>.enabled: whether that tool is offered to the model.
 enabled: true
 # Raised from 5 when MCP landed: a single Context7 lookup already costs two turns

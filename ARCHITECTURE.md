@@ -901,6 +901,52 @@ Two extensions to the gate, made for a shell tool (#78) and inert until a tool u
   `execute()` with the unknown-tool message, left out of the name hint, and `lookup()` returns
   `None` so no approval card is ever shown for a call that would be refused anyway.
 
+### Host tools — the appliance's shell (`tools/host.py`)
+
+`bash`, `read_file`, `write_file`, `edit_file`, for the calivi-vm appliance (#78), where the model
+operates the machine Calivi runs on. **Registered only when `CALIVI_HOST_TOOLS=1`**; the Docker
+deployment never sets it, so nothing here changes that deployment's security model. All four are
+`privileged` (super admin only, see above).
+
+- **Who runs it.** The backend is an unprivileged service account. Every command — the file
+  tools included — runs as the owner's Linux account via `sudo -n -u <user> -H`, the only sudo
+  the service account has. The account name is read **per call** from `CALIVI_HOST_USER_FILE`
+  (written by the appliance's bootstrap at first registration, while the backend is already up);
+  `CALIVI_HOST_USER` overrides it. When it is the backend's own user the sudo hop is skipped —
+  that is how the tests run.
+- **Output goes to a temp file, not a pipe.** With a pipe, a process the command leaves behind
+  (`nohup server &`) holds the write end open, the read never sees EOF, and the call hangs until
+  the timeout — which then kills that background process too. With a file the call returns when
+  the command itself exits.
+- **Timeout.** GNU `timeout` wraps the command and signals its whole process group
+  (`CALIVI_HOST_TIMEOUT`, default 120s); the backend has its own backstop a little later. Exit
+  124/137 counts as "killed" only if the time was really up, or a command that exits 124 by itself
+  would be misreported. Long jobs are the model's to detach (`nohup … >log 2>&1 &`,
+  `systemd-run`), and the tool description tells it so — background turns are a separate problem.
+- **The policy is a seatbelt, not a boundary.** `bash` asks first for commands that destroy data,
+  cut access or stop things (`rm`, `mv`, `dd`, `mkfs`, `systemctl stop|disable`, `reboot`,
+  `apt purge`, firewall and `ip … set|del`, `| sh`, writes into system paths by `>` or `tee`, …)
+  and **refuses** a very short list outright (`rm -rf /`, `--no-preserve-root`, the fork bomb) —
+  no card for those, since saying yes would not make them run. Harmless look-alikes are tested
+  not to ask (`docker run --rm`, `git add`, `systemctl status`), because a policy that asks for
+  everything decays into clicking. None of it survives a model that *wants* around it — `r''m`
+  matches nothing, and the account has sudo by design. It exists to catch mistakes; **the
+  boundary is the VM**.
+- **File tools** run without sudo, expand `~` themselves (the path reaches bash quoted, where the
+  shell would not), resolve relative paths against home, and ask before writing outside it. That
+  check is lexical — a symlink in home can point out — which is acceptable because the write still
+  carries only the account's own permissions.
+- **`max_iterations` ceiling raised from 20 to 200.** Twenty was ample for search and
+  documentation lookups; installing and configuring one service is easily 20–40 calls. The value
+  itself stays in `tools.yml`; the ceiling only stops a typo from meaning "unbounded".
+
+> **⚠️ A guard test must fail harmlessly when the guard is broken.** The first version of the
+> deny-list test proved a refusal by running the real command after `touch marker`. The mutation
+> run that removed the deny check therefore executed a fork bomb on the machine running the
+> suite, and took it down. The test now replaces `_run` and asserts it was never reached;
+> dangerous strings only ever go to the pure classifier. "Safe while the guard holds" is not
+> enough — mutation testing exists precisely to run the suite with the guard gone.
+
 ### Playwright MCP — evaluated and declined
 
 Browser automation was the motivating example for building the approval layer. It was then
@@ -1001,7 +1047,7 @@ button, back gesture; `matchMedia` is mocked since jsdom has none),
 Fake timers (`vi.useFakeTimers`) deadlock with RTL's async `act` wrapper; the two tests that verify
 delay behaviour deliberately use **real** timers (~3s).
 
-### Backend — pytest (211 tests)
+### Backend — pytest (274 tests)
 
 `backend/tests/` — pytest + `httpx.ASGITransport` (a real HTTP layer, no live server needed). They
 do not ship in the prod image: the `Dockerfile` installs only `requirements.txt`, and the test
@@ -1023,7 +1069,9 @@ python3 -m venv .venv-test && ./.venv-test/bin/pip install -r requirements-dev.t
 parse subprocess: killed on timeout, capped in number), `test_secret_encryption.py` (ciphertext
 in the raw column, legacy plaintext, key rotation), `test_tools_registry.py` (the
 `mutating` gate, per-call approval, privileged tools), `test_privileged_tools.py` (the loop hands
-the registry the right caller: id 1 only, no approval card for a hidden tool), `test_tool_loop.py` (the agentic loop's `tool_result.ok` flag — the error-prefix
+the registry the right caller: id 1 only, no approval card for a hidden tool),
+`test_host_tools.py` (the shell policy in both directions, real bash in a temporary home, the
+file tools), `test_tool_loop.py` (the agentic loop's `tool_result.ok` flag — the error-prefix
 contract above), `test_compaction.py` (what reaches the model before/after compaction, full mode,
 edit/delete/fork invalidation, the save race, the column migration).
 
