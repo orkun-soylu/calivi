@@ -84,6 +84,24 @@ image: the session key and the setup code are generated on each VM's first boot.
 way `build.sh` does, then run it as root. Running it again updates Calivi in place and keeps
 `/var/lib/calivi`.
 
+## Updating
+
+Calivi is a Debian package, `calivi`. Each release has `calivi_X.Y.Z-N_amd64.deb` attached. On
+the VM:
+
+```sh
+curl -fLO https://github.com/orkun-soylu/calivi/releases/download/vX.Y.Z/calivi_X.Y.Z-1_amd64.deb
+sudo apt install ./calivi_X.Y.Z-1_amd64.deb
+```
+
+That works on an image from before the package too (0.3–0.5): the package takes over its files,
+and your chats and settings in `/var/lib/calivi` stay. If a reply is running, the restart waits
+for it, up to 30 minutes. A signed APT repository, so that `apt upgrade` picks new versions up
+by itself, is planned (#95). To go back, `apt install` the older `.deb`. Removing the package
+keeps `/var/lib/calivi`, even on `purge`.
+
+To build the package yourself: `packaging/build-deb.sh` (needs Docker).
+
 ## Where things are
 
 | | |

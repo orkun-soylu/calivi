@@ -1026,6 +1026,49 @@ chats against a local model. The model inspected the VM, wrote, read and deleted
 approval card for `rm` (denial held, then approval ran it), ran `sudo apt-get install` without a
 card, and strict mode put a card on `uptime`.
 
+### The package (`packaging/`, #95)
+
+calivi-vm updates like the rest of the system: Calivi ships as `calivi_X.Y.Z-N_amd64.deb`.
+`packaging/build-deb.sh` builds it inside `debian:trixie`. Until the signed APT repository
+exists, the `.deb` is a release asset and is installed with `apt install ./calivi_….deb`.
+
+- **The venv is built where it runs** (`/opt/calivi/venv`, inside the container) because a venv
+  hard-codes its location. Its compiled wheels tie it to Debian 13's Python, hence
+  `Depends: python3 (>= 3.13), python3 (<< 3.14)`. The app is byte-compiled at build time:
+  the service account cannot write `__pycache__` under a root-owned tree.
+- **One configure step for both paths.** `/usr/lib/calivi/configure` holds everything that turns
+  the files into a running service: account, data dirs, default config, the nginx site derived
+  from `frontend/nginx.conf`, units, (re)start. The `.deb`'s `postinst` and `install.sh` (image
+  build, manual install) both run it, and both install the same files at the same paths, so the
+  package can take over an image's install. Paths are Debian's (`/usr/sbin`, `/usr/lib/calivi`,
+  `/usr/lib/systemd/system`), not `/usr/local`, which a package may not use.
+- **Taking over an older image** (0.3–0.5, `install.sh` layout): `preinst` moves an unowned
+  `/opt/calivi` aside, so no stale venv files survive; `postinst` deletes it once configured.
+  `configure` removes the old unit copies in `/etc/systemd/system` — they would override the
+  package's forever — and the `/usr/local` copies.
+- **Conffiles are only `calivi.env` and the cloud-init snippet.** The sudoers rule is deliberately
+  *not* a conffile. Tested: with it as one, `--force-confold` (how timar upgrades) kept an old
+  image's rule pointing at the removed `/usr/local/sbin` helper, which would break the first
+  registration of an unclaimed machine. It is part of the security design, not an admin
+  setting. For the same reason `CALIVI_BUSY_FILE` sits in the unit, not in `calivi.env`.
+- **An upgrade does not cut a running reply.** `configure` restarts at once when
+  `/run/calivi/busy` is absent. Otherwise it hands over to a transient
+  `calivi-restart-when-idle` unit that waits for the marker (at most 30 min). Meanwhile nginx
+  already serves the new frontend against the old backend.
+- **Removal keeps data.** `remove` stops the service and drops the nginx site. `purge` also drops
+  `/etc/calivi` (key, setup code, owner marker). `/var/lib/calivi` and the owner's account stay:
+  deleting a user's chats is not a package manager's call.
+
+Verified on Proxmox with throwaway VMs:
+- a fresh Debian 13 install, claimed, with a host tool running as the new owner;
+- a claimed 0.5.0 image migrated with its chats intact, the old units and `/usr/local` files
+  gone, the service on the package's unit;
+- an unclaimed 0.5.0 image migrated, then claimed;
+- an upgrade during a 40-second tool call: postinst deferred, same PID until the reply ended,
+  then restarted, reply saved;
+- remove and purge;
+- the image rebuilt with the refactored `install.sh`, booted and claimed.
+
 ### Playwright MCP — evaluated and declined
 
 Browser automation was the motivating example for building the approval layer. It was then

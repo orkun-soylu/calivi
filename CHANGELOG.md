@@ -9,6 +9,19 @@ Read this file before upgrading.
 
 ## [Unreleased]
 
+### Added
+
+- **calivi-vm updates as a Debian package** (#95). `packaging/build-deb.sh` builds
+  `calivi_X.Y.Z-N_amd64.deb`, to be attached to releases. `apt install ./calivi_….deb` updates a
+  VM — including one from an older image — without touching its chats. The restart waits for a
+  running reply to finish. A signed APT repository comes next.
+
+### Changed
+
+- calivi-vm paths follow Debian: the bootstrap helper is `/usr/sbin/calivi-bootstrap-user`, and
+  the units and first-boot script live under `/usr/lib`. Installing the package migrates older
+  images.
+
 ## [0.5.0] — 2026-09-27
 
 Agent mode. On calivi-vm a chat now works like a coding agent's session: the model remembers

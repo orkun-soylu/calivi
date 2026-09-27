@@ -1,0 +1,19 @@
+#!/bin/sh
+set -e
+case "$1" in
+    remove|purge)
+        rm -f /etc/nginx/sites-enabled/calivi /etc/nginx/sites-available/calivi
+        if [ -d /run/systemd/system ]; then
+            systemctl daemon-reload || true
+            systemctl reload nginx 2>/dev/null || true
+        fi
+        ;;
+esac
+if [ "$1" = purge ]; then
+    # Per-machine state: the session key, the setup code, the owner marker and the bootstrap
+    # lock. The chats in /var/lib/calivi are kept even on purge — deleting a user's data is
+    # not a package manager's call. The owner's Linux account and sudoers files stay too.
+    rm -rf /etc/calivi /run/calivi
+    echo "calivi: /var/lib/calivi (chats and settings) was kept; remove it by hand if you mean to."
+fi
+exit 0
