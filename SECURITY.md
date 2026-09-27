@@ -8,7 +8,7 @@ next release; older releases do not get backports.
 | Version | Supported |
 |---|---|
 | `main` | ✅ |
-| Latest release (currently `v0.2.0`) | ✅ until the next release |
+| Latest release (currently `v0.3.0`) | ✅ until the next release |
 | Anything older | ❌ |
 
 If you run Calivi, run the latest release or `main`.
@@ -56,12 +56,19 @@ can expect:
 - the frontend's Content-Security-Policy, or script execution through rendered model output;
 - document extraction: a crafted file that hangs or crashes the backend despite the extraction
   limits;
+- **calivi-vm**: claiming a machine without its setup code; anyone but the owner (including
+  another admin) reaching the host tools; the `calivi` service account gaining root other than
+  through the bootstrap helper, or running that helper twice; a per-machine secret shipped
+  inside the published image;
 - a vulnerable dependency, when you can show the vulnerable code is reachable in Calivi.
 
 **Out of scope:**
 
 - anything an **admin** can already do — admins are trusted by design, for example pointing a
   model server or an MCP server at an internal address;
+- on calivi-vm, anything the **owner's** account can do — it has sudo by design, and so does the
+  model acting for it. The approval patterns catch a model's mistakes; a command written so that
+  no pattern matches it (`r''m`) is a known limit, not a vulnerability. The VM is the boundary;
 - a model producing wrong, harmful or "jailbroken" text without crossing one of the boundaries
   above;
 - deployments that switch a protection off, such as `COOKIE_SECURE=false` on plain HTTP or a

@@ -11,11 +11,17 @@ Design and security notes: *Host tools* and *First registration on the appliance
 
 ## Create the VM
 
-On a Proxmox VE node, as root:
+Download `calivi-vm-X.Y.Z.qcow2` and `proxmox-create.sh` from the
+[latest release](https://github.com/orkun-soylu/calivi/releases/latest) onto a Proxmox VE node,
+check the image against its `.sha256`, and as root:
 
 ```sh
+sha256sum -c calivi-vm-X.Y.Z.qcow2.sha256
+chmod +x proxmox-create.sh
 ./proxmox-create.sh 900 calivi-vm-X.Y.Z.qcow2 --storage local-lvm --bridge vmbr0 --start
 ```
+
+Or build the image yourself (below).
 
 The VM is q35 + OVMF with Secure Boot off, 4 cores, 8 GB RAM and a 32 GB disk, and gets its
 address by DHCP. Use the VM's Cloud-Init tab for a static address, and *Resize disk* for more
