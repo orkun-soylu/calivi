@@ -14,12 +14,15 @@ and fake_model.py listening on the runner, which the guest reaches as 10.0.2.2. 
   deferred    reinstalling while a reply streams leaves the service alone until the reply is
               complete, then restarts it
   purge       the package goes; the owner's account and the chats stay
+  apt source  the package's calivi.sources and keyring: the right suite, the pinned key, and
+              apt update against the real https://apt.calivi.ai verifies with it
   apt repo    (with --apt-url) a signed repository built by packaging/apt/publish.sh: added
               the way apt.calivi.ai documents it, `apt install calivi` brings this build
 
 Every step prints what it checked; the first failure stops the run with the evidence.
 """
 import argparse
+import hashlib
 import http.cookiejar
 import json
 import os
@@ -184,7 +187,23 @@ def upgrade():
     step(f"upgrade {os.path.basename(args.previous)} → {os.path.basename(args.deb)}")
     key = ssh("sudo cat /etc/calivi/secret.env").stdout
     pid = main_pid()
+    # Set up by hand exactly as apt.calivi.ai documents it (calivi-vm 0.6.1 was): the source is
+    # taken from the index page's own instructions, so the page and the package cannot drift
+    # apart unnoticed. The package ships the same two files and must take them over without a
+    # conffile question — dpkg would stop at one ("end of file on stdin at conffile prompt").
+    here = os.path.dirname(os.path.abspath(__file__))
+    subprocess.run(["scp", "-q", "-F", args.ssh_config, os.path.join(here, "..", "apt", "calivi.gpg"), "vm:/tmp/calivi.gpg"], check=True)
+    suite = ssh(". /etc/os-release; echo $VERSION_CODENAME").stdout.strip()
+    with open(os.path.join(here, "..", "apt", "index.html.in"), encoding="utf-8") as f:
+        page = f.read()
+    documented = page.split("calivi.sources &gt;/dev/null &lt;&lt;EOF\n", 1)[1].split("\nEOF\n", 1)[0] + "\n"
+    documented = documented.replace("$VERSION_CODENAME", suite)
+    subprocess.run(["ssh", "-F", args.ssh_config, "vm", "sudo tee /etc/apt/sources.list.d/calivi.sources >/dev/null"],
+                   input=documented, text=True, check=True)
+    ssh("sudo install -m 0644 /tmp/calivi.gpg /usr/share/keyrings/calivi.gpg")
     out = apt_install("/tmp/new.deb")
+    leftovers = ssh("ls /etc/apt/sources.list.d/ | grep -E 'dpkg-(dist|new|old)' || true").stdout.strip()
+    check(not leftovers, "a hand-added source is taken over without a conffile question", leftovers)
     want = deb_version(args.deb)
     check(ssh("dpkg-query -W -f='${Version}' calivi").stdout == want, f"calivi {want} is installed", out[-2000:])
     wait("the service restarted", lambda: main_pid() not in ("0", pid))
@@ -192,6 +211,24 @@ def upgrade():
     check(ssh("sudo cat /etc/calivi/secret.env").stdout == key, "the session key survived")
     check(request("GET", "/api/auth/me")[0] == 200, "the owner's session is still valid")
     check(ssh("sudo cat /etc/calivi/host-user").stdout.strip() == OWNER, "the owner marker survived")
+
+
+def shipped_source():
+    step("the package's own APT source")
+    suite = ssh(". /etc/os-release; echo $VERSION_CODENAME").stdout.strip()
+    sources = ssh("cat /etc/apt/sources.list.d/calivi.sources").stdout
+    check(f"Suites: {suite}\n" in sources and "URIs: https://apt.calivi.ai\n" in sources,
+          f"calivi.sources points at apt.calivi.ai, suite {suite}", sources)
+    here = os.path.dirname(os.path.abspath(__file__))
+    with open(os.path.join(here, "..", "apt", "calivi.gpg"), "rb") as f:
+        want = hashlib.sha256(f.read()).hexdigest()
+    got = ssh("sha256sum /usr/share/keyrings/calivi.gpg").stdout.split()[0]
+    check(got == want, "the keyring is the pinned key (packaging/apt/calivi.gpg)")
+    # The real repository: its signature must verify with the key the package ships.
+    p = ssh("sudo apt-get -o DPkg::Lock::Timeout=600 update 2>&1", ok=False)
+    bad = [ln for ln in p.stdout.splitlines() if ln.startswith(("W:", "E:")) and "calivi" in ln]
+    check(p.returncode == 0 and not bad, "apt update against https://apt.calivi.ai verifies", "\n".join(bad) or p.stdout[-1500:])
+    check("https://apt.calivi.ai" in ssh("apt-cache policy calivi").stdout, "apt sees calivi in apt.calivi.ai")
 
 
 def host_tool():
@@ -248,26 +285,31 @@ def purge():
     ssh("sudo DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=600 purge -y -q calivi")
     check(ssh("systemctl cat calivi.service", ok=False).returncode != 0, "the unit is gone")
     check(ssh("test -e /opt/calivi || test -e /etc/calivi", ok=False).returncode != 0, "/opt/calivi and /etc/calivi are gone")
+    check(ssh("test -e /etc/apt/sources.list.d/calivi.sources || test -e /usr/share/keyrings/calivi.gpg", ok=False).returncode != 0,
+          "the APT source and its key are gone")
     check(ssh("sudo test -s /var/lib/calivi/calivi.db", ok=False).returncode == 0, "the chats are kept")
     check(ssh(f"id {OWNER}", ok=False).returncode == 0, "the owner's account is kept")
 
 
 def apt_repo():
     step("apt repository")
-    subprocess.run(["scp", "-q", "-F", args.ssh_config, args.apt_key, "vm:/tmp/calivi.gpg"], check=True)
-    # As https://apt.calivi.ai says, with the test repository's URL.
-    ssh("sudo install -m 0644 /tmp/calivi.gpg /usr/share/keyrings/calivi.gpg")
+    subprocess.run(["scp", "-q", "-F", args.ssh_config, args.apt_key, "vm:/tmp/calivi-test.gpg"], check=True)
+    # As https://apt.calivi.ai says, with the test repository's URL and key — under their own
+    # names, because the package installs calivi.sources and calivi.gpg itself.
+    ssh("sudo install -m 0644 /tmp/calivi-test.gpg /usr/share/keyrings/calivi-test.gpg")
     suite = ssh(". /etc/os-release; echo $VERSION_CODENAME").stdout.strip()
     sources = (f"Types: deb\nURIs: {args.apt_url}\nSuites: {suite}\nComponents: main\n"
-               "Signed-By: /usr/share/keyrings/calivi.gpg\n")
-    ssh(f"printf '{sources}' | sudo tee /etc/apt/sources.list.d/calivi.sources >/dev/null")
+               "Signed-By: /usr/share/keyrings/calivi-test.gpg\n")
+    ssh(f"printf '{sources}' | sudo tee /etc/apt/sources.list.d/calivi-test.sources >/dev/null")
     p = ssh("sudo apt-get -o DPkg::Lock::Timeout=600 update 2>&1", ok=False)
     check(p.returncode == 0 and "calivi" not in "".join(l for l in p.stdout.splitlines(True) if l.startswith(("W:", "E:"))),
           f"apt update accepts the signed '{suite}' suite", p.stdout[-2000:])
     policy = ssh("apt-cache policy calivi").stdout
     want = deb_version(args.deb)
-    check(f"Candidate: {want}" in policy, f"the candidate is {want}", policy)
+    check(f"Candidate: {want}" in policy and args.apt_url in policy, f"the candidate is {want}, from the test repository", policy)
     ssh("sudo DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=600 install -y -q calivi")
+    check(ssh("test -f /etc/apt/sources.list.d/calivi.sources", ok=False).returncode == 0,
+          "the reinstall put the package's own source back")
     check(ssh("dpkg-query -W -f='${Version}' calivi").stdout == want, "apt install calivi installed it")
     wait("calivi answers on :80", up)
     print("  ok  calivi answers on :80")
@@ -289,6 +331,7 @@ def main():
             upgrade()
         else:
             print("\n== upgrade: skipped, no earlier release for this distribution")
+        shipped_source()
         host_tool()
         deferred_restart()
         purge()

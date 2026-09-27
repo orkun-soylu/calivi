@@ -5,8 +5,8 @@
 # it has attached them; also runnable by hand for an existing release (Actions → apt → Run
 # workflow, e.g. to publish one that predates this workflow).
 #
-# Secrets: APT_SIGNING_KEY (the armored private key; its fingerprint is pinned below and
-# checked) and APT_DEPLOY_KEY (an SSH deploy key with write access to orkun-soylu/calivi-apt,
+# Secrets: APT_SIGNING_KEY (the armored private key; its fingerprint is pinned in
+# packaging/apt/fingerprint and checked) and APT_DEPLOY_KEY (an SSH deploy key with write access to orkun-soylu/calivi-apt,
 # the Pages repository). Nothing else here can write anywhere.
 name: apt
 
@@ -35,17 +35,13 @@ concurrency:
   group: apt-publish
   cancel-in-progress: false
 
-env:
-  # Calivi APT repository <apt@calivi.ai>. Also on https://apt.calivi.ai and in the docs.
-  APT_KEY_FPR: 4E282AB666CE1E29488B06CF615529D504381965
-
 jobs:
   publish:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           repository: orkun-soylu/calivi-apt
           ssh-key: ${{ secrets.APT_DEPLOY_KEY }}
@@ -76,7 +72,7 @@ jobs:
       - name: Build and sign the repository
         run: |
           sudo apt-get install -y -qq --no-install-recommends apt-utils >/dev/null
-          packaging/apt/publish.sh apt-repo "$APT_KEY_FPR" debs/*.deb
+          packaging/apt/publish.sh apt-repo "$(cat packaging/apt/fingerprint)" debs/*.deb
 
       - name: Push
         env:

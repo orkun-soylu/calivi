@@ -21,9 +21,19 @@
 was installed and tested in a VM of its distribution before it was published, and a release is
 published only when all three passed.</p>
 
-<h2>Add the repository</h2>
+<h2>Install</h2>
+<p>From 0.6.2 the package adds this repository itself. Download it for your distribution from the
+<a href="https://github.com/orkun-soylu/calivi/releases/latest">latest release</a>
+(<code>+deb13</code>, <code>+ubuntu24.04</code> or <code>+ubuntu26.04</code>) and install it once:</p>
+<pre><code>sudo apt install ./calivi_X.Y.Z-1+deb13_amd64.deb</code></pre>
+<p>From then on <code>apt upgrade</code> updates Calivi like the rest of the system. An upgrade
+that lands while a reply is running restarts Calivi only once the reply is done.</p>
+
+<h2>Or add the repository by hand</h2>
 <pre><code>curl -fsSL https://apt.calivi.ai/calivi.gpg | sudo tee /usr/share/keyrings/calivi.gpg &gt;/dev/null
-gpg --show-keys /usr/share/keyrings/calivi.gpg   # must show @FPR_SPACED@
+
+# Check the key. Cloud and minimal images have no gpg: sudo apt install gpg
+gpg --show-keys /usr/share/keyrings/calivi.gpg   # must show @FPR@
 
 . /etc/os-release
 sudo tee /etc/apt/sources.list.d/calivi.sources &gt;/dev/null &lt;&lt;EOF
@@ -34,8 +44,8 @@ Components: main
 Signed-By: /usr/share/keyrings/calivi.gpg
 EOF
 sudo apt update &amp;&amp; sudo apt install calivi</code></pre>
-<p>From then on <code>apt upgrade</code> updates Calivi like the rest of the system. An upgrade
-that lands while a reply is running restarts Calivi only once the reply is done.</p>
+<p class="muted">This writes the same two files the package installs, so installing the package
+later takes them over without a question.</p>
 
 <h2>Signing key</h2>
 <p><code>@FPR_SPACED@</code><br>

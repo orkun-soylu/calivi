@@ -46,7 +46,7 @@ echo "== layout"
 A="$REPO/appliance"
 install -d "$ROOT/opt/calivi/backend" "$ROOT/usr/sbin" "$ROOT/usr/lib/calivi" "$ROOT/usr/lib/systemd/system" \
     "$ROOT/usr/share/calivi" "$ROOT/etc/calivi" "$ROOT/etc/sudoers.d" "$ROOT/etc/cloud/cloud.cfg.d" "$ROOT/etc/needrestart/conf.d" \
-    "$ROOT/DEBIAN"
+    "$ROOT/etc/apt/sources.list.d" "$ROOT/usr/share/keyrings" "$ROOT/DEBIAN"
 cp -r "$REPO/backend/app" "$REPO/backend/requirements.txt" "$ROOT/opt/calivi/backend/"
 find "$ROOT/opt/calivi/backend" -name __pycache__ -prune -exec rm -rf {} +
 cp -r "$REPO/frontend/dist" "$ROOT/opt/calivi/frontend"
@@ -60,6 +60,14 @@ install -m 0644 "$A/files/calivi.env" "$ROOT/etc/calivi/calivi.env"
 install -m 0440 "$A/files/sudoers-calivi" "$ROOT/etc/sudoers.d/70-calivi-bootstrap"
 install -m 0644 "$A/files/cloud-calivi.cfg" "$ROOT/etc/cloud/cloud.cfg.d/90-calivi.cfg"
 install -m 0644 "$A/files/needrestart-calivi.conf" "$ROOT/etc/needrestart/conf.d/calivi.conf"
+# The package brings its own APT source, so one `apt install ./calivi_….deb` is enough and
+# `apt upgrade` does the rest. Byte for byte what https://apt.calivi.ai tells people to write
+# (packaging/apt/index.html.in): a machine set up by hand then takes the package's copy without
+# a conffile prompt.
+install -m 0644 "$REPO/packaging/apt/calivi.gpg" "$ROOT/usr/share/keyrings/calivi.gpg"
+printf 'Types: deb\nURIs: https://apt.calivi.ai\nSuites: %s\nComponents: main\nSigned-By: /usr/share/keyrings/calivi.gpg\n' \
+    "$DISTRO" > "$WORK/calivi.sources"
+install -m 0644 "$WORK/calivi.sources" "$ROOT/etc/apt/sources.list.d/calivi.sources"
 install -m 0644 "$REPO/packaging/debian/conffiles" "$ROOT/DEBIAN/"
 install -m 0755 "$REPO/packaging/debian/preinst" "$REPO/packaging/debian/postinst" \
     "$REPO/packaging/debian/prerm" "$REPO/packaging/debian/postrm" "$ROOT/DEBIAN/"
