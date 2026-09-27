@@ -187,6 +187,11 @@ jobs:
             libguestfs-tools qemu-system-x86 qemu-utils cloud-image-utils >/dev/null
           # libguestfs boots the host's kernel, which Ubuntu keeps readable by root only.
           sudo chmod 0644 /boot/vmlinuz-*
+          # virt-customize --network runs passt, and Ubuntu's AppArmor profile for passt does not
+          # allow the socket libguestfs gives it ("passt exited with status 1").
+          if [ -e /etc/apparmor.d/usr.bin.passt ]; then
+            sudo apparmor_parser -R /etc/apparmor.d/usr.bin.passt
+          fi
 
       - uses: actions/download-artifact@v8
         with:
@@ -197,6 +202,10 @@ jobs:
         # From the Debian 13 package this run built and tested — on a release, the very file
         # that gets attached and published.
         run: appliance/build.sh --deb debs/*.deb
+
+      - name: libguestfs diagnostics
+        if: failure()
+        run: libguestfs-test-tool 2>&1 | tail -60
 
       - name: Boot it and test
         env:
