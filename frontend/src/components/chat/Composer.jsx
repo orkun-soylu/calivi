@@ -18,6 +18,9 @@ export default function Composer({
   onPaste,
   useTools,
   onToggleUseTools,
+  hostTools = false,
+  askEveryTool = false,
+  onToggleAskEveryTool,
 }) {
   const t = useT();
   const fileInputRef = useRef(null);
@@ -110,6 +113,23 @@ export default function Composer({
             <path d="M14.7 6.3l3-3a4 4 0 0 1 3 6l-1.7 1.7" />
           </svg>
         </button>
+        {/* Only where the model can operate the host: elsewhere the default policy already
+            asks for every tool that changes anything. */}
+        {hostTools && (
+          <button
+            onClick={onToggleAskEveryTool}
+            aria-pressed={askEveryTool}
+            title={askEveryTool ? t("chat.askEveryToolOn") : t("chat.askEveryToolOff")}
+            className={`h-10 px-3 md:px-4 rounded-xl shrink-0 flex items-center justify-center ${
+              askEveryTool ? "bg-accent text-white hover:bg-accent-hover" : "bg-neutral-800 text-neutral-300 hover:bg-neutral-700"
+            }`}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+              {askEveryTool && <path d="M9 12l2 2 4-4" />}
+            </svg>
+          </button>
+        )}
         <textarea
           ref={inputRef}
           value={input}

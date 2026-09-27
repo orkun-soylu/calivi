@@ -900,6 +900,15 @@ Two extensions to the gate, made for a shell tool (#78) and inert until a tool u
   privileged. For everyone else the tool does not exist: absent from `specs()`, refused by
   `execute()` with the unknown-tool message, left out of the name hint, and `lookup()` returns
   `None` so no approval card is ever shown for a call that would be refused anyway.
+- **Strict mode — "ask before every tool".** The default only asks for risky calls; an operator
+  who wants to watch every step flips the 🛡 toggle next to 🔧. It travels with each request
+  (`ask_every_tool`, like `use_tools`, remembered per browser), the loop shows a card for every
+  call, and `execute(strict=True)` refuses any call without `approved` — so the registry enforces
+  it too. It can only **add** a question: it never unhides a privileged tool. The toggle is
+  rendered only when `/api/auth/me` reports `host_tools` (the switch is on and the caller is
+  id 1), and a preference left in the browser is ignored elsewhere, so nobody gets cards from a
+  switch they cannot see. Not a chat column: the mode belongs to the operator watching, not to
+  the conversation.
 
 ### Host tools — the appliance's shell (`tools/host.py`)
 
@@ -1024,7 +1033,7 @@ as an unhandled `IntegrityError` (a 500).
 
 ## Tests
 
-### Frontend — `npm test` (vitest + jsdom, 61 tests)
+### Frontend — `npm test` (vitest + jsdom, 64 tests)
 
 ```bash
 cd frontend && npm install && npm test     # or: npm run test:watch
@@ -1047,7 +1056,7 @@ button, back gesture; `matchMedia` is mocked since jsdom has none),
 Fake timers (`vi.useFakeTimers`) deadlock with RTL's async `act` wrapper; the two tests that verify
 delay behaviour deliberately use **real** timers (~3s).
 
-### Backend — pytest (274 tests)
+### Backend — pytest (282 tests)
 
 `backend/tests/` — pytest + `httpx.ASGITransport` (a real HTTP layer, no live server needed). They
 do not ship in the prod image: the `Dockerfile` installs only `requirements.txt`, and the test
@@ -1071,7 +1080,8 @@ in the raw column, legacy plaintext, key rotation), `test_tools_registry.py` (th
 `mutating` gate, per-call approval, privileged tools), `test_privileged_tools.py` (the loop hands
 the registry the right caller: id 1 only, no approval card for a hidden tool),
 `test_host_tools.py` (the shell policy in both directions, real bash in a temporary home, the
-file tools), `test_tool_loop.py` (the agentic loop's `tool_result.ok` flag — the error-prefix
+file tools), `test_ask_every_tool.py` (strict mode from all three streaming endpoints, and
+`/me`'s `host_tools`), `test_tool_loop.py` (the agentic loop's `tool_result.ok` flag — the error-prefix
 contract above), `test_compaction.py` (what reaches the model before/after compaction, full mode,
 edit/delete/fork invalidation, the save race, the column migration).
 

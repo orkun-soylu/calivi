@@ -251,6 +251,7 @@ export default function App() {
           onBack={isMobile ? closeChat : undefined}
           chat={activeChat}
           servers={servers}
+          hostTools={!!me?.host_tools}
           onMessageSent={handleMessageSent}
           onForked={handleForked}
           onOpenSettings={() => setSettingsOpen(true)}

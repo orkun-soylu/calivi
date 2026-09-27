@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app import auth, models, schemas
+from app import auth, config, models, schemas
 from app.config import (
     LOGIN_MAX_ATTEMPTS,
     LOGIN_WINDOW_SECONDS,
@@ -13,6 +13,7 @@ from app.config import (
 )
 from app.database import get_db
 from app.rate_limit import SlidingWindowLimiter, login_key
+from app.routers.users import SUPER_ADMIN_ID
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -42,7 +43,14 @@ def auth_config(db: Session = Depends(get_db)):
     return schemas.AuthConfigOut(registration_enabled=_get_settings(db).registration_enabled)
 
 
-@router.post("/register", response_model=schemas.UserOut)
+def _me(user: models.User) -> schemas.MeOut:
+    out = schemas.MeOut.model_validate(user)
+    # Mirrors the loop's rule: host tools are privileged, and privileged means id 1.
+    out.host_tools = config.HOST_TOOLS_ENABLED and user.id == SUPER_ADMIN_ID
+    return out
+
+
+@router.post("/register", response_model=schemas.MeOut)
 def register(payload: schemas.RegisterIn, response: Response, db: Session = Depends(get_db)):
     email = payload.email.strip().lower()
     username = payload.username.strip()
@@ -88,10 +96,10 @@ def register(payload: schemas.RegisterIn, response: Response, db: Session = Depe
     db.refresh(user)
     register_limiter.record("global")
     auth.set_session_cookie(response, user.id)
-    return user
+    return _me(user)
 
 
-@router.post("/login", response_model=schemas.UserOut)
+@router.post("/login", response_model=schemas.MeOut)
 def login(payload: schemas.LoginIn, response: Response, db: Session = Depends(get_db)):
     ident = payload.identifier.strip()
     user = (
@@ -127,7 +135,7 @@ def login(payload: schemas.LoginIn, response: Response, db: Session = Depends(ge
 
     login_limiter.reset(key)
     auth.set_session_cookie(response, user.id)
-    return user
+    return _me(user)
 
 
 @router.post("/logout")
@@ -136,6 +144,6 @@ def logout(response: Response):
     return {"ok": True}
 
 
-@router.get("/me", response_model=schemas.UserOut)
+@router.get("/me", response_model=schemas.MeOut)
 def me(user: models.User = Depends(auth.get_current_user)):
-    return user
+    return _me(user)

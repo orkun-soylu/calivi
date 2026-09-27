@@ -8,13 +8,13 @@ import { CompactIcon, SettingsIcon } from "./icons.jsx";
 import { useChatStream } from "../hooks/useChatStream.js";
 import { useServerModel } from "../hooks/useServerModel.js";
 import { fileToScaledDataUrl } from "../lib/images.js";
-import { USE_TOOLS_KEY, loadUseTools } from "../lib/modelPrefs.js";
+import { ASK_EVERY_TOOL_KEY, USE_TOOLS_KEY, loadAskEveryTool, loadUseTools } from "../lib/modelPrefs.js";
 import { api } from "../api.js";
 import { useT } from "../i18n.js";
 
 /** Orchestrates the chat screen: combines the selected target (useServerModel), stream state
  * (useChatStream) and attachment/edit state; the rendering is done by child components. */
-export default function ChatView({ chat, servers, onMessageSent, onForked, onOpenSettings, onBack }) {
+export default function ChatView({ chat, servers, hostTools, onMessageSent, onForked, onOpenSettings, onBack }) {
   const t = useT();
   const { serverId, model, setTarget, upServers, selectedServer } = useServerModel(servers);
   const stream = useChatStream();
@@ -28,6 +28,10 @@ export default function ChatView({ chat, servers, onMessageSent, onForked, onOpe
   const [pending, setPending] = useState({ user: null, images: [], attachments: [] });
   const [lightbox, setLightbox] = useState(null); // image to display full size (data-URI)
   const [useTools, setUseTools] = useState(loadUseTools);
+  const [askEveryToolPref, setAskEveryTool] = useState(loadAskEveryTool);
+  // Only in effect where the toggle is visible — a preference left over in this browser must
+  // not put cards on a user who cannot see the switch that caused them.
+  const askEveryTool = !!hostTools && askEveryToolPref;
 
   const [editingId, setEditingId] = useState(null);
   const [editContent, setEditContent] = useState("");
@@ -39,6 +43,10 @@ export default function ChatView({ chat, servers, onMessageSent, onForked, onOpe
   useEffect(() => {
     localStorage.setItem(USE_TOOLS_KEY, useTools ? "1" : "0");
   }, [useTools]);
+
+  useEffect(() => {
+    localStorage.setItem(ASK_EVERY_TOOL_KEY, askEveryToolPref ? "1" : "0");
+  }, [askEveryToolPref]);
 
   // Clear attached images if the model does not support vision (they cannot be sent).
   useEffect(() => {
@@ -109,7 +117,7 @@ export default function ChatView({ chat, servers, onMessageSent, onForked, onOpe
       ({ signal, onPiece }) =>
         api.sendMessage(
           chat.id,
-          { content, images: imgs, attachments: atts, serverId, model, useTools, signal },
+          { content, images: imgs, attachments: atts, serverId, model, useTools, askEveryTool, signal },
           onPiece
         ),
       {
@@ -154,7 +162,7 @@ export default function ChatView({ chat, servers, onMessageSent, onForked, onOpe
     cancelEdit();
     await stream.run(
       ({ signal, onPiece }) =>
-        api.editMessage(chat.id, mid, { content, ...editTarget, useTools, signal }, onPiece),
+        api.editMessage(chat.id, mid, { content, ...editTarget, useTools, askEveryTool, signal }, onPiece),
       { afterClear: () => onMessageSent() }
     );
   }
@@ -168,7 +176,7 @@ export default function ChatView({ chat, servers, onMessageSent, onForked, onOpe
       ({ signal, onPiece }) =>
         api.forkChat(
           chat.id,
-          { messageId: mid, content, ...editTarget, useTools, signal },
+          { messageId: mid, content, ...editTarget, useTools, askEveryTool, signal },
           (newId) => onForked(newId),
           onPiece
         ),
@@ -295,6 +303,9 @@ export default function ChatView({ chat, servers, onMessageSent, onForked, onOpe
         onPaste={handlePaste}
         useTools={useTools}
         onToggleUseTools={() => setUseTools((v) => !v)}
+        hostTools={!!hostTools}
+        askEveryTool={askEveryTool}
+        onToggleAskEveryTool={() => setAskEveryTool((v) => !v)}
       />
 
       <ToolOutputModal tool={inspecting} onClose={() => setInspecting(null)} />

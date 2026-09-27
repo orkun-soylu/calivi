@@ -233,3 +233,28 @@ async def test_lookup_hides_privileged_tools(reg):
     assert reg.lookup("host_shell") is None
     assert reg.lookup("host_shell", privileged=True) is tool
     assert reg.get("host_shell") is tool  # the raw accessor stays raw
+
+
+# --- Strict mode ("ask before every tool") --------------------------------------------------
+
+
+async def test_strict_asks_even_for_a_harmless_call(reg):
+    ran = []
+
+    async def handler(args):
+        ran.append(args)
+        return "ran"
+
+    reg.register(_tool(name="harmless", handler=handler))
+    assert (await reg.execute("harmless", {}, strict=True)).startswith("ERROR:")
+    assert ran == []
+    assert await reg.execute("harmless", {}, strict=True, approved=True) == "ran"
+
+
+async def test_strict_cannot_reveal_a_privileged_tool(reg):
+    """Strict only ever adds a question; approving it must not reach a hidden tool."""
+    tool, ran = _privileged()
+    reg.register(tool)
+    result = await reg.execute("host_shell", {}, strict=True, approved=True)
+    assert "no tool named" in result
+    assert ran == []

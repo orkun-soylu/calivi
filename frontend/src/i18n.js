@@ -72,6 +72,8 @@ const translations = {
     "chat.visionUnsupported": "Seçili model görsel desteklemiyor — görsel eklenmedi",
     "chat.toolsOn": "Araçlar açık — model web araması ve MCP araçlarını kendi kararıyla çağırabilir (kapatmak için tıkla)",
     "chat.toolsOff": "Araçlar kapalı (açmak için tıkla)",
+    "chat.askEveryToolOn": "Her araç çağrısı onayını bekliyor (kapatmak için tıkla)",
+    "chat.askEveryToolOff": "Yalnız riskli araç çağrıları onay ister — her adımı onaylamak için tıkla",
 
     "search.generating": "🔍 Arama sorgusu hazırlanıyor…",
     "search.searching": "🔍 Aranıyor: {query}",
@@ -250,6 +252,8 @@ const translations = {
     "chat.visionUnsupported": "The selected model doesn't support images — image not added",
     "chat.toolsOn": "Tools on — the model may call web search and MCP tools at its own discretion (click to turn off)",
     "chat.toolsOff": "Tools off (click to turn on)",
+    "chat.askEveryToolOn": "Every tool call waits for your approval (click to turn off)",
+    "chat.askEveryToolOff": "Only risky tool calls ask first — click to approve every step",
 
     "search.generating": "🔍 Preparing search query…",
     "search.searching": "🔍 Searching: {query}",
@@ -428,6 +432,8 @@ const translations = {
     "chat.visionUnsupported": "Das gewählte Modell unterstützt keine Bilder — Bild nicht hinzugefügt",
     "chat.toolsOn": "Tools an — das Modell darf Websuche und MCP-Tools nach eigenem Ermessen aufrufen (zum Ausschalten klicken)",
     "chat.toolsOff": "Tools aus (zum Einschalten klicken)",
+    "chat.askEveryToolOn": "Jeder Tool-Aufruf wartet auf deine Freigabe (zum Ausschalten klicken)",
+    "chat.askEveryToolOff": "Nur riskante Tool-Aufrufe fragen nach — klicken, um jeden Schritt freizugeben",
 
     "search.generating": "🔍 Suchanfrage wird vorbereitet…",
     "search.searching": "🔍 Suche: {query}",
@@ -560,6 +566,8 @@ const translations = {
     "chat.visionUnsupported": "El modelo seleccionado no admite imágenes — imagen no añadida",
     "chat.toolsOn": "Herramientas activadas — el modelo puede llamar a la búsqueda web y a las herramientas MCP a su criterio (haz clic para desactivar)",
     "chat.toolsOff": "Herramientas desactivadas (haz clic para activar)",
+    "chat.askEveryToolOn": "Cada llamada a una herramienta espera tu aprobación (haz clic para desactivar)",
+    "chat.askEveryToolOff": "Solo las llamadas arriesgadas piden aprobación — haz clic para aprobar cada paso",
 
     "search.generating": "🔍 Preparando la consulta de búsqueda…",
     "search.searching": "🔍 Buscando: {query}",
@@ -692,6 +700,8 @@ const translations = {
     "chat.visionUnsupported": "Il modello selezionato non supporta le immagini — immagine non aggiunta",
     "chat.toolsOn": "Strumenti attivi — il modello può chiamare la ricerca web e gli strumenti MCP a sua discrezione (clicca per disattivare)",
     "chat.toolsOff": "Strumenti disattivati (clicca per attivare)",
+    "chat.askEveryToolOn": "Ogni chiamata a uno strumento attende la tua approvazione (clicca per disattivare)",
+    "chat.askEveryToolOff": "Solo le chiamate rischiose chiedono conferma — clicca per approvare ogni passo",
 
     "search.generating": "🔍 Preparazione della query di ricerca…",
     "search.searching": "🔍 Ricerca: {query}",
@@ -824,6 +834,8 @@ const translations = {
     "chat.visionUnsupported": "O modelo selecionado não suporta imagens — imagem não adicionada",
     "chat.toolsOn": "Ferramentas ativadas — o modelo pode chamar a busca na web e as ferramentas MCP a seu critério (clique para desativar)",
     "chat.toolsOff": "Ferramentas desativadas (clique para ativar)",
+    "chat.askEveryToolOn": "Cada chamada de ferramenta aguarda sua aprovação (clique para desativar)",
+    "chat.askEveryToolOff": "Só chamadas arriscadas pedem aprovação — clique para aprovar cada passo",
 
     "search.generating": "🔍 Preparando a consulta de busca…",
     "search.searching": "🔍 Buscando: {query}",
@@ -956,6 +968,8 @@ const translations = {
     "chat.visionUnsupported": "Выбранная модель не поддерживает изображения — изображение не добавлено",
     "chat.toolsOn": "Инструменты включены — модель может по своему усмотрению вызывать веб-поиск и инструменты MCP (нажмите, чтобы выключить)",
     "chat.toolsOff": "Инструменты выключены (нажмите, чтобы включить)",
+    "chat.askEveryToolOn": "Каждый вызов инструмента ждёт вашего одобрения (нажмите, чтобы выключить)",
+    "chat.askEveryToolOff": "Подтверждения требуют только рискованные вызовы — нажмите, чтобы подтверждать каждый шаг",
 
     "search.generating": "🔍 Подготовка поискового запроса…",
     "search.searching": "🔍 Поиск: {query}",
@@ -1088,6 +1102,8 @@ const translations = {
     "chat.visionUnsupported": "選択中のモデルは画像に対応していません — 画像は追加されませんでした",
     "chat.toolsOn": "ツールオン — モデルが判断してウェブ検索や MCP ツールを呼び出せます（クリックでオフ）",
     "chat.toolsOff": "ツールオフ（クリックでオン）",
+    "chat.askEveryToolOn": "すべてのツール呼び出しが承認を待ちます（クリックでオフ）",
+    "chat.askEveryToolOff": "承認を求めるのは危険な呼び出しのみ — クリックで毎回承認",
 
     "search.generating": "🔍 検索クエリを準備中…",
     "search.searching": "🔍 検索中: {query}",
@@ -1220,6 +1236,8 @@ const translations = {
     "chat.visionUnsupported": "所选模型不支持图片 — 图片未添加",
     "chat.toolsOn": "工具已开启 — 模型可自行决定调用网络搜索和 MCP 工具（点击关闭）",
     "chat.toolsOff": "工具已关闭（点击开启）",
+    "chat.askEveryToolOn": "每次工具调用都等待你的批准（点击关闭）",
+    "chat.askEveryToolOff": "仅有风险的调用需要批准 — 点击以批准每一步",
 
     "search.generating": "🔍 正在准备搜索查询…",
     "search.searching": "🔍 正在搜索：{query}",

@@ -88,7 +88,8 @@ class ToolRegistry:
         ]
 
     async def execute(
-        self, name: str, args: dict, approved: bool = False, privileged: bool = False
+        self, name: str, args: dict, approved: bool = False, privileged: bool = False,
+        strict: bool = False,
     ) -> str:
         """Runs the tool and returns a plain-text result. Unknown/unapproved-mutating tool → an
         error string rather than an exception, so the model can recover and the loop survives.
@@ -100,12 +101,16 @@ class ToolRegistry:
 
         `privileged` follows the same rule: default False, and a privileged tool named by a
         non-privileged caller gets the unknown-tool answer, so its existence does not leak.
+
+        `strict` is the user's "ask before every tool" mode: every call needs `approved`,
+        whatever the tool's own classification says. It can only add a question, never
+        remove one.
         """
         args = args or {}
         tool = self.lookup(name, privileged)
         if tool is None:
             return f"{ERROR_PREFIX} no tool named '{name}'.{self._name_hint(name, privileged)}"
-        if tool.requires_approval(args) and not approved:
+        if (strict or tool.requires_approval(args)) and not approved:
             return f"{ERROR_PREFIX} tool '{name}' changes state and was not approved."
         return await tool.handler(args)
 
