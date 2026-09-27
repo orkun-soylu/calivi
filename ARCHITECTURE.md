@@ -884,6 +884,23 @@ chat. Both failures return 404: an approval id is a capability and must not be p
 > a summary. Summarising here *is* the vulnerability: the operator has to see exactly what will
 > run. This is the one place in the UI where the "render it nicely" instinct must be resisted.
 
+### Per-call approval and privileged tools
+
+Two extensions to the gate, made for a shell tool (#78) and inert until a tool uses them.
+
+- **`needs_approval(args)`.** `mutating` is fixed per tool, but a shell's risk depends on the
+  command: marking it mutating would put a card on every `ls` — the decay that sank Playwright
+  below — and not marking it would run `rm -rf` unasked. The classifier decides per call; the
+  **registry** still enforces the answer (rule 1), `mutating=True` still means "always", and a
+  classifier that raises counts as "ask". The loop evaluates the same arguments it later passes
+  to `execute`, so the card shows exactly what the registry will judge.
+- **`privileged`.** A tool that acts on the host belongs to the **super admin (id 1)** alone —
+  not to every admin, since a second admin of the same instance would otherwise inherit the
+  owner's shell. The loop derives `privileged` from `user_id`; an unidentified caller is not
+  privileged. For everyone else the tool does not exist: absent from `specs()`, refused by
+  `execute()` with the unknown-tool message, left out of the name hint, and `lookup()` returns
+  `None` so no approval card is ever shown for a call that would be refused anyway.
+
 ### Playwright MCP — evaluated and declined
 
 Browser automation was the motivating example for building the approval layer. It was then
@@ -984,7 +1001,7 @@ button, back gesture; `matchMedia` is mocked since jsdom has none),
 Fake timers (`vi.useFakeTimers`) deadlock with RTL's async `act` wrapper; the two tests that verify
 delay behaviour deliberately use **real** timers (~3s).
 
-### Backend — pytest (197 tests)
+### Backend — pytest (211 tests)
 
 `backend/tests/` — pytest + `httpx.ASGITransport` (a real HTTP layer, no live server needed). They
 do not ship in the prod image: the `Dockerfile` installs only `requirements.txt`, and the test
@@ -1004,8 +1021,9 @@ python3 -m venv .venv-test && ./.venv-test/bin/pip install -r requirements-dev.t
 `test_account_deletion.py` (FK cascade — no orphaned messages), `test_probe_cache.py`,
 `test_model_liveness.py`, `test_image_stripping.py`, `test_extract.py` (upload caps, and the
 parse subprocess: killed on timeout, capped in number), `test_secret_encryption.py` (ciphertext
-in the raw column, legacy plaintext, key rotation), `test_tools_registry.py` (the read-only
-`mutating` gate), `test_tool_loop.py` (the agentic loop's `tool_result.ok` flag — the error-prefix
+in the raw column, legacy plaintext, key rotation), `test_tools_registry.py` (the
+`mutating` gate, per-call approval, privileged tools), `test_privileged_tools.py` (the loop hands
+the registry the right caller: id 1 only, no approval card for a hidden tool), `test_tool_loop.py` (the agentic loop's `tool_result.ok` flag — the error-prefix
 contract above), `test_compaction.py` (what reaches the model before/after compaction, full mode,
 edit/delete/fork invalidation, the save race, the column migration).
 

@@ -9,7 +9,12 @@ source-agnostic and MCP-ready:
 
 `mutating=True` tools only run when the caller passes `approved=True`, which the agentic loop
 does after a human says yes (see `approvals.py`). The check lives here rather than in the loop
-so a caller bug cannot skip it.
+so a caller bug cannot skip it. A tool whose risk depends on its arguments (a shell command)
+decides per call through `needs_approval` instead; the same gate enforces the answer.
+
+`privileged=True` tools exist only for a privileged caller (the instance owner): they are left
+out of that caller's `specs()` and refused by `execute()` as if they did not exist. The loop
+decides who is privileged; the registry enforces it.
 """
 from dataclasses import dataclass
 from typing import Awaitable, Callable
@@ -27,7 +32,22 @@ class Tool:
     parameters: dict  # JSON Schema (object)
     handler: Callable[[dict], Awaitable[str]]
     source: str = "builtin"
-    mutating: bool = False  # True → not executed in Phase 1 (read-only gate)
+    mutating: bool = False  # True → always needs a human yes before it runs
+    # Per-call decision for a tool whose risk depends on its arguments. Ignored when `mutating`
+    # is set (that already means "always").
+    needs_approval: Callable[[dict], bool] | None = None
+    privileged: bool = False  # True → invisible and unrunnable for a non-privileged caller
+
+    def requires_approval(self, args: dict) -> bool:
+        if self.mutating:
+            return True
+        if self.needs_approval is None:
+            return False
+        try:
+            return bool(self.needs_approval(args))
+        except Exception:
+            # A classifier that cannot decide must not grant: fail towards asking.
+            return True
 
 
 class ToolRegistry:
@@ -45,12 +65,20 @@ class ToolRegistry:
     def get(self, name: str) -> Tool | None:
         return self._tools.get(name)
 
+    def lookup(self, name: str, privileged: bool = False) -> Tool | None:
+        """`get` as seen by one caller: a privileged tool does not exist for anybody else."""
+        tool = self._tools.get(name)
+        if tool is not None and tool.privileged and not privileged:
+            return None
+        return tool
+
     def names(self) -> list[str]:
         return list(self._tools)
 
-    def specs(self, names: list[str] | None = None) -> list[dict]:
+    def specs(self, names: list[str] | None = None, privileged: bool = False) -> list[dict]:
         """Native tool-calling wire format (Ollama and OpenAI share the same schema)."""
         tools = self._tools.values() if names is None else [self._tools[n] for n in names if n in self._tools]
+        tools = [t for t in tools if privileged or not t.privileged]
         return [
             {
                 "type": "function",
@@ -59,7 +87,9 @@ class ToolRegistry:
             for t in tools
         ]
 
-    async def execute(self, name: str, args: dict, approved: bool = False) -> str:
+    async def execute(
+        self, name: str, args: dict, approved: bool = False, privileged: bool = False
+    ) -> str:
         """Runs the tool and returns a plain-text result. Unknown/unapproved-mutating tool → an
         error string rather than an exception, so the model can recover and the loop survives.
 
@@ -67,20 +97,27 @@ class ToolRegistry:
         setting it, but the check stays **here**: loosening it because "the caller handles
         approval now" would move a security boundary into the caller, where a later refactor
         can silently skip it. The loop asks; the registry still refuses.
-        """
-        tool = self._tools.get(name)
-        if tool is None:
-            return f"{ERROR_PREFIX} no tool named '{name}'.{self._name_hint(name)}"
-        if tool.mutating and not approved:
-            return f"{ERROR_PREFIX} tool '{name}' changes state and was not approved."
-        return await tool.handler(args or {})
 
-    def _name_hint(self, name: str) -> str:
+        `privileged` follows the same rule: default False, and a privileged tool named by a
+        non-privileged caller gets the unknown-tool answer, so its existence does not leak.
+        """
+        args = args or {}
+        tool = self.lookup(name, privileged)
+        if tool is None:
+            return f"{ERROR_PREFIX} no tool named '{name}'.{self._name_hint(name, privileged)}"
+        if tool.requires_approval(args) and not approved:
+            return f"{ERROR_PREFIX} tool '{name}' changes state and was not approved."
+        return await tool.handler(args)
+
+    def _name_hint(self, name: str, privileged: bool = False) -> str:
         """Points at the real name when a model drops a namespace (calls `scan_packages` for
         `mcp__cve__scan_packages`). Only a hint: running the guessed tool would bypass the loop's
         per-name approval lookup, and an ambiguous guess could run the wrong server's tool."""
         bare = name.rsplit("__", 1)[-1]
-        matches = [n for n in self._tools if n.rsplit("__", 1)[-1] == bare]
+        matches = [
+            n for n, t in self._tools.items()
+            if n.rsplit("__", 1)[-1] == bare and (privileged or not t.privileged)
+        ]
         return f" Did you mean '{matches[0]}'?" if len(matches) == 1 else ""
 
 
