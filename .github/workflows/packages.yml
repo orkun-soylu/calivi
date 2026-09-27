@@ -209,9 +209,14 @@ jobs:
       - name: libguestfs diagnostics
         if: failure()
         run: |
-          qemu-img create -q -f qcow2 "$RUNNER_TEMP/t.qcow2" 1G
-          LIBGUESTFS_DEBUG=1 LIBGUESTFS_TRACE=1 virt-customize -a "$RUNNER_TEMP/t.qcow2" --network \
-            --run-command true 2>&1 | grep -iE "passt|slirp|netdev|error" | head -40 || true
+          cat /etc/resolv.conf
+          cp appliance/.cache/debian-13-genericcloud-amd64.qcow2 "$RUNNER_TEMP/t.qcow2"
+          virt-customize -a "$RUNNER_TEMP/t.qcow2" --network --run-command '
+            echo "--- resolv.conf"; cat /etc/resolv.conf; echo "--- ip"; ip -br addr; ip route
+            echo "--- getent default"; getent hosts deb.debian.org || echo FAIL
+            echo "--- getent via 169.254.2.3"; cp /etc/resolv.conf /tmp/r; echo "nameserver 169.254.2.3" > /etc/resolv.conf; getent hosts deb.debian.org || echo FAIL
+            echo "--- getent via 1.1.1.1"; echo "nameserver 1.1.1.1" > /etc/resolv.conf; getent hosts deb.debian.org || echo FAIL
+            cp /tmp/r /etc/resolv.conf' 2>&1 | tail -30
 
       - name: Boot it and test
         env:
