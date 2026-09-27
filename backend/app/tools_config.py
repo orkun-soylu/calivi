@@ -10,6 +10,10 @@ import yaml
 from app.config import TOOLS_CONFIG_PATH
 
 DEFAULT_MAX_ITERATIONS = 5
+# 20 was plenty for search and documentation lookups; operating a machine is not — installing
+# and configuring one service is easily 20-40 tool calls. The config value stays the admin's
+# choice, this only stops a typo from meaning "unbounded".
+MAX_ITERATIONS_CEILING = 200
 DEFAULT_NUM_RESULTS = 5
 
 
@@ -29,7 +33,7 @@ def is_enabled() -> bool:
 
 def get_max_iterations() -> int:
     n = _load().get("max_iterations")
-    return n if isinstance(n, int) and 1 <= n <= 20 else DEFAULT_MAX_ITERATIONS
+    return n if isinstance(n, int) and 1 <= n <= MAX_ITERATIONS_CEILING else DEFAULT_MAX_ITERATIONS
 
 
 def _tool_cfg(name: str) -> dict:

@@ -67,6 +67,14 @@ OLLAMA_CHAT_TIMEOUT = float(os.environ.get("OLLAMA_CHAT_TIMEOUT", "300"))
 # only decides when the UI suggests it. A turn = a user message plus the replies after it.
 COMPACT_SUGGEST_TOKENS = int(os.environ.get("COMPACT_SUGGEST_TOKENS", "16000"))
 COMPACT_KEEP_TURNS = int(os.environ.get("COMPACT_KEEP_TURNS", "4"))
+# Host tools (tools/host.py): the chat model operates the machine Calivi runs on — the
+# calivi-vm appliance. Off unless explicitly enabled; the Docker deployment never sets this.
+HOST_TOOLS_ENABLED = os.environ.get("CALIVI_HOST_TOOLS") == "1"
+# The Linux account commands run as. The appliance's bootstrap writes the owner's account name
+# to HOST_USER_FILE at first registration; CALIVI_HOST_USER overrides it (development, tests).
+HOST_USER = os.environ.get("CALIVI_HOST_USER", "")
+HOST_USER_FILE = os.environ.get("CALIVI_HOST_USER_FILE", "/etc/calivi/host-user")
+HOST_COMMAND_TIMEOUT = int(os.environ.get("CALIVI_HOST_TIMEOUT", "120"))
 OPENAI_PROBE_TIMEOUT = 5.0  # a little longer, since these APIs are remote
 SEARCH_TIMEOUT = 15.0  # SearXNG JSON search
 
