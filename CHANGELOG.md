@@ -9,12 +9,49 @@ Read this file before upgrading.
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-09-27
+
+calivi-vm. A Proxmox image that boots straight into Calivi and lets the chat model **operate
+the VM it runs on**: bash, file reads, writes and edits, behind approval cards for anything
+destructive. The same release adds the approval machinery that makes this safe to hand to a
+model. A normal `docker compose` install behaves as before; everything host-related is off
+unless `CALIVI_HOST_TOOLS=1`.
+
+> **Upgrading:** no schema change. `/api/auth/me`, `/login` and `/register` return one more
+> field (`host_tools`), and `/api/auth/config` returns `host_setup`. Both are always `false`
+> outside calivi-vm.
+
 ### Added
 
+- **calivi-vm** (#78, #83): `appliance/` builds a Proxmox-ready qcow2 (Debian 13, Calivi
+  installed natively on :80, standard kernel so a passed-through GPU gets its drivers), and
+  `proxmox-create.sh` creates the VM (q35 + OVMF, ready for passthrough). The session key and a
+  setup code are generated on each VM's first boot, never in the image, and the console shows
+  the address and the code. See [`appliance/README.md`](appliance/README.md).
+- **Host tools** (#80): `bash`, `read_file`, `write_file`, `edit_file`, run as the machine
+  owner's Linux account. Destructive or access-cutting commands (`rm`, `mv`, `dd`,
+  `systemctl stop`, firewall changes, `| sh`, writes into system paths, …) ask first. A few
+  (`rm -rf /`, the fork bomb) are refused outright. Writes outside home ask. Commands time out
+  (120s default); a job left in the background does not hold the call open.
+- **Claiming the machine** (#82): on calivi-vm the first registration needs the setup code from
+  the console and also creates a Linux account with the same name and password, in `sudo`, with
+  optional hostname, timezone and SSH key. Registration then closes. A single root helper, the
+  service account's only sudo rule, does the work and re-validates everything it is given.
+- **"Ask before every tool"** (#81): a 🛡 toggle next to 🔧 that puts every tool call behind an
+  approval card. It is shown only to the calivi-vm owner.
+- **Per-call approval and owner-only tools** (#79): a tool can decide per call whether it
+  needs approval, and a tool can be restricted to the super admin, for whom alone it exists.
 - **Setup prompt for coding agents** — [calivi.ai/prompt](https://calivi.ai/prompt) carries one
   prompt (`docs/setup-prompt.txt`) that has Claude Code, Codex or any coding agent install,
   configure and verify Calivi, then hand back the URL. It preserves an existing install's
   `.env`, volume and secret key, and leaves the first (admin) sign-up to you.
+
+### Changed
+
+- `max_iterations` in `tools.yml` accepts up to 200 (was 20). Operating a machine takes far
+  more tool calls than a documentation lookup. The default is unchanged.
+- A tool call refused for lack of approval now says so, rather than claiming the call
+  "changes state".
 
 ## [0.2.0] — 2026-09-26
 
@@ -153,6 +190,7 @@ someone can install and stay on, instead of tracking `main`.
 - **About 700 MB on disk for the whole stack**, web search included — backend 230 MB, frontend
   95.8 MB, SearXNG 372 MB (measured on arm64).
 
-[Unreleased]: https://github.com/orkun-soylu/calivi/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/orkun-soylu/calivi/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/orkun-soylu/calivi/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/orkun-soylu/calivi/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/orkun-soylu/calivi/releases/tag/v0.1.0
