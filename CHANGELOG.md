@@ -13,6 +13,16 @@ Read this file before upgrading.
 
 - The Debian package is built for **Ubuntu 24.04 LTS and 26.04 LTS** as well as Debian 13
   (#95): one build per distribution, since each has its own Python (3.12, 3.14, 3.13).
+- Package CI (#95): on every pull request and release, each distribution's package is installed
+  in a real VM booted from that distribution's cloud image and tested end to end — claim, a
+  host-tool call from a scripted model, upgrade from the previous release, an upgrade while a
+  reply is running, purge. A release gets its packages only if all three distributions pass.
+
+### Fixed
+
+- On Ubuntu, upgrading Calivi while a reply was running cut the reply: needrestart restarted the
+  service right after apt, undoing the deferred restart. Calivi now tells needrestart to leave it
+  alone; it restarts itself once idle.
 
 ### Changed
 

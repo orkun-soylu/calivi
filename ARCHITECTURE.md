@@ -1028,8 +1028,8 @@ card, and strict mode put a card on `uptime`.
 
 ### The package (`packaging/`, #95)
 
-calivi-vm updates like the rest of the system: Calivi ships as `calivi_X.Y.Z-N_amd64.deb`.
-`packaging/build-deb.sh` builds it inside `debian:trixie`. Until the signed APT repository
+calivi-vm updates like the rest of the system: Calivi ships as `calivi_X.Y.Z-N+<distro>_amd64.deb`.
+`packaging/build-deb.sh` builds it inside the distribution's own image. Until the signed APT repository
 exists, the `.deb` is a release asset and is installed with `apt install ./calivi_….deb`.
 
 - **The venv is built where it runs** (`/opt/calivi/venv`, inside the container) because a venv
@@ -1067,6 +1067,12 @@ exists, the `.deb` is a release asset and is installed with `apt install ./caliv
   `/run/calivi/busy` is absent. Otherwise it hands over to a transient
   `calivi-restart-when-idle` unit that waits for the marker (at most 30 min). Meanwhile nginx
   already serves the new frontend against the old backend.
+- **needrestart is told to leave Calivi alone** (`/etc/needrestart/conf.d/calivi.conf`, not a
+  conffile). Ubuntu ships needrestart and, since 24.04, lets it restart services on its own
+  after every apt run — including right after Calivi's upgrade, which undid the deferral above
+  and cut the reply. Found by the first install test on Ubuntu; Debian's cloud image has no
+  needrestart, so the Proxmox tests had missed it. It now only lists Calivi, whichever package
+  triggered it (a Python security update, too).
 - **Removal keeps data.** `remove` stops the service and drops the nginx site. `purge` also drops
   `/etc/calivi` (key, setup code, owner marker). `/var/lib/calivi` and the owner's account stay:
   deleting a user's chats is not a package manager's call.
@@ -1080,6 +1086,39 @@ Verified on Proxmox with throwaway VMs:
   then restarted, reply saved;
 - remove and purge;
 - the image rebuilt with the refactored `install.sh`, booted and claimed.
+
+### Package CI (`.github/workflows/packages.yml`, `packaging/test/`)
+
+Nothing is published for a distribution that was not tested on it, and nothing at all unless
+all three pass. Per distribution, on every pull request, push to `main` and published release:
+
+- **backend**: the test suite in the distribution's official image, on its own Python.
+- **build**: `build-deb.sh --distro`.
+- **install**: a real VM from the distribution's official cloud image, under KVM on the runner
+  (`vm.sh`: QEMU user networking, cloud-init seed, SSH and :80 forwarded to localhost).
+  `install_test.py` then checks, in order: install (the previous release's package when there is
+  one); claim (a wrong setup code creates nothing; the right one creates the owner with sudo, sets
+  the hostname, deletes the code and closes registration); upgrade to this build (key, session and
+  owner survive); a host-tool call (the owner's account, on this machine); an upgrade while a
+  reply streams (same PID until the reply is complete, then restarted); purge (data and owner
+  kept). needrestart is installed first on every distribution, so the deferral is tested against
+  it.
+- **The model is a script**, `fake_model.py`: an OpenAI-compatible server on the runner (the
+  guest reaches it as 10.0.2.2) whose reply is decided by the last user message — `RUN: <cmd>`
+  asks for a `bash` call, `SLOW: <n>` streams for n seconds. The tool call itself is real: it
+  runs through the host tools on the VM, so the whole chain from the model to `sudo -u <owner>`
+  is exercised without a GPU or a network model.
+- **The previous release** (`previous-release.sh`) is the newest release whose package for this
+  distribution has a lower version by dpkg's rules. So a pull request that has not bumped the
+  version still upgrades from the release it follows, and a release upgrades from the one
+  before. Ubuntu has none before 0.6.1, and its upgrade step is skipped until then.
+- **publish** runs only for a published release and needs every job above for all three
+  distributions. It checks that each package's version matches the tag, then attaches the three
+  `.deb`s and their checksums. A release whose tests fail therefore has no packages.
+
+Mutation-checked: a `configure` that restarts regardless of the busy marker fails the test at
+"the upgrade says it waits for the reply"; the build without the needrestart file failed on both
+Ubuntus at "the service was not restarted under the reply".
 
 ### Playwright MCP — evaluated and declined
 
