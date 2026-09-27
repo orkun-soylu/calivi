@@ -67,6 +67,7 @@ export default function ChatView({ chat, servers, hostTools, onMessageSent, onFo
     const id = chat.id;
     stream.run(({ signal, onPiece }) => api.followTurn(id, { signal }, onPiece), {
       chatId: id,
+      agent: chat.mode === "agent",
       beforeClear: () => onMessageSent(),
     });
   }, [chat?.id, chat?.active_turn, stream.sending]);
@@ -140,6 +141,7 @@ export default function ChatView({ chat, servers, hostTools, onMessageSent, onFo
         ),
       {
         chatId: chat.id,
+        agent: chat.mode === "agent",
         // Clear the streaming bubble only AFTER the new message lands in the list (no empty gap).
         beforeClear: async () => {
           await onMessageSent();
@@ -182,7 +184,7 @@ export default function ChatView({ chat, servers, hostTools, onMessageSent, onFo
     await stream.run(
       ({ signal, onPiece }) =>
         api.editMessage(chat.id, mid, { content, ...editTarget, useTools, askEveryTool, signal }, onPiece),
-      { chatId: chat.id, afterClear: () => onMessageSent() }
+      { chatId: chat.id, agent: chat.mode === "agent", afterClear: () => onMessageSent() }
     );
   }
 
@@ -203,7 +205,7 @@ export default function ChatView({ chat, servers, hostTools, onMessageSent, onFo
           },
           onPiece
         ),
-      { afterClear: () => onMessageSent() }
+      { agent: chat.mode === "agent", afterClear: () => onMessageSent() }
     );
   }
 
@@ -226,6 +228,13 @@ export default function ChatView({ chat, servers, hostTools, onMessageSent, onFo
       setCompacting(null);
     }
     if (failed) stream.flashError(failed);
+    await onMessageSent();
+  }
+
+  // Agent mode (#91) keeps each reply's tool steps and replays them. Offered where the model can
+  // operate the host; a chat switched back to plain chat keeps its steps but stops replaying them.
+  async function toggleAgentMode() {
+    await api.updateChat(chat.id, { mode: chat.mode === "agent" ? "chat" : "agent" });
     await onMessageSent();
   }
 
@@ -270,11 +279,24 @@ export default function ChatView({ chat, servers, hostTools, onMessageSent, onFo
         <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1 md:flex-none">
           <ServerModelPicker servers={upServers} value={{ serverId, model }} onChange={setTarget} />
         </div>
+        {hostTools && (
+          <button
+            onClick={toggleAgentMode}
+            disabled={stream.sending}
+            aria-pressed={chat.mode === "agent"}
+            title={t(chat.mode === "agent" ? "mode.agentTitle" : "mode.chatTitle")}
+            className={`ml-auto shrink-0 rounded-full px-2.5 py-1 text-xs disabled:opacity-40 ${
+              chat.mode === "agent" ? "bg-accent text-white" : "bg-neutral-800 text-neutral-300 hover:bg-neutral-700"
+            }`}
+          >
+            {t(chat.mode === "agent" ? "mode.agent" : "mode.chat")}
+          </button>
+        )}
         {chat.compactable && (
           <button
             onClick={handleCompact}
             disabled={!!compacting || stream.sending}
-            className="ml-auto shrink-0 text-neutral-300 opacity-70 hover:opacity-100 disabled:opacity-30"
+            className={`${hostTools ? "" : "ml-auto "}shrink-0 text-neutral-300 opacity-70 hover:opacity-100 disabled:opacity-30`}
             title={t("compact.buttonTitle")}
           >
             <CompactIcon className="w-5 h-5" />
@@ -282,7 +304,7 @@ export default function ChatView({ chat, servers, hostTools, onMessageSent, onFo
         )}
         <button
           onClick={onOpenSettings}
-          className={`${chat.compactable ? "" : "ml-auto "}shrink-0 text-neutral-300 opacity-70 hover:opacity-100`}
+          className={`${chat.compactable || hostTools ? "" : "ml-auto "}shrink-0 text-neutral-300 opacity-70 hover:opacity-100`}
           title={t("common.settings")}
         >
           <SettingsIcon className="w-5 h-5" />
