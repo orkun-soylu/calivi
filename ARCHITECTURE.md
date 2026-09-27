@@ -1116,6 +1116,32 @@ all three pass. Per distribution, on every pull request, push to `main` and publ
   distributions. It checks that each package's version matches the tag, then attaches the three
   `.deb`s and their checksums. A release whose tests fail therefore has no packages.
 
+### The APT repository (`packaging/apt/`, `.github/workflows/apt.yml`)
+
+`https://apt.calivi.ai` is GitHub Pages serving `orkun-soylu/calivi-apt`, a repository only
+the release workflow writes to. One suite per distribution, named by codename (`trixie`,
+`noble`, `resolute`), component `main`, amd64.
+
+- **Built from the release's assets, never from a build.** After `publish` has attached the
+  three tested `.deb`s, `apt.yml` downloads them, checks their checksums and that they match the
+  tag, and runs `publish.sh`. Nothing reaches the repository that did not pass all three install
+  tests. `apt.yml` can also be run by hand for an existing release.
+- **Stateless.** `publish.sh` adds the packages to `pool/<suite>/`, keeps the newest five per
+  suite (rollback: `apt install calivi=<version>`), and regenerates every index with
+  `apt-ftparchive`. There is no database to lose or to fall out of step with the files.
+- **Signed; the fingerprint is pinned** in `apt.yml` (`4E28 2AB6 66CE 1E29 488B  06CF 6155 29D5
+  0438 1965`, RSA 4096, no passphrase: the secret store is the protection, no expiry: a rotation
+  would break every installed machine; the revocation certificate is kept offline).
+  `publish.sh` refuses to sign unless exactly that key is in the keyring, so a wrong secret
+  stops the publish instead of shipping a repository nobody's keyring trusts. `InRelease` and
+  `Release.gpg` use SHA-512.
+- **Two secrets, two jobs.** `APT_SIGNING_KEY` proves the packages come from here;
+  `APT_DEPLOY_KEY` is an SSH deploy key that can write to `calivi-apt` and nothing else.
+- **Tested with the real script.** The install job signs a repository with a throwaway key,
+  serves it on the runner, and the VM's last step adds it exactly as `apt.calivi.ai` documents
+  (`Signed-By` keyring, deb822 `.sources`) and runs `apt install calivi`. Mutation-checked: a
+  repository signed by another key fails `apt update` (`NO_PUBKEY`, "is not signed").
+
 Mutation-checked: a `configure` that restarts regardless of the busy marker fails the test at
 "the upgrade says it waits for the reply"; the build without the needrestart file failed on both
 Ubuntus at "the service was not restarted under the reply".

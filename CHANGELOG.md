@@ -9,6 +9,14 @@ Read this file before upgrading.
 
 ## [Unreleased]
 
+### Added
+
+- **APT repository: https://apt.calivi.ai** (#95). Suites for Debian 13, Ubuntu 24.04 and
+  26.04; signed (key `4E28 2AB6 66CE 1E29 488B  06CF 6155 29D5 0438 1965`). A release is
+  published there only after its packages passed the install tests on all three distributions,
+  and the install tests now end with `apt install calivi` from a signed repository built by the
+  same script.
+
 ## [0.6.1] — 2026-09-27
 
 The package now installs on Ubuntu too, and every package is tested before it is published.

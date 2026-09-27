@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Calivi APT repository</title>
+<style>
+  :root { --bg: #fafafa; --fg: #1c1c1c; --muted: #666; --code: #efefef; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #161616; --fg: #e8e8e8; --muted: #999; --code: #242424; } }
+  body { background: var(--bg); color: var(--fg); font: 16px/1.55 system-ui, sans-serif; max-width: 46rem; margin: 2.5rem auto; padding: 0 16px; }
+  pre { background: var(--code); padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  code { font-family: ui-monospace, monospace; font-size: .92em; }
+  small, .muted { color: var(--muted); }
+  a { color: inherit; }
+</style>
+</head>
+<body>
+<h1>Calivi APT repository</h1>
+<p>Packages of <a href="https://calivi.ai">Calivi</a> for <b>Debian 13</b> (trixie),
+<b>Ubuntu 24.04 LTS</b> (noble) and <b>Ubuntu 26.04 LTS</b> (resolute), amd64. Every package here
+was installed and tested in a VM of its distribution before it was published, and a release is
+published only when all three passed.</p>
+
+<h2>Add the repository</h2>
+<pre><code>curl -fsSL https://apt.calivi.ai/calivi.gpg | sudo tee /usr/share/keyrings/calivi.gpg &gt;/dev/null
+gpg --show-keys /usr/share/keyrings/calivi.gpg   # must show @FPR_SPACED@
+
+. /etc/os-release
+sudo tee /etc/apt/sources.list.d/calivi.sources &gt;/dev/null &lt;&lt;EOF
+Types: deb
+URIs: https://apt.calivi.ai
+Suites: $VERSION_CODENAME
+Components: main
+Signed-By: /usr/share/keyrings/calivi.gpg
+EOF
+sudo apt update &amp;&amp; sudo apt install calivi</code></pre>
+<p>From then on <code>apt upgrade</code> updates Calivi like the rest of the system. An upgrade
+that lands while a reply is running restarts Calivi only once the reply is done.</p>
+
+<h2>Signing key</h2>
+<p><code>@FPR_SPACED@</code><br>
+<small>Calivi APT repository &lt;apt@calivi.ai&gt; · RSA 4096 · <a href="calivi.asc">calivi.asc</a></small></p>
+
+<p class="muted">Source and release notes: <a href="https://github.com/orkun-soylu/calivi">github.com/orkun-soylu/calivi</a>.</p>
+</body>
+</html>
