@@ -86,13 +86,17 @@ way `build.sh` does, then run it as root. Running it again updates Calivi in pla
 
 ## Updating
 
-Calivi is a Debian package, `calivi`. Each release has `calivi_X.Y.Z-N_amd64.deb` attached. On
-the VM:
+Calivi is a Debian package, `calivi`. From 0.6.1 each release has one per supported
+distribution attached, `calivi_X.Y.Z-N+deb13_amd64.deb` for the calivi-vm image (0.6.0's is
+`calivi_0.6.0-1_amd64.deb`). On the VM:
 
 ```sh
-curl -fLO https://github.com/orkun-soylu/calivi/releases/download/vX.Y.Z/calivi_X.Y.Z-1_amd64.deb
-sudo apt install ./calivi_X.Y.Z-1_amd64.deb
+curl -fLO https://github.com/orkun-soylu/calivi/releases/download/vX.Y.Z/calivi_X.Y.Z-1+deb13_amd64.deb
+sudo apt install ./calivi_X.Y.Z-1+deb13_amd64.deb
 ```
+
+Each package is attached only after it was installed and tested in a VM of its distribution,
+and only if that passed on all three.
 
 That works on an image from before the package too (0.3–0.5): the package takes over its files,
 and your chats and settings in `/var/lib/calivi` stay. If a reply is running, the restart waits

@@ -45,7 +45,8 @@ fi
 echo "== layout"
 A="$REPO/appliance"
 install -d "$ROOT/opt/calivi/backend" "$ROOT/usr/sbin" "$ROOT/usr/lib/calivi" "$ROOT/usr/lib/systemd/system" \
-    "$ROOT/usr/share/calivi" "$ROOT/etc/calivi" "$ROOT/etc/sudoers.d" "$ROOT/etc/cloud/cloud.cfg.d" "$ROOT/DEBIAN"
+    "$ROOT/usr/share/calivi" "$ROOT/etc/calivi" "$ROOT/etc/sudoers.d" "$ROOT/etc/cloud/cloud.cfg.d" "$ROOT/etc/needrestart/conf.d" \
+    "$ROOT/DEBIAN"
 cp -r "$REPO/backend/app" "$REPO/backend/requirements.txt" "$ROOT/opt/calivi/backend/"
 find "$ROOT/opt/calivi/backend" -name __pycache__ -prune -exec rm -rf {} +
 cp -r "$REPO/frontend/dist" "$ROOT/opt/calivi/frontend"
@@ -58,6 +59,7 @@ install -m 0644 "$A/files/tools.yml" "$ROOT/usr/share/calivi/tools.yml"
 install -m 0644 "$A/files/calivi.env" "$ROOT/etc/calivi/calivi.env"
 install -m 0440 "$A/files/sudoers-calivi" "$ROOT/etc/sudoers.d/70-calivi-bootstrap"
 install -m 0644 "$A/files/cloud-calivi.cfg" "$ROOT/etc/cloud/cloud.cfg.d/90-calivi.cfg"
+install -m 0644 "$A/files/needrestart-calivi.conf" "$ROOT/etc/needrestart/conf.d/calivi.conf"
 install -m 0644 "$REPO/packaging/debian/conffiles" "$ROOT/DEBIAN/"
 install -m 0755 "$REPO/packaging/debian/preinst" "$REPO/packaging/debian/postinst" \
     "$REPO/packaging/debian/prerm" "$REPO/packaging/debian/postrm" "$ROOT/DEBIAN/"

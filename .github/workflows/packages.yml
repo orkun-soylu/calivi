@@ -1,0 +1,164 @@
+# The calivi-vm packages (#95): one .deb per supported distribution, each tested on that
+# distribution before anything is published.
+#
+#   backend   the test suite on the distribution's own Python, in its official image
+#   build     packaging/build-deb.sh --distro …
+#   install   the .deb in a real VM booted from the distribution's cloud image (KVM on the
+#             runner): claim, a host-tool call driven by a scripted model, the upgrade from the
+#             previous release, the restart deferred past a running reply, purge
+#   publish   on a published release only, and only when every job above passed for all three
+#             distributions: the .debs are attached to the release. All or nothing.
+#
+# The supported set is a policy, not a list: Debian's current stable and Ubuntu's two newest
+# LTS. Change the three matrices together (and build-deb.sh's case).
+name: packages
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: backend (${{ matrix.distro }})
+    runs-on: ubuntu-latest
+    container: ${{ matrix.image }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { distro: trixie, image: "debian:trixie" }
+          - { distro: noble, image: "ubuntu:24.04" }
+          - { distro: resolute, image: "ubuntu:26.04" }
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install
+        run: |
+          apt-get update -qq
+          DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends python3-venv >/dev/null
+          python3 --version
+          python3 -m venv /tmp/venv
+          /tmp/venv/bin/pip install -q -r backend/requirements-dev.txt
+
+      - name: Run the tests
+        working-directory: backend
+        run: /tmp/venv/bin/python -m pytest -q
+
+  build:
+    name: build (${{ matrix.distro }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        distro: [trixie, noble, resolute]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build the package
+        run: packaging/build-deb.sh --distro ${{ matrix.distro }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: deb-${{ matrix.distro }}
+          path: packaging/out/
+          if-no-files-found: error
+
+  install:
+    name: install (${{ matrix.distro }})
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { distro: trixie, tag: deb13 }
+          - { distro: noble, tag: ubuntu24.04 }
+          - { distro: resolute, tag: ubuntu26.04 }
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules >/dev/null
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
+            qemu-system-x86 qemu-utils cloud-image-utils >/dev/null
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: deb-${{ matrix.distro }}
+          path: debs
+
+      - name: Find the previous release
+        id: previous
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          built=$(dpkg-deb -f debs/*.deb Version)
+          echo "deb=$(packaging/test/previous-release.sh ${{ matrix.tag }} "$built" previous)" >> "$GITHUB_OUTPUT"
+
+      - name: Boot the VM
+        run: |
+          python3 packaging/test/fake_model.py 8099 > fake-model.log 2>&1 &
+          packaging/test/vm.sh start ${{ matrix.distro }} "$RUNNER_TEMP/vm"
+
+      - name: Install tests
+        run: |
+          previous=${{ steps.previous.outputs.deb }}
+          python3 -u packaging/test/install_test.py --ssh-config "$RUNNER_TEMP/vm/ssh_config" \
+            --deb debs/*.deb ${previous:+--previous "$previous"}
+
+      - name: Console and model logs
+        if: failure()
+        run: |
+          tail -100 "$RUNNER_TEMP/vm/console.log" || true
+          cat fake-model.log || true
+
+      - name: Stop the VM
+        if: always()
+        run: packaging/test/vm.sh stop "$RUNNER_TEMP/vm"
+
+  publish:
+    name: attach to the release
+    if: github.event_name == 'release'
+    needs: [backend, install]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: deb-*
+          path: debs
+          merge-multiple: true
+
+      - name: Attach the packages
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          cd debs
+          ls -l
+          # A release whose tag does not match the version in package.json would publish
+          # packages under the wrong number.
+          for f in *.deb; do
+            case $f in calivi_"${TAG#v}"-*) ;; *) echo "$f does not match $TAG"; exit 1 ;; esac
+          done
+          [ "$(ls *.deb | wc -l)" -eq 3 ] || { echo "expected three packages"; exit 1; }
+          gh release upload "$TAG" *.deb *.sha256 --clobber -R "$GITHUB_REPOSITORY"

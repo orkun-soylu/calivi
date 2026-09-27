@@ -30,6 +30,7 @@ install -d -m 0755 "$ETC" /usr/lib/calivi /usr/share/calivi
 install -m 0644 "$SRC/appliance/files/calivi.env" "$ETC/calivi.env"
 install -m 0755 "$SRC/appliance/bootstrap/calivi_bootstrap_user.py" /usr/sbin/calivi-bootstrap-user
 install -m 0440 "$SRC/appliance/files/sudoers-calivi" /etc/sudoers.d/70-calivi-bootstrap
+install -D -m 0644 "$SRC/appliance/files/needrestart-calivi.conf" /etc/needrestart/conf.d/calivi.conf
 install -m 0755 "$SRC/appliance/files/firstboot" "$SRC/appliance/files/configure" /usr/lib/calivi/
 install -m 0644 "$SRC/appliance/files/tools.yml" /usr/share/calivi/tools.yml
 install -m 0644 "$SRC/appliance/files/calivi.service" \
