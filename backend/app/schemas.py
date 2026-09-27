@@ -26,6 +26,12 @@ class UserOut(BaseModel):
     created_at: datetime.datetime
 
 
+class MeOut(UserOut):
+    """The signed-in user, plus what the UI needs to know about their own capabilities."""
+
+    host_tools: bool = False  # the host's shell is available to this user (calivi-vm owner)
+
+
 class UserUpdate(BaseModel):
     # Partial admin update: only the fields actually sent are applied.
     email: str | None = None
@@ -207,6 +213,7 @@ class SendMessageIn(BaseModel):
     server_id: int | None = None  # None → chosen by the caller
     model: str | None = None  # None → chosen by the caller (on server_id if given)
     use_tools: bool = False  # when on, the tool layer is offered to the model (it decides what to call)
+    ask_every_tool: bool = False  # when on, every tool call waits for the user's approval
 
 
 class EditMessageIn(BaseModel):
@@ -215,6 +222,7 @@ class EditMessageIn(BaseModel):
     server_id: int | None = None
     model: str | None = None
     use_tools: bool = False
+    ask_every_tool: bool = False
 
 
 class ForkIn(BaseModel):
@@ -225,3 +233,4 @@ class ForkIn(BaseModel):
     server_id: int | None = None
     model: str | None = None
     use_tools: bool = False
+    ask_every_tool: bool = False

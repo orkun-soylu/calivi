@@ -174,7 +174,7 @@ def _persist_chips(chat_id: int, chips: list[dict]) -> None:
 def build_stream_response(
     chat_id: int, target: dict, model: str, history: list[dict],
     use_tools: bool = False, extra_headers: dict | None = None, user_id: int | None = None,
-    summary: str | None = None,
+    summary: str | None = None, ask_every_tool: bool = False,
 ) -> StreamingResponse:
     """Injects the system prompt (and optional tools), returns the NDJSON stream and saves the
     assistant message at the end.
@@ -185,6 +185,8 @@ def build_stream_response(
 
     `summary` is the chat's compaction summary when it is in compact mode (`history` then holds
     only the messages after it); it goes into the system layer, after the persona prompt.
+
+    `ask_every_tool` puts every tool call behind the approval card, harmless or not.
     """
     server_name = target["name"]
     # Privileged tools (the host's own shell, on an appliance install) belong to the instance
@@ -261,7 +263,8 @@ def build_stream_response(
                     # (Traefik's default is 180s).
                     approved = False
                     tool = registry.lookup(call["name"], privileged=privileged)
-                    if tool is not None and tool.requires_approval(args) and user_id is not None:
+                    needs_yes = tool is not None and (ask_every_tool or tool.requires_approval(args))
+                    if needs_yes and user_id is not None:
                         approval_id = approvals.create(chat_id, user_id, call["name"], args)
                         try:
                             yield json.dumps({
@@ -285,7 +288,8 @@ def build_stream_response(
 
                     try:
                         result = await registry.execute(
-                            call["name"], args, approved=approved, privileged=privileged
+                            call["name"], args, approved=approved, privileged=privileged,
+                            strict=ask_every_tool,
                         )
                         ok = not result.startswith(ERROR_PREFIX)
                     except Exception:
@@ -477,7 +481,8 @@ async def send_message(
     history.append({"role": "user", "content": payload.content, "images": payload.images, "attachments": atts})
 
     return build_stream_response(
-        chat.id, target, model, history, use_tools=payload.use_tools, user_id=user.id, summary=summary
+        chat.id, target, model, history, use_tools=payload.use_tools, user_id=user.id, summary=summary,
+        ask_every_tool=payload.ask_every_tool,
     )
 
 
@@ -526,7 +531,8 @@ async def edit_message(
 
     history, summary = _context_of(db, chat_id)
     return build_stream_response(
-        chat_id, target, model, history, use_tools=payload.use_tools, user_id=user.id, summary=summary
+        chat_id, target, model, history, use_tools=payload.use_tools, user_id=user.id, summary=summary,
+        ask_every_tool=payload.ask_every_tool,
     )
 
 
@@ -582,6 +588,7 @@ async def fork_chat(
     return build_stream_response(
         new_chat.id, target, model, history,
         use_tools=payload.use_tools, user_id=user.id, summary=summary,
+        ask_every_tool=payload.ask_every_tool,
         extra_headers={"X-Calivi-Chat-Id": str(new_chat.id)},
     )
 

@@ -115,7 +115,7 @@ export const api = {
     return resp.json();
   },
 
-  async sendMessage(chatId, { content, images, attachments, serverId, model, useTools, signal }, onPiece) {
+  async sendMessage(chatId, { content, images, attachments, serverId, model, useTools, askEveryTool, signal }, onPiece) {
     const resp = await fetch(`${BASE}/chats/${chatId}/messages`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -125,6 +125,7 @@ export const api = {
         images: images || [],
         attachments: attachments || [],
         use_tools: !!useTools,
+        ask_every_tool: !!askEveryTool,
         ...normalizeTarget(serverId, model),
       }),
       signal,
@@ -133,12 +134,14 @@ export const api = {
   },
 
   // Edit a user message / reroute it to a different model → truncate + regen (same chat).
-  async editMessage(chatId, messageId, { content, serverId, model, useTools, signal }, onPiece) {
+  async editMessage(chatId, messageId, { content, serverId, model, useTools, askEveryTool, signal }, onPiece) {
     const resp = await fetch(`${BASE}/chats/${chatId}/messages/${messageId}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
-      body: JSON.stringify({ content, use_tools: !!useTools, ...normalizeTarget(serverId, model) }),
+      body: JSON.stringify({
+        content, use_tools: !!useTools, ask_every_tool: !!askEveryTool, ...normalizeTarget(serverId, model),
+      }),
       signal,
     });
     await streamNdjson(resp, onPiece);
@@ -158,12 +161,15 @@ export const api = {
   },
 
   // Fork a new chat from history. onChatId(newId) comes from the header, then the stream flows.
-  async forkChat(chatId, { messageId, content, serverId, model, useTools, signal }, onChatId, onPiece) {
+  async forkChat(chatId, { messageId, content, serverId, model, useTools, askEveryTool, signal }, onChatId, onPiece) {
     const resp = await fetch(`${BASE}/chats/${chatId}/fork`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
-      body: JSON.stringify({ message_id: messageId, content, use_tools: !!useTools, ...normalizeTarget(serverId, model) }),
+      body: JSON.stringify({
+        message_id: messageId, content, use_tools: !!useTools, ask_every_tool: !!askEveryTool,
+        ...normalizeTarget(serverId, model),
+      }),
       signal,
     });
     if (!resp.ok) throw new Error(`${resp.status} ${await resp.text()}`);
