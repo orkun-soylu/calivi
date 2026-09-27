@@ -9,6 +9,16 @@ Read this file before upgrading.
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-09-27
+
+Agent mode. On calivi-vm a chat now works like a coding agent's session: the model remembers
+the commands it ran and what they printed, and the reply shows each step with its output and
+its approval. Normal installs keep plain chats.
+
+> **Upgrading:** two columns are added on startup (`chats.mode`, default `chat`, and
+> `messages.steps`). Existing chats stay plain chats; on calivi-vm, new chats start in agent
+> mode and an existing one can be switched from the chat header.
+
 ### Added
 
 - **Agent mode** (#91), the default for new chats on calivi-vm. A reply's tool steps are kept:
@@ -22,9 +32,6 @@ Read this file before upgrading.
 
 - Re-attaching to a running reply (after a reload or a chat switch) could show its text, or
   its steps, twice.
-
-### Fixed
-
 - One unreachable MCP server could make every MCP server show as unreachable, so the model got
   no MCP tools at all. Slow-failing DNS lookups filled uvloop's 4-thread resolver pool and the
   other servers' probes timed out waiting behind them. The pool is now 64 threads, in the Docker
@@ -236,7 +243,8 @@ someone can install and stay on, instead of tracking `main`.
 - **About 700 MB on disk for the whole stack**, web search included — backend 230 MB, frontend
   95.8 MB, SearXNG 372 MB (measured on arm64).
 
-[Unreleased]: https://github.com/orkun-soylu/calivi/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/orkun-soylu/calivi/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/orkun-soylu/calivi/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/orkun-soylu/calivi/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/orkun-soylu/calivi/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/orkun-soylu/calivi/compare/v0.1.0...v0.2.0
