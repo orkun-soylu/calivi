@@ -9,6 +9,13 @@ Read this file before upgrading.
 
 ## [Unreleased]
 
+### Fixed
+
+- One unreachable MCP server could make every MCP server show as unreachable, so the model got
+  no MCP tools at all. Slow-failing DNS lookups filled uvloop's 4-thread resolver pool and the
+  other servers' probes timed out waiting behind them. The pool is now 64 threads, in the Docker
+  image and the calivi-vm service alike.
+
 ## [0.4.0] — 2026-09-27
 
 Replies that outlive the tab. A reply now runs on the server, so closing the tab, reloading,

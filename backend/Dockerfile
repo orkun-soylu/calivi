@@ -23,4 +23,11 @@ COPY app ./app
 
 VOLUME /data
 
+# uvicorn runs on uvloop, and uvloop resolves hostnames on libuv's threadpool — 4 threads by
+# default, shared by every lookup in the process. A hostname that fails slowly (Docker's DNS
+# takes 5 s to give up on the name of a stopped container) holds a thread for that long, so a
+# few unreachable MCP servers starved every other probe into its 10 s timeout and ALL servers
+# showed as unreachable. Measured with ten such servers: 4 threads → all down, 64 → all up in 5 s.
+ENV UV_THREADPOOL_SIZE=64
+
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

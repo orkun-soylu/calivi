@@ -9,6 +9,8 @@ Group=calivi
 WorkingDirectory=/opt/calivi/backend
 EnvironmentFile=/etc/calivi/calivi.env
 EnvironmentFile=/etc/calivi/secret.env
+# See backend/Dockerfile: uvloop resolves DNS on this pool, 4 threads by default.
+Environment=UV_THREADPOOL_SIZE=64
 ExecStart=/opt/calivi/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000
 Restart=on-failure
 RestartSec=2
