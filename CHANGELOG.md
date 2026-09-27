@@ -9,6 +9,17 @@ Read this file before upgrading.
 
 ## [Unreleased]
 
+## [0.6.1] — 2026-09-27
+
+The package now installs on Ubuntu too, and every package is tested before it is published.
+There are three builds per release — Debian 13, Ubuntu 24.04 LTS and Ubuntu 26.04 LTS — and
+each is installed and exercised in a real VM of its distribution first. A release gets its
+packages only when all three pass.
+
+> **Upgrading a calivi-vm:** download `calivi_0.6.1-1+deb13_amd64.deb` from this release and
+> `sudo apt install ./calivi_0.6.1-1+deb13_amd64.deb`. Chats and settings stay. Docker installs:
+> rebuild as usual; no schema change.
+
 ### Added
 
 - The Debian package is built for **Ubuntu 24.04 LTS and 26.04 LTS** as well as Debian 13
@@ -286,7 +297,8 @@ someone can install and stay on, instead of tracking `main`.
 - **About 700 MB on disk for the whole stack**, web search included — backend 230 MB, frontend
   95.8 MB, SearXNG 372 MB (measured on arm64).
 
-[Unreleased]: https://github.com/orkun-soylu/calivi/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/orkun-soylu/calivi/compare/v0.6.1...HEAD
+[0.6.1]: https://github.com/orkun-soylu/calivi/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/orkun-soylu/calivi/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/orkun-soylu/calivi/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/orkun-soylu/calivi/compare/v0.3.0...v0.4.0
