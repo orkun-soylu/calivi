@@ -100,7 +100,12 @@ for it, up to 30 minutes. A signed APT repository, so that `apt upgrade` picks n
 by itself, is planned (#95). To go back, `apt install` the older `.deb`. Removing the package
 keeps `/var/lib/calivi`, even on `purge`.
 
-To build the package yourself: `packaging/build-deb.sh` (needs Docker).
+To build the package yourself: `packaging/build-deb.sh --distro trixie|noble|resolute` (needs
+Docker).
+
+The package also installs on a plain server, not only on the calivi-vm image. Supported:
+**Debian 13** (the reference), **Ubuntu 24.04 LTS** and **Ubuntu 26.04 LTS**, each with its own
+build (`+deb13`, `+ubuntu24.04`, `+ubuntu26.04`) because each has its own Python.
 
 ## Where things are
 

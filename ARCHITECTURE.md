@@ -1033,9 +1033,21 @@ calivi-vm updates like the rest of the system: Calivi ships as `calivi_X.Y.Z-N_a
 exists, the `.deb` is a release asset and is installed with `apt install ./calivi_….deb`.
 
 - **The venv is built where it runs** (`/opt/calivi/venv`, inside the container) because a venv
-  hard-codes its location. Its compiled wheels tie it to Debian 13's Python, hence
-  `Depends: python3 (>= 3.13), python3 (<< 3.14)`. The app is byte-compiled at build time:
-  the service account cannot write `__pycache__` under a root-owned tree.
+  hard-codes its location. The app is byte-compiled at build time: the service account cannot
+  write `__pycache__` under a root-owned tree.
+- **One package per distribution.** Supported: Debian's current stable first (13 trixie), then
+  Ubuntu's two newest LTS (24.04 noble, 26.04 resolute) — a policy, not a fixed list. Their
+  Pythons differ (3.13, 3.12, 3.14), and the venv's compiled wheels are tied to one. So
+  `build-deb.sh --distro` builds inside that distribution's image, the `Depends` range comes
+  from the Python it found there, and the version carries a suffix (`+deb13`, `+ubuntu24.04`,
+  `+ubuntu26.04`). The suffix uses `+`, not `~`, so file names are safe in URLs, and
+  `0.6.1-1+deb13` sorts above the suffix-less `0.6.0-1`. The first matrix run found:
+  - three pins without Python 3.14 wheels, and `pydantic` 2.11 whose core had none either;
+  - SQLAlchemy 2.0.36 failing to import on 3.14 (`typing.Union` changed);
+  - a test that leaked sessions, which 3.14's collector freed too late (pool exhausted);
+  - a 10 ms timing test that failed on fast machines.
+
+  All fixed. The backend suite passes on all three Pythons.
 - **One configure step for both paths.** `/usr/lib/calivi/configure` holds everything that turns
   the files into a running service: account, data dirs, default config, the nginx site derived
   from `frontend/nginx.conf`, units, (re)start. The `.deb`'s `postinst` and `install.sh` (image

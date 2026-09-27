@@ -74,6 +74,16 @@ def _chat(mode):
         db.close()
 
 
+def _history(chat_id):
+    """`_context_of` on a session that is closed afterwards — an unclosed one leaks a pooled
+    connection, which Python 3.14's collector frees late enough to exhaust the pool."""
+    db = SessionLocal()
+    try:
+        return _context_of(db, chat_id)
+    finally:
+        db.close()
+
+
 def _add_user(chat_id, text):
     db = SessionLocal()
     try:
@@ -85,7 +95,7 @@ def _add_user(chat_id, text):
 
 async def _turn(chat_id, text, agent=True, use_tools=True):
     """One user message + reply, the way send_message does it. Returns the stream's events."""
-    history, summary = _context_of(SessionLocal(), chat_id)
+    history, summary = _history(chat_id)
     _add_user(chat_id, text)
     history.append({"role": "user", "content": text})
     resp = build_stream_response(chat_id, TARGET, "m", history, use_tools=use_tools, user_id=1,
@@ -164,7 +174,7 @@ async def test_older_outputs_are_trimmed_but_calls_are_kept(fake, echo_tool):
     fake.output = "A" * 10_000
     for i in range(3):
         await _turn(chat_id, f"turn {i}")
-    history, _ = _context_of(SessionLocal(), chat_id)
+    history, _ = _history(chat_id)
     tools = [m for m in history if m["role"] == "tool"]
     calls = [m for m in history if m.get("tool_calls")]
     assert len(tools) == 3 and len(calls) == 3
@@ -205,7 +215,7 @@ async def test_a_stopped_turn_keeps_the_steps_it_ran(monkeypatch, echo_tool):
     [reply] = _replies(chat_id)
     assert reply.content == ""
     assert [s["role"] for s in reply.steps] == ["assistant", "tool"]
-    history, _ = _context_of(SessionLocal(), chat_id)
+    history, _ = _history(chat_id)
     assert [m["role"] for m in history] == ["user", "assistant", "tool"]
 
 
@@ -267,8 +277,10 @@ async def test_a_fork_keeps_the_mode_and_the_steps(admin, fake, echo_tool, monke
     chat_id = (await admin.post("/api/chats", json={"mode": "agent"})).json()["id"]
     await _turn(chat_id, "first")
     _add_user(chat_id, "second")
-    second = SessionLocal().query(models.Message).filter_by(chat_id=chat_id, role="user").order_by(
+    db = SessionLocal()
+    second = db.query(models.Message).filter_by(chat_id=chat_id, role="user").order_by(
         models.Message.id.desc()).first().id
+    db.close()
 
     seen = {}
 

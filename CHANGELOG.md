@@ -9,6 +9,16 @@ Read this file before upgrading.
 
 ## [Unreleased]
 
+### Added
+
+- The Debian package is built for **Ubuntu 24.04 LTS and 26.04 LTS** as well as Debian 13
+  (#95): one build per distribution, since each has its own Python (3.12, 3.14, 3.13).
+
+### Changed
+
+- Dependencies updated for Python 3.14: SQLAlchemy 2.0.54, pydantic 2.13.5, uvloop 0.22.1,
+  httptools 0.8.0, PyYAML 6.0.3.
+
 ## [0.6.0] — 2026-09-27
 
 calivi-vm becomes updatable. Calivi now ships as a Debian package too, attached to each release
