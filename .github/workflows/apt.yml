@@ -1,0 +1,95 @@
+# Publishes a release's packages to the APT repository, https://apt.calivi.ai (#95).
+#
+# The source is the release's attached .debs — packages.yml attaches them only after all three
+# distributions passed — so this never publishes anything untested. Called by packages.yml once
+# it has attached them; also runnable by hand for an existing release (Actions → apt → Run
+# workflow, e.g. to publish one that predates this workflow).
+#
+# Secrets: APT_SIGNING_KEY (the armored private key; its fingerprint is pinned below and
+# checked) and APT_DEPLOY_KEY (an SSH deploy key with write access to orkun-soylu/calivi-apt,
+# the Pages repository). Nothing else here can write anywhere.
+name: apt
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        required: true
+        type: string
+    secrets:
+      APT_SIGNING_KEY:
+        required: true
+      APT_DEPLOY_KEY:
+        required: true
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag whose packages to publish, e.g. v0.6.1
+        required: true
+
+permissions:
+  contents: read
+
+# One publish at a time: each one rewrites the repository's indexes.
+concurrency:
+  group: apt-publish
+  cancel-in-progress: false
+
+env:
+  # Calivi APT repository <apt@calivi.ai>. Also on https://apt.calivi.ai and in the docs.
+  APT_KEY_FPR: 4E282AB666CE1E29488B06CF615529D504381965
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/checkout@v4
+        with:
+          repository: orkun-soylu/calivi-apt
+          ssh-key: ${{ secrets.APT_DEPLOY_KEY }}
+          path: apt-repo
+
+      - name: Download the release's packages
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          gh release download "$TAG" -p '*.deb' -p '*.deb.sha256' -D debs -R "$GITHUB_REPOSITORY"
+          cd debs
+          sha256sum -c ./*.sha256
+          for f in *.deb; do
+            case $f in calivi_"${TAG#v}"-*) ;; *) echo "$f does not match $TAG"; exit 1 ;; esac
+          done
+          [ "$(ls ./*.deb | wc -l)" -eq 3 ] || { echo "expected three packages"; exit 1; }
+
+      - name: Import the signing key
+        env:
+          APT_SIGNING_KEY: ${{ secrets.APT_SIGNING_KEY }}
+        run: |
+          export GNUPGHOME="$RUNNER_TEMP/gnupg"
+          install -d -m 0700 "$GNUPGHOME"
+          printf '%s\n' "$APT_SIGNING_KEY" | gpg --batch --import
+          echo "GNUPGHOME=$GNUPGHOME" >> "$GITHUB_ENV"
+
+      - name: Build and sign the repository
+        run: |
+          sudo apt-get install -y -qq --no-install-recommends apt-utils >/dev/null
+          packaging/apt/publish.sh apt-repo "$APT_KEY_FPR" debs/*.deb
+
+      - name: Push
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          cd apt-repo
+          git config user.name "calivi release"
+          git config user.email "orkun-soylu@users.noreply.github.com"
+          git add -A
+          git commit -q -m "calivi $TAG"
+          git push -q
+          git log --oneline -1
+
+      - name: Remove the key
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/gnupg"

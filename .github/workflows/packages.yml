@@ -5,9 +5,11 @@
 #   build     packaging/build-deb.sh --distro …
 #   install   the .deb in a real VM booted from the distribution's cloud image (KVM on the
 #             runner): claim, a host-tool call driven by a scripted model, the upgrade from the
-#             previous release, the restart deferred past a running reply, purge
+#             previous release, the restart deferred past a running reply, purge, and a fresh
+#             install from a signed test APT repository built by the real publish script
 #   publish   on a published release only, and only when every job above passed for all three
 #             distributions: the .debs are attached to the release. All or nothing.
+#   apt       then apt.yml publishes those attached .debs to https://apt.calivi.ai
 #
 # The supported set is a policy, not a list: Debian's current stable and Ubuntu's two newest
 # LTS. Change the three matrices together (and build-deb.sh's case).
@@ -113,22 +115,35 @@ jobs:
           built=$(dpkg-deb -f debs/*.deb Version)
           echo "deb=$(packaging/test/previous-release.sh ${{ matrix.tag }} "$built" previous)" >> "$GITHUB_OUTPUT"
 
+      - name: A test APT repository
+        # The same script as the real publish (apt.yml), signed with a throwaway key, served on
+        # the runner: the VM's last step installs from it, the way users will.
+        run: |
+          sudo apt-get install -y -qq --no-install-recommends apt-utils >/dev/null
+          export GNUPGHOME="$RUNNER_TEMP/gnupg"
+          install -d -m 0700 "$GNUPGHOME"
+          gpg --batch --passphrase '' --quick-gen-key "Calivi CI <ci@calivi.invalid>" rsa4096 sign never
+          fpr=$(gpg --with-colons --list-keys ci@calivi.invalid | awk -F: '/^fpr/ {print $10; exit}')
+          packaging/apt/publish.sh "$RUNNER_TEMP/apt" "$fpr" debs/*.deb
+
       - name: Boot the VM
         run: |
           python3 packaging/test/fake_model.py 8099 > fake-model.log 2>&1 &
+          python3 -m http.server 8098 --bind 127.0.0.1 -d "$RUNNER_TEMP/apt" > apt-repo.log 2>&1 &
           packaging/test/vm.sh start ${{ matrix.distro }} "$RUNNER_TEMP/vm"
 
       - name: Install tests
         run: |
           previous=${{ steps.previous.outputs.deb }}
           python3 -u packaging/test/install_test.py --ssh-config "$RUNNER_TEMP/vm/ssh_config" \
-            --deb debs/*.deb ${previous:+--previous "$previous"}
+            --deb debs/*.deb ${previous:+--previous "$previous"} \
+            --apt-url http://10.0.2.2:8098 --apt-key "$RUNNER_TEMP/apt/calivi.gpg"
 
       - name: Console and model logs
         if: failure()
         run: |
           tail -100 "$RUNNER_TEMP/vm/console.log" || true
-          cat fake-model.log || true
+          cat fake-model.log apt-repo.log || true
 
       - name: Stop the VM
         if: always()
@@ -162,3 +177,11 @@ jobs:
           done
           [ "$(ls *.deb | wc -l)" -eq 3 ] || { echo "expected three packages"; exit 1; }
           gh release upload "$TAG" *.deb *.sha256 --clobber -R "$GITHUB_REPOSITORY"
+
+  apt:
+    name: publish to apt.calivi.ai
+    needs: publish
+    uses: ./.github/workflows/apt.yml
+    with:
+      tag: ${{ github.event.release.tag_name }}
+    secrets: inherit

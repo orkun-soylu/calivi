@@ -98,10 +98,14 @@ sudo apt install ./calivi_X.Y.Z-1+deb13_amd64.deb
 Each package is attached only after it was installed and tested in a VM of its distribution,
 and only if that passed on all three.
 
+**Or let `apt upgrade` do it:** add the APT repository once, and Calivi updates with the rest of
+the system. The instructions and
+the key's fingerprint are on https://apt.calivi.ai. Check the fingerprint:
+`4E28 2AB6 66CE 1E29 488B  06CF 6155 29D5 0438 1965`.
+
 That works on an image from before the package too (0.3–0.5): the package takes over its files,
 and your chats and settings in `/var/lib/calivi` stay. If a reply is running, the restart waits
-for it, up to 30 minutes. A signed APT repository, so that `apt upgrade` picks new versions up
-by itself, is planned (#95). To go back, `apt install` the older `.deb`. Removing the package
+for it, up to 30 minutes. To go back, `apt install` the older `.deb`. Removing the package
 keeps `/var/lib/calivi`, even on `purge`.
 
 To build the package yourself: `packaging/build-deb.sh --distro trixie|noble|resolute` (needs

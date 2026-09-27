@@ -14,6 +14,8 @@ and fake_model.py listening on the runner, which the guest reaches as 10.0.2.2. 
   deferred    reinstalling while a reply streams leaves the service alone until the reply is
               complete, then restarts it
   purge       the package goes; the owner's account and the chats stay
+  apt repo    (with --apt-url) a signed repository built by packaging/apt/publish.sh: added
+              the way apt.calivi.ai documents it, `apt install calivi` brings this build
 
 Every step prints what it checked; the first failure stops the run with the evidence.
 """
@@ -250,12 +252,35 @@ def purge():
     check(ssh(f"id {OWNER}", ok=False).returncode == 0, "the owner's account is kept")
 
 
+def apt_repo():
+    step("apt repository")
+    subprocess.run(["scp", "-q", "-F", args.ssh_config, args.apt_key, "vm:/tmp/calivi.gpg"], check=True)
+    # As https://apt.calivi.ai says, with the test repository's URL.
+    ssh("sudo install -m 0644 /tmp/calivi.gpg /usr/share/keyrings/calivi.gpg")
+    suite = ssh(". /etc/os-release; echo $VERSION_CODENAME").stdout.strip()
+    sources = (f"Types: deb\nURIs: {args.apt_url}\nSuites: {suite}\nComponents: main\n"
+               "Signed-By: /usr/share/keyrings/calivi.gpg\n")
+    ssh(f"printf '{sources}' | sudo tee /etc/apt/sources.list.d/calivi.sources >/dev/null")
+    p = ssh("sudo apt-get -o DPkg::Lock::Timeout=600 update 2>&1", ok=False)
+    check(p.returncode == 0 and "calivi" not in "".join(l for l in p.stdout.splitlines(True) if l.startswith(("W:", "E:"))),
+          f"apt update accepts the signed '{suite}' suite", p.stdout[-2000:])
+    policy = ssh("apt-cache policy calivi").stdout
+    want = deb_version(args.deb)
+    check(f"Candidate: {want}" in policy, f"the candidate is {want}", policy)
+    ssh("sudo DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=600 install -y -q calivi")
+    check(ssh("dpkg-query -W -f='${Version}' calivi").stdout == want, "apt install calivi installed it")
+    wait("calivi answers on :80", up)
+    print("  ok  calivi answers on :80")
+
+
 def main():
     global args
     p = argparse.ArgumentParser()
     p.add_argument("--ssh-config", required=True)
     p.add_argument("--deb", required=True)
     p.add_argument("--previous")
+    p.add_argument("--apt-url", help="a test APT repository, as the guest reaches it")
+    p.add_argument("--apt-key", help="its public key (binary, for Signed-By)")
     args = p.parse_args()
     try:
         install()
@@ -267,6 +292,8 @@ def main():
         host_tool()
         deferred_restart()
         purge()
+        if args.apt_url:
+            apt_repo()
     except Failed as e:
         print(f"\nFAILED: {e}", file=sys.stderr)
         for cmd in ("sudo journalctl -u calivi -u calivi-restart-when-idle --no-pager -n 80", "sudo tail -30 /var/log/nginx/error.log"):
