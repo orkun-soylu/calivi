@@ -104,6 +104,14 @@ existing install's data or key, and leaving the admin account for you to create.
 **Updating:** read the [CHANGELOG](CHANGELOG.md) first — it flags schema changes — then
 `git pull && docker compose up -d --build`. Migrations run on startup.
 
+### calivi-vm — a VM the model can operate
+
+A Proxmox image that boots straight into Calivi on port 80 and lets the chat model **run
+commands on that VM**: bash plus file read, write and edit, like a terminal coding agent, behind
+approval cards for anything destructive. The first account claims the machine with a setup code
+shown on the VM console, and it also becomes the VM's sudo-capable Linux account. See
+[`appliance/README.md`](appliance/README.md).
+
 ### Adding a server
 
 Settings (⚙) → **Servers** → use the form at the bottom:

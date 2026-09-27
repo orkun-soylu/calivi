@@ -1,0 +1,9 @@
+[Unit]
+Description=Calivi: refresh the console banner once the machine has an owner
+
+[Path]
+PathChanged=/etc/calivi/host-user
+Unit=calivi-firstboot.service
+
+[Install]
+WantedBy=multi-user.target

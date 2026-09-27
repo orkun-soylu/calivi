@@ -21,3 +21,7 @@ __pycache__/
 
 # Live bridge config (may name local paths / tokens); the template is servers.example.json
 stdio-bridge/servers.json
+
+# calivi-vm image build
+appliance/out/
+appliance/.cache/

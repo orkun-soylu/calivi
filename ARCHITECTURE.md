@@ -988,6 +988,42 @@ machine's owner, a Linux account with passwordless sudo. `host_bootstrap.py` + t
   so the tests can break every check without creating an account — the lesson from the host
   tools' deny-list test.
 
+### The appliance image (`appliance/`)
+
+`build.sh` turns Debian 13 genericcloud into calivi-vm with `virt-customize`. `install.sh` does
+the actual install and also works on a running Debian 13 machine. `proxmox-create.sh` creates a
+VM from the image. Decisions that are easy to undo by accident:
+
+- **Native, not Docker.** A containerised backend cannot reach the host's shell without an escape
+  hatch. On a single-purpose VM the container layer only gets in the way. nginx's site is
+  **derived** from `frontend/nginx.conf` at install time, so the CSP has one source. Each
+  substitution must match, or the install fails instead of shipping a proxy to
+  `calivi-backend`.
+- **`calivi.service` has no sandbox, on purpose.** Every command the host tools run is a child of
+  the unit and inherits its settings: `NoNewPrivileges` alone breaks sudo, `ProtectSystem` makes
+  the owner's `apt install` fail, and `PrivateTmp` gives their shell a private `/tmp`. The
+  service account being unprivileged is the control. `KillMode=process` keeps a job the owner
+  left running alive across a Calivi restart.
+- **Nothing per-machine is in the image.** `calivi-firstboot` creates `CALIVI_SECRET_KEY` and the
+  setup code on each VM's first boot. A key baked into a published image would let anyone forge a
+  session on every calivi-vm. The build also empties `machine-id` and resets cloud-init's state.
+  A `.path` unit re-runs the script when `/etc/calivi/host-user` appears, which drops the code
+  from the console banner (`/etc/issue.d`, whose `\4` agetty expands to the VM's address).
+- **Standard kernel, not the cloud one.** The genericcloud kernel leaves out most hardware
+  drivers, including the GPU drivers a passed-through card needs.
+- **q35 + OVMF with Secure Boot off.** This is ready for PCIe passthrough, and out-of-tree
+  drivers (NVIDIA's DKMS module) load without key enrolment.
+- **The appliance's `tools.yml`**: `max_iterations: 60`, and `web_search` off because the
+  appliance has no SearXNG; the model has curl.
+- **`preserve_hostname`.** cloud-init's `update_hostname` runs on every boot and would restore the
+  Proxmox VM name, so the bootstrap helper pins the owner's choice when one is given.
+
+Verified end to end on Proxmox VE 9 (2026-09-27): console banner, wrong code refused, claim with
+hostname, timezone and SSH key (sudoers, `preserve_hostname`, the code removed afterwards), then
+chats against a local model. The model inspected the VM, wrote, read and deleted a file with an
+approval card for `rm` (denial held, then approval ran it), ran `sudo apt-get install` without a
+card, and strict mode put a card on `uptime`.
+
 ### Playwright MCP — evaluated and declined
 
 Browser automation was the motivating example for building the approval layer. It was then

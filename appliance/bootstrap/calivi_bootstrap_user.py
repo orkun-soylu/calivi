@@ -35,6 +35,7 @@ STATE_DIR = "/etc/calivi"
 LOCK = f"{STATE_DIR}/bootstrap.lock"
 HOST_USER_FILE = f"{STATE_DIR}/host-user"
 ZONEINFO = "/usr/share/zoneinfo"
+CLOUD_HOSTNAME_CFG = "/etc/cloud/cloud.cfg.d/99-calivi-hostname.cfg"
 
 USERNAME = re.compile(r"^[a-z_][a-z0-9_-]{0,31}$")
 # Names that exist on a stock Debian or mean something to sudo/ssh; getent catches the rest.
@@ -105,7 +106,7 @@ def build_plan(req: dict, user_exists=_probe_user_exists, zone_exists=_probe_zon
          f"# The machine's owner (created by Calivi's first registration).\n"
          f"{username} ALL=(ALL:ALL) NOPASSWD: ALL\n", 0o440, None),
         ("write", "/etc/sudoers.d/80-calivi-host",
-         f"# Calivi's host tools run as the owner — and as nobody else.\n"
+         f"# Calivi's host tools run as the owner - and as nobody else.\n"
          f"{SERVICE_USER} ALL=({username}) NOPASSWD: ALL\n", 0o440, None),
     ]
     if ssh_key:
@@ -121,6 +122,9 @@ def build_plan(req: dict, user_exists=_probe_user_exists, zone_exists=_probe_zon
             # every call that it cannot resolve the host.
             ("run", ["sed", "-i", "-E", rf"s/^127\.0\.1\.1\s.*/127.0.1.1\t{hostname}/",
                      "/etc/hosts"], None),
+            # cloud-init's update_hostname runs on every boot and would put the Proxmox VM
+            # name back; the owner's choice has to win.
+            ("write", CLOUD_HOSTNAME_CFG, "preserve_hostname: true\n", 0o644, None),
         ]
     if timezone:
         plan.append(("run", ["timedatectl", "set-timezone", timezone], None))

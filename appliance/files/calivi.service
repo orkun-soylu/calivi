@@ -1,0 +1,23 @@
+[Unit]
+Description=Calivi (backend)
+After=network-online.target calivi-firstboot.service
+Wants=network-online.target calivi-firstboot.service
+
+[Service]
+User=calivi
+Group=calivi
+WorkingDirectory=/opt/calivi/backend
+EnvironmentFile=/etc/calivi/calivi.env
+EnvironmentFile=/etc/calivi/secret.env
+ExecStart=/opt/calivi/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000
+Restart=on-failure
+RestartSec=2
+# Everything the host tools run is a child of this unit, so it inherits the unit's sandbox.
+# That is why there is none: NoNewPrivileges alone breaks sudo, ProtectSystem would make the
+# owner's `apt install` fail, PrivateTmp would give their shell a private /tmp.
+# KillMode=process: restarting Calivi (an update) must not kill a job the owner left running.
+# Long jobs belong in `systemd-run` anyway — the bash tool's description says so.
+KillMode=process
+
+[Install]
+WantedBy=multi-user.target
