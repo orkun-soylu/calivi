@@ -6,7 +6,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app import auth, compaction, models, schemas, llm, tools_config
+from app import auth, compaction, config, models, schemas, llm, tools_config
 from app.database import get_db, SessionLocal
 from app.system_prompts import get_system_prompt
 from app import approvals, turns
@@ -175,7 +175,7 @@ def _persist_chips(chat_id: int, chips: list[dict]) -> None:
 def build_stream_response(
     chat_id: int, target: dict, model: str, history: list[dict],
     use_tools: bool = False, extra_headers: dict | None = None, user_id: int | None = None,
-    summary: str | None = None, ask_every_tool: bool = False,
+    summary: str | None = None, ask_every_tool: bool = False, agent: bool = False,
 ) -> StreamingResponse:
     """Injects the system prompt (and optional tools), returns the NDJSON stream and saves the
     assistant message at the end.
@@ -188,6 +188,11 @@ def build_stream_response(
     only the messages after it); it goes into the system layer, after the persona prompt.
 
     `ask_every_tool` puts every tool call behind the approval card, harmless or not.
+
+    `agent` (the chat's mode, #91): the turn's tool traffic is kept as `steps` on the saved
+    reply and replayed on later turns (`_context_of`); the reply's own `content` is then only
+    the text after the last step, since the text between steps lives in those steps. Chips
+    are not written — the timeline replaces them.
     """
     server_name = target["name"]
     # Privileged tools (the host's own shell, on an appliance install) belong to the instance
@@ -196,8 +201,9 @@ def build_stream_response(
 
     async def generate():
         messages = _inject_attachments(history)
-        # Documents (attachments) are untrusted external content → the guard is required.
-        has_untrusted = any(m.get("attachments") for m in history)
+        # Documents (attachments) and replayed tool results are untrusted external content →
+        # the guard is required.
+        has_untrusted = any(m.get("attachments") or m.get("role") == "tool" for m in history)
 
         # Tool layer: if 🔍 is on and the master switch is on, offer the enabled tools.
         tools_spec = None
@@ -226,6 +232,8 @@ def build_stream_response(
         tokens_per_sec = None
         error_msg = None
         tool_chips: list[dict] = []  # tool-usage chips shown after a reload
+        steps: list[dict] = []  # agent mode: the turn's tool traffic, saved with the reply
+        tail_text = ""  # agent mode: text since the last step — the reply's own content
         chipped_calls: set[str] = set()  # _call_key of every call that already has a chip
         try:
             max_iter = tools_config.get_max_iterations() if tools_spec else 1
@@ -246,6 +254,7 @@ def build_stream_response(
                     if ptype == "content":
                         turn_content += piece["text"]
                         collected += piece["text"]
+                        tail_text += piece["text"]
                     elif ptype == "stats":
                         tokens_per_sec = piece.get("tokens_per_sec")
                     yield json.dumps(piece) + "\n"
@@ -253,6 +262,9 @@ def build_stream_response(
                     break
                 # Append the assistant's tool-call turn to history, then run each tool.
                 messages.append({"role": "assistant", "content": turn_content, "tool_calls": turn_calls})
+                if agent:
+                    steps.append({"role": "assistant", "content": turn_content, "tool_calls": turn_calls})
+                    tail_text = ""  # that text now lives in the step
                 for call in turn_calls:
                     args = call.get("arguments") or {}
                     yield json.dumps({"type": "tool_call", "name": call["name"], "args": args}) + "\n"
@@ -263,6 +275,7 @@ def build_stream_response(
                     # while a person decides and proxies time out on idle connections
                     # (Traefik's default is 180s).
                     approved = False
+                    approval = None  # display only: "approved" / "denied" when a card was shown
                     tool = registry.lookup(call["name"], privileged=privileged)
                     needs_yes = tool is not None and (ask_every_tool or tool.requires_approval(args))
                     if needs_yes and user_id is not None:
@@ -283,6 +296,7 @@ def build_stream_response(
                             # Stop raises CancelledError (a BaseException), so this has to be in
                             # a finally or the pending entry leaks.
                             approvals.discard(approval_id)
+                        approval = "approved" if approved else "denied"
                         yield json.dumps({
                             "type": "approval_result", "name": call["name"], "approved": approved,
                         }) + "\n"
@@ -302,8 +316,16 @@ def build_stream_response(
                         "role": "tool", "tool_call_id": call["id"], "name": call["name"],
                         "content": _wrap_untrusted(f"tool: {call['name']}", result),
                     })
-                    yield json.dumps({"type": "tool_result", "name": call["name"], "ok": ok}) + "\n"
-                    if ok:
+                    event = {"type": "tool_result", "name": call["name"], "ok": ok}
+                    if agent:
+                        # The timeline fills the row in live; rendered as plain text, never markup.
+                        event["output"] = _clip(result)
+                        steps.append({
+                            "role": "tool", "name": call["name"], "tool_call_id": call["id"],
+                            "content": _clip(result), "ok": ok, "approval": approval,
+                        })
+                    yield json.dumps(event) + "\n"
+                    if ok and not agent:
                         # Every tool leaves a trace, not just web_search — otherwise a reloaded
                         # chat gives no clue that an MCP server was consulted at all.
                         # Deduped on name *and* arguments: keying on the label alone kept only
@@ -320,7 +342,7 @@ def build_stream_response(
             yield json.dumps({"type": "error", "message": error_msg}) + "\n"
         finally:
             # If it failed with no content at all, save a visible marker instead of a "ghost" empty message.
-            content_to_save = collected
+            content_to_save = tail_text if agent else collected
             if error_msg:
                 marker = f"⚠️ {error_msg}"
                 content_to_save = f"{collected}\n\n{marker}".strip() if collected.strip() else marker
@@ -332,7 +354,7 @@ def build_stream_response(
             # (CancelledError is a BaseException, so it never reaches the except) or a model
             # that simply returned no text still persisted an empty row, which renders as a
             # blank assistant bubble indistinguishable from a real reply.
-            if content_to_save.strip():
+            if content_to_save.strip() or steps:  # a stopped agent turn keeps the steps it ran
                 save_db = SessionLocal()
                 try:
                     # The chat may have been deleted while this turn ran (the delete cancels it,
@@ -347,6 +369,7 @@ def build_stream_response(
                                 model_used=model,
                                 server_used=server_name,
                                 tokens_per_sec=tokens_per_sec,
+                                steps=steps or None,
                             )
                         )
                         save_db.query(models.Chat).filter(models.Chat.id == chat_id).update({"updated_at": models.utcnow()})
@@ -376,15 +399,40 @@ def _ensure_idle(chat_id: int) -> None:
         raise HTTPException(409, BUSY_MESSAGE)
 
 
+def _replay_steps(steps: list[dict], full: bool) -> list[dict]:
+    """A reply's persisted steps back in provider shape (#91); older results cut per
+    compaction's step budget, and every result wrapped as untrusted, as inside a turn."""
+    out = []
+    for s in steps:
+        if s.get("role") == "tool":
+            content = s.get("content") or ""
+            if not full:
+                content = compaction.trim_old_output(content)
+            out.append({
+                "role": "tool", "name": s.get("name", ""), "tool_call_id": s.get("tool_call_id", ""),
+                "content": _wrap_untrusted(f"tool: {s.get('name', '')}", content),
+            })
+        else:
+            out.append({"role": "assistant", "content": s.get("content") or "", "tool_calls": s.get("tool_calls") or []})
+    return out
+
+
 def _context_of(db: Session, chat_id: int) -> tuple[list[dict], str | None]:
     """(messages to send verbatim, summary or None) under the chat's context mode."""
     chat = db.get(models.Chat, chat_id)
     db.refresh(chat)  # the relationship may be stale after the bulk deletes in edit/delete
     rows = compaction.active_messages(chat)
-    history = [
-        {"role": m.role, "content": m.content, "images": m.images or [], "attachments": m.attachments or []}
-        for m in rows
-    ]
+    agent = chat.mode == "agent"
+    full_ids = compaction.full_step_ids(rows) if agent else set()
+    history = []
+    for m in rows:
+        if agent and m.steps:
+            history.extend(_replay_steps(m.steps, full=m.id in full_ids))
+            if not (m.content or "").strip():
+                continue  # a stopped turn: its steps are the whole reply
+        history.append(
+            {"role": m.role, "content": m.content, "images": m.images or [], "attachments": m.attachments or []}
+        )
     return history, compaction.active_summary(chat)
 
 
@@ -443,6 +491,8 @@ def update_chat(
         chat.pinned = payload.pinned
     if payload.context_mode is not None:
         chat.context_mode = payload.context_mode
+    if payload.mode is not None:
+        chat.mode = payload.mode
     db.commit()
     db.refresh(chat)
     return chat
@@ -454,7 +504,8 @@ def create_chat(
     user: models.User = Depends(auth.get_current_user),
     db: Session = Depends(get_db),
 ):
-    chat = models.Chat(title=payload.title, user_id=user.id)
+    mode = payload.mode or ("agent" if config.HOST_TOOLS_ENABLED else "chat")
+    chat = models.Chat(title=payload.title, user_id=user.id, mode=mode)
     db.add(chat)
     db.commit()
     db.refresh(chat)
@@ -512,7 +563,7 @@ async def send_message(
 
     return build_stream_response(
         chat.id, target, model, history, use_tools=payload.use_tools, user_id=user.id, summary=summary,
-        ask_every_tool=payload.ask_every_tool,
+        ask_every_tool=payload.ask_every_tool, agent=chat.mode == "agent",
     )
 
 
@@ -544,7 +595,7 @@ async def edit_message(
     db: Session = Depends(get_db),
 ):
     """Edits a user message / reroutes it to another model: update content, truncate after it, regenerate."""
-    _owned_chat(db, chat_id, user)
+    chat = _owned_chat(db, chat_id, user)
     _ensure_idle(chat_id)
     msg = db.get(models.Message, message_id)
     if not msg or msg.chat_id != chat_id or msg.role != "user":
@@ -564,7 +615,7 @@ async def edit_message(
     history, summary = _context_of(db, chat_id)
     return build_stream_response(
         chat_id, target, model, history, use_tools=payload.use_tools, user_id=user.id, summary=summary,
-        ask_every_tool=payload.ask_every_tool,
+        ask_every_tool=payload.ask_every_tool, agent=chat.mode == "agent",
     )
 
 
@@ -583,7 +634,9 @@ async def fork_chat(
 
     target, model = resolve_target(db, payload.server_id, payload.model)
 
-    new_chat = models.Chat(title=payload.content[:60], user_id=user.id, context_mode=chat.context_mode)
+    new_chat = models.Chat(
+        title=payload.content[:60], user_id=user.id, context_mode=chat.context_mode, mode=chat.mode
+    )
     db.add(new_chat)
     db.commit()
     db.refresh(new_chat)
@@ -599,6 +652,7 @@ async def fork_chat(
         copy = models.Message(
             chat_id=new_chat.id, role=m.role, content=m.content, images=m.images,
             attachments=m.attachments, model_used=m.model_used, server_used=m.server_used,
+            steps=m.steps,
         )
         db.add(copy)
         db.flush()
@@ -620,7 +674,7 @@ async def fork_chat(
     return build_stream_response(
         new_chat.id, target, model, history,
         use_tools=payload.use_tools, user_id=user.id, summary=summary,
-        ask_every_tool=payload.ask_every_tool,
+        ask_every_tool=payload.ask_every_tool, agent=new_chat.mode == "agent",
         extra_headers={"X-Calivi-Chat-Id": str(new_chat.id)},
     )
 

@@ -9,11 +9,13 @@ Compaction is **user-triggered only**. The backend merely reports when a chat ha
 `COMPACT_SUGGEST_TOKENS` so the UI can suggest it; summarising silently would change what the
 model knows without the user having asked for it.
 """
+import json
 from app import models
 from app.config import COMPACT_KEEP_TURNS, COMPACT_SUGGEST_TOKENS
 
 CHARS_PER_TOKEN = 4  # rough, tokenizer-free estimate; only drives a suggestion, never a cut
 MAX_ATTACHMENT_CHARS = 4_000  # per document in the transcript handed to the summariser
+MAX_STEP_ARGS_CHARS = 200  # an agent step in the compaction transcript
 
 SUMMARY_INSTRUCTIONS = (
     "You are compacting a long conversation so it can continue with a smaller context. Write a "
@@ -55,10 +57,46 @@ def active_summary(chat: models.Chat) -> str | None:
     return chat.summary
 
 
+# Agent mode replays tool results (#91; routers/chats.py::_context_of). The last few turns go
+# back in full — the work the next message most likely refers to. Older results are cut to
+# their head and tail, where commands put what matters (the invocation echo, and the error or
+# summary at the end). The tool calls themselves are always kept.
+FULL_STEP_TURNS = 2
+OLD_STEP_CHARS = 1_500
+
+
+def trim_old_output(text: str) -> str:
+    if len(text) <= OLD_STEP_CHARS:
+        return text
+    head = OLD_STEP_CHARS // 2
+    tail = OLD_STEP_CHARS - head
+    return f"{text[:head]}\n… [{len(text) - OLD_STEP_CHARS} characters from an earlier turn omitted] …\n{text[-tail:]}"
+
+
+def full_step_ids(rows: list[models.Message]) -> set[int]:
+    """The replies whose tool results are replayed in full."""
+    return set([m.id for m in rows if m.steps][-FULL_STEP_TURNS:])
+
+
+def _step_chars(m: models.Message, full: bool) -> int:
+    n = 0
+    for s in m.steps or []:
+        if s.get("role") == "tool":
+            text = s.get("content") or ""
+            n += len(text if full else trim_old_output(text))
+        else:
+            n += len(s.get("content") or "") + len(json.dumps(s.get("tool_calls") or []))
+    return n
+
+
 def context_estimate(chat: models.Chat) -> int:
-    chars = sum(
-        _message_chars({"content": m.content, "attachments": m.attachments}) for m in active_messages(chat)
-    )
+    rows = active_messages(chat)
+    chars = sum(_message_chars({"content": m.content, "attachments": m.attachments}) for m in rows)
+    if chat.mode == "agent":
+        # Replayed steps are most of an agent chat's context; without them the estimate would
+        # never reach the point where compaction is suggested.
+        full = full_step_ids(rows)
+        chars += sum(_step_chars(m, m.id in full) for m in rows if m.steps)
     summary = active_summary(chat)
     return (chars + len(summary or "")) // CHARS_PER_TOKEN
 
@@ -107,6 +145,19 @@ def _render(m: models.Message) -> str:
         parts.append(f"[attached: {a.get('name', '')}]\n{text}")
     if m.images:
         parts.append(f"[{len(m.images)} image(s)]")
+    # Agent steps (#91): one line per action, so the summary remembers what was *done* — not
+    # the outputs, which are the bulk and would crowd out the conversation.
+    for s in m.steps or []:
+        if s.get("role") == "assistant":
+            if (s.get("content") or "").strip():
+                parts.append(s["content"])
+            for c in s.get("tool_calls") or []:
+                args = json.dumps(c.get("arguments") or {}, ensure_ascii=False)
+                parts.append(f"[ran {c.get('name', '')} {args[:MAX_STEP_ARGS_CHARS]}]")
+        elif s.get("role") == "tool":
+            status = "denied" if s.get("approval") == "denied" else ("ok" if s.get("ok") else "failed")
+            first = (s.get("content") or "").strip().splitlines()[:1]
+            parts.append(f"  → {status}" + (f": {first[0][:MAX_STEP_ARGS_CHARS]}" if first else ""))
     parts.append(m.content or "")
     return f"{who}:\n" + "\n".join(parts)
 

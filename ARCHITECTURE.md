@@ -638,8 +638,8 @@ tool is still called `web_search` — that is a tool name, and it is accurate.
    second call that narrowed a lookup — often the one the answer relied on — was silently dropped
    (#49). MCP chip labels now end in a clipped argument summary (`🔧 server: tool · version=2.17.1`)
    so distinct calls are distinguishable; exact repeats still collapse.
-   Tool turns themselves are **not persisted** as messages (the final answer carries the context)
-   → history reconstruction and the DB schema did not change.
+   In **chat** mode tool turns are **not persisted** as messages (the final answer carries the context); **agent** mode (#91, *Agent mode* below) does persist them
+   (in chat mode history reconstruction is exactly as it was).
    - `web_search` → `🔍 <query>` **with its result text**, which is how a search stays in context
      on later turns (`_inject_attachments` re-injects attachment text on *every* subsequent turn).
    - Any other tool → `🔧 <label>`, and for MCP `mcp_client.display_label` renders
@@ -1126,7 +1126,7 @@ button, back gesture; `matchMedia` is mocked since jsdom has none),
 Fake timers (`vi.useFakeTimers`) deadlock with RTL's async `act` wrapper; the two tests that verify
 delay behaviour deliberately use **real** timers (~3s).
 
-### Backend — pytest (341 tests)
+### Backend — pytest (352 tests)
 
 `backend/tests/` — pytest + `httpx.ASGITransport` (a real HTTP layer, no live server needed). They
 do not ship in the prod image: the `Dockerfile` installs only `requirements.txt`, and the test
@@ -1152,7 +1152,8 @@ the registry the right caller: id 1 only, no approval card for a hidden tool),
 `test_host_tools.py` (the shell policy in both directions, real bash in a temporary home, the
 file tools), `test_ask_every_tool.py` (strict mode from all three streaming endpoints, and
 `/me`'s `host_tools`), `test_host_bootstrap.py` (the appliance's first registration: setup code,
-ordering, registration closing), `test_turns.py` (background turns: a closed tab does not stop the reply, re-attach replays,
+ordering, registration closing), `test_agent_steps.py` (agent mode: steps saved and replayed, the context budget, the guard
+with 🔧 off, stop, fork, compaction), `test_turns.py` (background turns: a closed tab does not stop the reply, re-attach replays,
 Stop saves the partial, one turn per chat with the history left untouched, deletion,
 ownership), `test_bootstrap_helper.py` (the root helper's validation —
 planning only, nothing is executed), `test_tool_loop.py` (the agentic loop's `tool_result.ok` flag — the error-prefix
@@ -1172,6 +1173,35 @@ caught by mutation testing (breaking `_owned_chat` broke only 4 of 9 tests). The
 creates a real server and a real message → ownership is the only source of the 404 (7 tests break
 under the same mutation). **When adding a new guard test, deliberately break the guard and confirm
 the test actually fails.**
+
+## Agent mode — persisted tool steps (#91)
+
+On calivi-vm a chat is an agent session, and the chat-mode decision above — persist only the
+final answer — throws away the agent's working memory: on "now restart it" the model no longer
+knows which unit it created or which command failed. So a chat has a **mode**: `chat` (unchanged)
+or `agent`. New chats are `agent` when `CALIVI_HOST_TOOLS=1`, `chat` otherwise; `PATCH` switches
+it, and a fork inherits it.
+
+- **One assistant row per turn, plus `messages.steps`.** The turn's tool traffic in provider shape
+  and order — assistant tool-call turns and tool results — with display fields on the results
+  (`ok`, `approval`). Edit, delete, fork and ordering keep working per message because the steps
+  travel with their row. The row's `content` is the text **after the last step**: the text
+  between steps is already in them, and keeping it in both would replay it twice.
+- **Written in the loop's `finally`**, so a stopped turn keeps the steps it ran. It is saved even
+  with empty content — its steps are then the whole reply, and replay adds no empty assistant
+  message after them. No chips in agent mode: the timeline replaces them.
+- **Replayed on later turns** (`_context_of`): each row expands to its steps, then its content.
+  Results go back through `_wrap_untrusted`, and the guard is in the system layer **whenever
+  history holds a replayed result** — including when 🔧 is off for this turn, which a mutation
+  test showed the "tools offered" condition alone did not cover.
+- **Context budget** (`compaction.py`): the results of the last `FULL_STEP_TURNS` (2) replies go
+  back in full; older ones are cut to head and tail (`OLD_STEP_CHARS`, 1.5k), where commands put
+  what matters. Tool *calls* are always kept, so the model still sees what it ran. The size
+  estimate counts replayed steps, or an agent chat would never reach the compaction suggestion;
+  the compaction transcript renders steps as `[ran tool {args}]` / `→ ok: first line` so a summary
+  remembers the actions, not the outputs.
+- **Live:** in agent mode `tool_result` also carries the clipped output, so the UI can fill the
+  step in as it happens.
 
 ## Background turns (`turns.py`)
 
@@ -1308,7 +1338,8 @@ and caching a transient failure permanently again breaks 1. The tests carry weig
     the registry, the loop and the wire format did not change. ~~Encrypting stored MCP
     secrets~~ — **done**, see *Secrets at rest*. ~~**stdio**~~ — **done**, via a bridge
     container, see *stdio servers — the bridge*.
-  - Persisting tool provenance as messages (currently live-only + a compact 🔍 chip).
+  - ~~Persisting tool provenance as messages~~ — done for **agent** chats, see *Agent mode*. Chat
+    mode keeps the chips.
   - A prompt-based fallback for non-tool models (not needed today — the models are strong
     tool-callers).
   - Live verification of the OpenAI path; a stress test for parallel multi-tool calls.

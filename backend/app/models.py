@@ -106,6 +106,9 @@ class Chat(Base):
     summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     summary_upto_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     context_mode: Mapped[str] = mapped_column(String(10), default="compact")  # "compact" | "full"
+    # "agent": tool steps are persisted with each reply and replayed on later turns (#91).
+    # "chat": today's behaviour, where only the reply's text reaches the history.
+    mode: Mapped[str] = mapped_column(String(10), default="chat")
 
     messages: Mapped[list["Message"]] = relationship(
         back_populates="chat", cascade="all, delete-orphan", order_by="Message.id"
@@ -124,6 +127,9 @@ class Message(Base):
     model_used: Mapped[str | None] = mapped_column(String(100), nullable=True)
     server_used: Mapped[str | None] = mapped_column(String(100), nullable=True)
     tokens_per_sec: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # Agent mode: the turn's tool traffic in provider shape, in order — assistant tool-call
+    # turns and tool results (+ display fields `ok`, `approval`). `content` is the final answer.
+    steps: Mapped[list | None] = mapped_column(JSON, nullable=True)
     timestamp: Mapped[datetime.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     chat: Mapped["Chat"] = relationship(back_populates="messages")

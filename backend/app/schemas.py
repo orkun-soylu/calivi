@@ -162,6 +162,7 @@ class ApprovalDecision(BaseModel):
 
 class ChatCreate(BaseModel):
     title: str = "New Chat"
+    mode: Literal["chat", "agent"] | None = None  # None → agent on calivi-vm, chat elsewhere
 
 
 class ChatOut(BaseModel):
@@ -170,6 +171,7 @@ class ChatOut(BaseModel):
     id: int
     title: str
     pinned: bool = False
+    mode: str = "chat"
     created_at: datetime.datetime
     updated_at: datetime.datetime
 
@@ -178,6 +180,7 @@ class ChatUpdate(BaseModel):
     title: str | None = None
     pinned: bool | None = None
     context_mode: Literal["compact", "full"] | None = None
+    mode: Literal["chat", "agent"] | None = None
 
 
 class MessageOut(BaseModel):
@@ -191,6 +194,7 @@ class MessageOut(BaseModel):
     model_used: str | None
     server_used: str | None
     tokens_per_sec: float | None = None
+    steps: list[dict] | None = None  # agent mode: the reply's tool steps (outputs are untrusted text)
     timestamp: datetime.datetime
 
 
