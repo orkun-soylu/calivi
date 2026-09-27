@@ -160,6 +160,25 @@ export const api = {
     await streamNdjson(resp, onPiece);
   },
 
+  // Re-attach to a reply that is still running (#85): replays what it has streamed so far,
+  // then continues live. A 404 means it finished in the meantime — its message is in the chat,
+  // so that is not an error: the caller just reloads.
+  async followTurn(chatId, { signal } = {}, onPiece) {
+    const resp = await fetch(`${BASE}/chats/${chatId}/turn`, { credentials: "include", signal });
+    if (resp.status === 404) return;
+    await streamNdjson(resp, onPiece);
+  },
+
+  // Stop. Disconnecting no longer stops a reply, so this is the only way to. 404 = it had
+  // already finished.
+  async cancelTurn(chatId) {
+    const resp = await fetch(`${BASE}/chats/${chatId}/turn/cancel`, { method: "POST", credentials: "include" });
+    if (!resp.ok && resp.status !== 404) {
+      handleUnauthorized(resp);
+      throw new Error(`${resp.status} ${await resp.text()}`);
+    }
+  },
+
   // Fork a new chat from history. onChatId(newId) comes from the header, then the stream flows.
   async forkChat(chatId, { messageId, content, serverId, model, useTools, askEveryTool, signal }, onChatId, onPiece) {
     const resp = await fetch(`${BASE}/chats/${chatId}/fork`, {

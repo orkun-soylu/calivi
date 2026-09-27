@@ -1,6 +1,9 @@
 import { act, renderHook } from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
 import { useChatStream } from "./useChatStream.js";
+import { api } from "../api.js";
+
+vi.mock("../api.js", () => ({ api: { cancelTurn: vi.fn(() => Promise.resolve()) } }));
 
 /** A manually resolvable promise — used to hold the flow open and observe intermediate state.
  * (renderHook's `result.current` only refreshes once the act block ends; intermediate state
@@ -266,6 +269,50 @@ describe("stop / Esc", () => {
     expect(active.signal().aborted).toBe(false);
 
     await active.finish();
+  });
+});
+
+describe("stop vs detach — the reply runs on the server (#85)", () => {
+  test("with a chat id, stop cancels the reply on the server and keeps following it", async () => {
+    api.cancelTurn.mockClear();
+    const { result } = renderHook(() => useChatStream());
+    const s = await startStream(result, { chatId: 7 });
+    act(() => result.current.stop());
+    expect(api.cancelTurn).toHaveBeenCalledWith(7);
+    expect(s.signal().aborted).toBe(false); // it ends by itself once the partial is saved
+    await s.finish();
+  });
+
+  test("Esc does the same", async () => {
+    api.cancelTurn.mockClear();
+    const { result } = renderHook(() => useChatStream());
+    const s = await startStream(result, { chatId: 7 });
+    act(() => window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" })));
+    expect(api.cancelTurn).toHaveBeenCalledWith(7);
+    expect(s.signal().aborted).toBe(false);
+    await s.finish();
+  });
+
+  test("detach stops following and leaves the reply running", async () => {
+    api.cancelTurn.mockClear();
+    const { result } = renderHook(() => useChatStream());
+    const s = await startStream(result, { chatId: 7 });
+    act(() => result.current.detach());
+    expect(s.signal().aborted).toBe(true);
+    expect(api.cancelTurn).not.toHaveBeenCalled();
+    await s.finish();
+  });
+
+  test("a fork is cancelled by its new chat's id once the header brings it", async () => {
+    api.cancelTurn.mockClear();
+    const { result } = renderHook(() => useChatStream());
+    const s = await startStream(result, {});
+    act(() => result.current.setChatId(42));
+    expect(result.current.followedChatId()).toBe(42);
+    act(() => result.current.stop());
+    expect(api.cancelTurn).toHaveBeenCalledWith(42);
+    expect(s.signal().aborted).toBe(false);
+    await s.finish();
   });
 });
 

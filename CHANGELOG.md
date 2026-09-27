@@ -9,6 +9,14 @@ Read this file before upgrading.
 
 ## [Unreleased]
 
+### Changed
+
+- **A reply keeps running when you close the tab** (#85). It runs on the server as a background
+  task. Reloading, switching chats or reopening Calivi on another device re-attaches to it —
+  pending approval cards included. **Closing the tab no longer stops a reply: use Stop (or
+  Esc).** While a reply is running, sending, editing, deleting a message and compacting in that
+  chat are refused (409).
+
 ## [0.3.0] — 2026-09-27
 
 calivi-vm. A Proxmox image that boots straight into Calivi and lets the chat model **operate
