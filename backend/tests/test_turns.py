@@ -131,7 +131,9 @@ async def test_one_turn_per_chat(owned, gate):
     await client.post("/api/servers", json={"name": "s", "host": "127.0.0.1", "port": 1})
     resp, turn = _start(chat_id)
     await _first_line(resp)
-    msg_id = SessionLocal().query(models.Message).filter_by(chat_id=chat_id).first().id
+    db = SessionLocal()
+    msg_id = db.query(models.Message).filter_by(chat_id=chat_id).first().id
+    db.close()
     body = {"content": "again", "server_id": 1, "model": "m"}
 
     assert (await client.post(f"/api/chats/{chat_id}/messages", json=body)).status_code == 409

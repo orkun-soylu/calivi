@@ -1,16 +1,35 @@
 #!/bin/bash
-# Builds the calivi .deb (#95):  packaging/build-deb.sh → packaging/out/calivi_<version>-<rev>_amd64.deb
+# Builds the calivi .deb for one distribution (#95):
 #
-# Needs Docker, and npm or Docker for the frontend. The venv is built inside debian:trixie, at
-# the path it runs from (/opt/calivi/venv): its compiled wheels are tied to Debian 13's Python
-# 3.13, which is why the package depends on python3 (>= 3.13, << 3.14).
+#   packaging/build-deb.sh [--distro trixie|noble|resolute]   (default: trixie)
+#     → packaging/out/calivi_<version>-<rev>+<tag>_amd64.deb
+#
+# Needs Docker, and npm or Docker for the frontend. The venv is built inside the distribution's
+# own image, at the path it runs from (/opt/calivi/venv). Its compiled wheels are tied to that
+# distribution's Python, so the package depends on exactly that minor version — one .deb per
+# distribution, each in its own APT suite. The version suffix (+deb13, +ubuntu24.04, …) keeps
+# the three apart; "+" rather than "~" so the file name is safe in URLs and release assets.
 set -euo pipefail
+
+DISTRO=trixie
+while [ $# -gt 0 ]; do
+    case $1 in
+        --distro) DISTRO=$2; shift 2 ;;
+        *) echo "usage: $0 [--distro trixie|noble|resolute]" >&2; exit 2 ;;
+    esac
+done
+case $DISTRO in
+    trixie) IMAGE=debian:trixie TAG=deb13 ;;
+    noble) IMAGE=ubuntu:24.04 TAG=ubuntu24.04 ;;
+    resolute) IMAGE=ubuntu:26.04 TAG=ubuntu26.04 ;;
+    *) echo "unsupported distribution: $DISTRO" >&2; exit 2 ;;
+esac
 
 REPO=$(cd "$(dirname "$0")/.." && pwd)
 OUT=${OUT:-$REPO/packaging/out}
 REVISION=${DEB_REVISION:-1}
 VERSION=$(sed -n 's/^ *"version": *"\([^"]*\)".*/\1/p' "$REPO/frontend/package.json" | head -1)
-DEB_VERSION="$VERSION-$REVISION"
+DEB_VERSION="$VERSION-$REVISION+$TAG"
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT
 ROOT="$WORK/root"
@@ -43,10 +62,10 @@ install -m 0644 "$REPO/packaging/debian/conffiles" "$ROOT/DEBIAN/"
 install -m 0755 "$REPO/packaging/debian/preinst" "$REPO/packaging/debian/postinst" \
     "$REPO/packaging/debian/prerm" "$REPO/packaging/debian/postrm" "$ROOT/DEBIAN/"
 
-echo "== venv + package (debian:trixie)"
+echo "== venv + package ($IMAGE)"
 mkdir -p "$OUT"
 docker run --rm -v "$WORK:/work" -v "$OUT:/out" -v "$REPO/packaging/debian/control.in:/control.in:ro" \
-    -e DEB_VERSION="$DEB_VERSION" -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" debian:trixie bash -euo pipefail -c '
+    -e DEB_VERSION="$DEB_VERSION" -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" "$IMAGE" bash -euo pipefail -c '
     export DEBIAN_FRONTEND=noninteractive
     apt-get update -qq && apt-get install -y -qq --no-install-recommends python3-venv >/dev/null
     # Built at the path it will run from: a venv hard-codes its own location.
@@ -58,7 +77,10 @@ docker run --rm -v "$WORK:/work" -v "$OUT:/out" -v "$REPO/packaging/debian/contr
     # recorded with the runtime path, for readable tracebacks.
     python3 -m compileall -q -d /opt/calivi/backend/app /work/root/opt/calivi/backend/app
     size=$(du -sk --exclude=DEBIAN /work/root | cut -f1)
-    sed -e "s/@VERSION@/$DEB_VERSION/" -e "s/@SIZE@/$size/" /control.in > /work/root/DEBIAN/control
+    py=$(python3 -c "import sys; print(\"%d.%d\" % sys.version_info[:2])")
+    pynext=$(python3 -c "import sys; print(\"%d.%d\" % (sys.version_info[0], sys.version_info[1] + 1))")
+    sed -e "s/@VERSION@/$DEB_VERSION/" -e "s/@SIZE@/$size/" -e "s/@PY@/$py/" -e "s/@PYNEXT@/$pynext/" \
+        /control.in > /work/root/DEBIAN/control
     dpkg-deb --root-owner-group -Zxz --build /work/root "/out/calivi_${DEB_VERSION}_amd64.deb" >/dev/null
     chown "$HOST_UID:$HOST_GID" "/out/calivi_${DEB_VERSION}_amd64.deb"
     chown -R "$HOST_UID:$HOST_GID" /work  # the pyc files above are root-owned; let the trap clean up

@@ -66,12 +66,22 @@ def test_keys_do_not_affect_each_other():
     assert lim.retry_after("b") == 0
 
 
-def test_stale_keys_are_swept():
-    """The dict must not grow without bound (a spray of random usernames must not bloat memory)."""
-    lim = SlidingWindowLimiter(max_attempts=5, window=0.01)
+def test_stale_keys_are_swept(monkeypatch):
+    """The dict must not grow without bound (a spray of random usernames must not bloat memory).
+
+    On a fake clock: with the real one this relied on 1200 records taking longer than the 10 ms
+    window, and failed on fast machines — in CI and on a fresh VM — where nothing had aged yet.
+    """
+    import app.rate_limit as rate_limit
+
+    now = [0.0]
+    monkeypatch.setattr(rate_limit.time, "monotonic", lambda: now[0])
+    lim = SlidingWindowLimiter(max_attempts=5, window=10)
     for i in range(1200):
+        now[0] += 1  # every key is 1 s after the previous one; the window is 10 s
         lim.record(f"k{i}")
     assert len(lim._events) < 1200
+    assert "k1199" in lim._events  # the sweep dropped the stale keys, not the live ones
 
 
 def test_login_key_normalises():
