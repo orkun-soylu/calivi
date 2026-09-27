@@ -9,6 +9,16 @@ Read this file before upgrading.
 
 ## [Unreleased]
 
+## [0.6.0] — 2026-09-27
+
+calivi-vm becomes updatable. Calivi now ships as a Debian package too, attached to each release
+as `calivi_X.Y.Z-1_amd64.deb`, so a VM updates in place with `apt install` — including one
+from an older image — and an update waits for a running reply instead of cutting it.
+
+> **Upgrading a calivi-vm:** download the `.deb` from this release and `sudo apt install
+> ./calivi_0.6.0-1_amd64.deb`. Your chats and settings in `/var/lib/calivi` stay. Docker
+> installs: nothing to do; no schema change.
+
 ### Added
 
 - **calivi-vm updates as a Debian package** (#95). `packaging/build-deb.sh` builds
@@ -256,7 +266,8 @@ someone can install and stay on, instead of tracking `main`.
 - **About 700 MB on disk for the whole stack**, web search included — backend 230 MB, frontend
   95.8 MB, SearXNG 372 MB (measured on arm64).
 
-[Unreleased]: https://github.com/orkun-soylu/calivi/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/orkun-soylu/calivi/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/orkun-soylu/calivi/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/orkun-soylu/calivi/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/orkun-soylu/calivi/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/orkun-soylu/calivi/compare/v0.2.0...v0.3.0
