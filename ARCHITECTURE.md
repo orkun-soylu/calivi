@@ -1126,7 +1126,7 @@ button, back gesture; `matchMedia` is mocked since jsdom has none),
 Fake timers (`vi.useFakeTimers`) deadlock with RTL's async `act` wrapper; the two tests that verify
 delay behaviour deliberately use **real** timers (~3s).
 
-### Backend — pytest (352 tests)
+### Backend — pytest (356 tests)
 
 `backend/tests/` — pytest + `httpx.ASGITransport` (a real HTTP layer, no live server needed). They
 do not ship in the prod image: the `Dockerfile` installs only `requirements.txt`, and the test
@@ -1267,6 +1267,11 @@ for chat, not for calivi-vm, where one message can be minutes of tool calls (#85
 - **In memory, deliberately** — the call made for approvals: a restart loses an in-flight
   turn (the user message stays, no reply is saved), as a crash always did. Single process, as
   approvals already assume.
+- **The busy marker** (`CALIVI_BUSY_FILE`, `/run/calivi/busy` on calivi-vm) exists while any
+  turn runs, and goes when the last one ends. An upgrade waits for it before restarting the
+  service (#95), because a restart is exactly the "in-flight turn lost" case above. It is
+  best effort: a marker that cannot be written never stops a reply. `RuntimeDirectory=` recreates
+  `/run/calivi` empty on every start, which is right, since a fresh process has no turns.
 
 Verified in a browser (headless Chromium against a live backend and a cloud model):
 - reloading mid-reply brought the Stop button back, the text kept growing, and exactly one reply

@@ -12,6 +12,12 @@ EnvironmentFile=/etc/calivi/secret.env
 # See backend/Dockerfile: uvloop resolves DNS on this pool, 4 threads by default.
 Environment=UV_THREADPOOL_SIZE=64
 ExecStart=/opt/calivi/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000
+# /run/calivi/busy exists while a reply runs; an upgrade waits for it before restarting this
+# unit (#95). The directory is created fresh on every start, when nothing can be running yet.
+# Set here, not in calivi.env: that is a conffile, and an upgrade keeping an older copy of it
+# (apt's --force-confold) would silently drop the setting.
+RuntimeDirectory=calivi
+Environment=CALIVI_BUSY_FILE=/run/calivi/busy
 Restart=on-failure
 RestartSec=2
 # Everything the host tools run is a child of this unit, so it inherits the unit's sandbox.
