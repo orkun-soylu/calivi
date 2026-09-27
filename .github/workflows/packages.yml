@@ -187,11 +187,9 @@ jobs:
             libguestfs-tools qemu-system-x86 qemu-utils cloud-image-utils >/dev/null
           # libguestfs boots the host's kernel, which Ubuntu keeps readable by root only.
           sudo chmod 0644 /boot/vmlinuz-*
-          # virt-customize --network runs passt, and Ubuntu's AppArmor profile for passt does not
-          # allow the socket libguestfs gives it ("passt exited with status 1").
-          if [ -e /etc/apparmor.d/usr.bin.passt ]; then
-            sudo apparmor_parser -R /etc/apparmor.d/usr.bin.passt
-          fi
+          # virt-customize --network runs passt, which sandboxes itself in a user namespace, and
+          # Ubuntu restricts unprivileged ones ("passt exited with status 1").
+          sudo sysctl -q -w kernel.apparmor_restrict_unprivileged_userns=0
 
       - uses: actions/download-artifact@v8
         with:
