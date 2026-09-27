@@ -192,6 +192,9 @@ jobs:
           # allowing unprivileged user namespaces helped. Without it, libguestfs falls back to
           # QEMU's own user networking, which is what ai-dev-01's builds use.
           if command -v passt >/dev/null; then sudo mv "$(command -v passt)" /usr/local/passt.disabled; fi
+          # libguestfs hands the host's resolv.conf to the guest; Ubuntu's points at resolved's
+          # 127.0.0.53 stub, which the guest cannot reach. The upstream servers it can.
+          sudo ln -sf /run/systemd/resolve/resolv.conf /etc/resolv.conf
 
       - uses: actions/download-artifact@v8
         with:
