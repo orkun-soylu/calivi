@@ -22,6 +22,12 @@ Read this file before upgrading.
   from then on `apt upgrade` updates Calivi. A machine where the repository was added by hand
   takes the package's copies over without a question.
 
+- **The calivi-vm image installs the package** (#95): `appliance/build.sh` `apt install`s the
+  Debian 13 `.deb` — for a release, the release's own asset — instead of running a separate
+  install script. The image and every other machine now run the same bytes, and a VM from the
+  image updates from apt.calivi.ai out of the box. `appliance/install.sh` is removed; on an
+  existing machine, install the package.
+
 ### Fixed
 
 - apt.calivi.ai's key check (`gpg --show-keys`) failed on systems without gpg, such as Debian's

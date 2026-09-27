@@ -1,7 +1,7 @@
 #!/bin/sh
-# Turns the installed calivi-vm files into a running service. Shared by the .deb's postinst and
-# by install.sh (image build, manual install), so there is one copy of this logic.
-# Installed as /usr/lib/calivi/configure. Idempotent: every upgrade runs it again.
+# Turns the installed calivi-vm files into a running service; run by the .deb's postinst, also
+# inside the image build (appliance/build.sh installs the package). Installed as
+# /usr/lib/calivi/configure. Idempotent: every upgrade runs it again.
 #
 # Expects in place: /opt/calivi/{backend,frontend,venv}, /usr/lib/calivi/firstboot,
 # /usr/sbin/calivi-bootstrap-user, the units in /usr/lib/systemd/system, /etc/calivi/calivi.env,
