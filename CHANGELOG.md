@@ -16,6 +16,21 @@ Read this file before upgrading.
   published there only after its packages passed the install tests on all three distributions,
   and the install tests now end with `apt install calivi` from a signed repository built by the
   same script.
+- **The package adds the APT repository itself** (#95): it installs
+  `/etc/apt/sources.list.d/calivi.sources` (a conffile, for this distribution's suite) and the
+  signing key as `/usr/share/keyrings/calivi.gpg`. One `apt install ./calivi_….deb` is enough;
+  from then on `apt upgrade` updates Calivi. A machine where the repository was added by hand
+  takes the package's copies over without a question.
+
+### Fixed
+
+- apt.calivi.ai's key check (`gpg --show-keys`) failed on systems without gpg, such as Debian's
+  cloud images; the page now says so, and leads with installing the package instead.
+
+### Changed
+
+- GitHub Actions updated to their Node.js 24 releases (checkout 7, setup-node 7, setup-python 7,
+  upload-artifact 7, download-artifact 8).
 
 ## [0.6.1] — 2026-09-27
 

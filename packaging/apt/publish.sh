@@ -36,7 +36,7 @@ cd "$repo"
 gpg --batch --yes --export "$fpr" > calivi.gpg
 gpg --batch --yes --armor --export "$fpr" > calivi.asc
 spaced=$(sed -E 's/(.{4})/\1 /g; s/ $//' <<<"$fpr")
-sed "s/@FPR_SPACED@/$spaced/g" "$here/index.html.in" > index.html
+sed -e "s/@FPR_SPACED@/$spaced/g" -e "s/@FPR@/$fpr/g" "$here/index.html.in" > index.html
 
 for suite in "${SUITE[@]}"; do
     [ -d "pool/$suite" ] || continue

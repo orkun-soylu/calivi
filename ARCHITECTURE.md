@@ -1129,12 +1129,24 @@ the release workflow writes to. One suite per distribution, named by codename (`
 - **Stateless.** `publish.sh` adds the packages to `pool/<suite>/`, keeps the newest five per
   suite (rollback: `apt install calivi=<version>`), and regenerates every index with
   `apt-ftparchive`. There is no database to lose or to fall out of step with the files.
-- **Signed; the fingerprint is pinned** in `apt.yml` (`4E28 2AB6 66CE 1E29 488B  06CF 6155 29D5
+- **Signed; the fingerprint is pinned** in `packaging/apt/fingerprint` (`4E28 2AB6 66CE 1E29 488B  06CF 6155 29D5
   0438 1965`, RSA 4096, no passphrase: the secret store is the protection, no expiry: a rotation
   would break every installed machine; the revocation certificate is kept offline).
   `publish.sh` refuses to sign unless exactly that key is in the keyring, so a wrong secret
   stops the publish instead of shipping a repository nobody's keyring trusts. `InRelease` and
   `Release.gpg` use SHA-512.
+- **The package brings its own source.** `calivi.sources` (deb822, the build's codename) and
+  the key as `/usr/share/keyrings/calivi.gpg`, which only that source trusts (`Signed-By`), not
+  every repository on the machine. The source is a conffile, so an admin can disable it; both
+  files are byte for byte what the index page tells people to write by hand, so a machine set
+  up that way is taken over without a conffile question. The upgrade step tests it with the
+  source text taken from the index page itself, so the two cannot drift apart unnoticed;
+  mutation-checked: one extra comment line in the package's copy makes dpkg stop with "end of
+  file on stdin at conffile prompt". The key is
+  `packaging/apt/calivi.gpg`, and the build job checks it holds exactly the fingerprint in
+  `packaging/apt/fingerprint` — the one place the fingerprint is pinned, read by `apt.yml` too.
+  The install test checks the shipped files and that `apt update` against the real
+  apt.calivi.ai verifies with them.
 - **Two secrets, two jobs.** `APT_SIGNING_KEY` proves the packages come from here;
   `APT_DEPLOY_KEY` is an SSH deploy key that can write to `calivi-apt` and nothing else.
 - **Tested with the real script.** The install job signs a repository with a throwaway key,
