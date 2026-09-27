@@ -9,6 +9,21 @@ Read this file before upgrading.
 
 ## [Unreleased]
 
+## [0.6.5] — 2026-09-28
+
+A fix for a browser console error on every page load.
+
+> **Upgrading:** `apt upgrade` on a machine with apt.calivi.ai, or install
+> `calivi_0.6.5-1+<distro>_amd64.deb` from this release. Docker installs: rebuild as usual; no
+> schema change.
+
+### Fixed
+
+- **The CSP no longer blocks a KaTeX font** (#118). Vite inlined `KaTeX_Size3` (under 4 KB) as a
+  `data:` URI, which `font-src 'self'` refuses, so every page load logged a CSP error and math
+  with the largest delimiters lacked its font. Fonts now always ship as files; the CSP is
+  unchanged.
+
 ## [0.6.4] — 2026-09-28
 
 calivi-vm's model can look at images: a screenshot it took of a page, a chart it drew.
@@ -374,7 +389,8 @@ someone can install and stay on, instead of tracking `main`.
 - **About 700 MB on disk for the whole stack**, web search included — backend 230 MB, frontend
   95.8 MB, SearXNG 372 MB (measured on arm64).
 
-[Unreleased]: https://github.com/orkun-soylu/calivi/compare/v0.6.4...HEAD
+[Unreleased]: https://github.com/orkun-soylu/calivi/compare/v0.6.5...HEAD
+[0.6.5]: https://github.com/orkun-soylu/calivi/compare/v0.6.4...v0.6.5
 [0.6.4]: https://github.com/orkun-soylu/calivi/compare/v0.6.3...v0.6.4
 [0.6.3]: https://github.com/orkun-soylu/calivi/compare/v0.6.2...v0.6.3
 [0.6.2]: https://github.com/orkun-soylu/calivi/compare/v0.6.1...v0.6.2
