@@ -184,7 +184,7 @@ jobs:
           sudo udevadm trigger --name-match=kvm
           sudo apt-get update -qq
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
-            libguestfs-tools qemu-system-x86 qemu-utils cloud-image-utils >/dev/null
+            libguestfs-tools qemu-system-x86 qemu-utils cloud-image-utils dhcpcd-base >/dev/null
           # libguestfs boots the host's kernel, which Ubuntu keeps readable by root only.
           sudo chmod 0644 /boot/vmlinuz-*
           # virt-customize --network uses passt when it can run it, and on the runner passt exits
@@ -192,9 +192,8 @@ jobs:
           # allowing unprivileged user namespaces helped. Without it, libguestfs falls back to
           # QEMU's own user networking, which is what ai-dev-01's builds use.
           if command -v passt >/dev/null; then sudo mv "$(command -v passt)" /usr/local/passt.disabled; fi
-          # libguestfs hands the host's resolv.conf to the guest; Ubuntu's points at resolved's
-          # 127.0.0.53 stub, which the guest cannot reach. The upstream servers it can.
-          sudo ln -sf /run/systemd/resolve/resolv.conf /etc/resolv.conf
+          # The libguestfs appliance brings its network up with the host's DHCP client, and
+          # --no-install-recommends leaves none: eth0 stayed DOWN, apt could not resolve anything.
 
       - uses: actions/download-artifact@v8
         with:
