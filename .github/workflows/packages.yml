@@ -7,8 +7,12 @@
 #             runner): claim, a host-tool call driven by a scripted model, the upgrade from the
 #             previous release, the restart deferred past a running reply, purge, and a fresh
 #             install from a signed test APT repository built by the real publish script
+#   image     the calivi-vm image, built from this run's Debian 13 package, booted and tested:
+#             first boot (as Proxmox does it, on a release), claim, APT source, host tool,
+#             deferred restart
 #   publish   on a published release only, and only when every job above passed for all three
-#             distributions: the .debs are attached to the release. All or nothing.
+#             distributions and the image: the .debs and the image are attached to the release.
+#             All or nothing.
 #   apt       then apt.yml publishes those attached .debs to https://apt.calivi.ai
 #
 # The supported set is a policy, not a list: Debian's current stable and Ubuntu's two newest
@@ -164,10 +168,93 @@ jobs:
         if: always()
         run: packaging/test/vm.sh stop "$RUNNER_TEMP/vm"
 
+  image:
+    name: calivi-vm image
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Tools
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules >/dev/null
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
+            libguestfs-tools qemu-system-x86 qemu-utils cloud-image-utils isc-dhcp-client dhcpcd-base >/dev/null
+          # libguestfs boots the host's kernel, which Ubuntu keeps readable by root only.
+          sudo chmod 0644 /boot/vmlinuz-*
+          # virt-customize --network uses passt when it can run it, and on the runner passt exits
+          # at once ("passt exited with status 1") — neither unloading its AppArmor profile nor
+          # allowing unprivileged user namespaces helped. Without it, libguestfs falls back to
+          # QEMU's own user networking, which is what ai-dev-01's builds use.
+          if command -v passt >/dev/null; then sudo mv "$(command -v passt)" /usr/local/passt.disabled; fi
+          # The libguestfs appliance brings its network up with a DHCP client copied from the
+          # host — isc-dhcp-client for 24.04's libguestfs, dhcpcd-base for 26.04's (read from
+          # their supermin.d/packages) — and a runner has neither: eth0 stayed DOWN, apt could not
+          # resolve anything. Both are installed, so the move of ubuntu-latest to 26.04 keeps working.
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: deb-trixie
+          path: debs
+
+      - name: Build the image
+        # From the Debian 13 package this run built and tested — on a release, the very file
+        # that gets attached and published.
+        run: appliance/build.sh --deb debs/*.deb
+
+      - name: libguestfs diagnostics
+        if: failure()
+        run: |
+          cat /etc/resolv.conf
+          cp appliance/.cache/debian-13-genericcloud-amd64.qcow2 "$RUNNER_TEMP/t.qcow2"
+          virt-customize -a "$RUNNER_TEMP/t.qcow2" --network --run-command '
+            echo "--- resolv.conf"; cat /etc/resolv.conf; echo "--- ip"; ip -br addr; ip route
+            echo "--- getent default"; getent hosts deb.debian.org || echo FAIL
+            echo "--- getent via 169.254.2.3"; cp /etc/resolv.conf /tmp/r; echo "nameserver 169.254.2.3" > /etc/resolv.conf; getent hosts deb.debian.org || echo FAIL
+            echo "--- getent via 1.1.1.1"; echo "nameserver 1.1.1.1" > /etc/resolv.conf; getent hosts deb.debian.org || echo FAIL
+            cp /tmp/r /etc/resolv.conf' 2>&1 | tail -30
+
+      - name: Boot it and test
+        env:
+          # Proxmox's cloud-init upgrades packages on a new VM's first boot; do the same on a
+          # release, where nothing newer is published yet and the image must keep its Calivi.
+          # A pull request's build sorts below the published version, which would replace it.
+          PACKAGE_UPGRADE: ${{ github.event_name == 'release' && 'true' || 'false' }}
+        run: |
+          python3 packaging/test/fake_model.py 8099 > fake-model.log 2>&1 &
+          IMAGE=$(ls appliance/out/calivi-vm-*.qcow2) packaging/test/vm.sh start trixie "$RUNNER_TEMP/vm"
+          python3 -u packaging/test/install_test.py --image --ssh-config "$RUNNER_TEMP/vm/ssh_config" --deb debs/*.deb
+
+      - name: Console and model logs
+        if: failure()
+        run: |
+          tail -100 "$RUNNER_TEMP/vm/console.log" || true
+          cat fake-model.log || true
+
+      - name: Stop the VM
+        if: always()
+        run: packaging/test/vm.sh stop "$RUNNER_TEMP/vm"
+
+      - uses: actions/upload-artifact@v7
+        if: github.event_name == 'release'
+        with:
+          name: image
+          path: |
+            appliance/out/calivi-vm-*.qcow2
+            appliance/out/calivi-vm-*.qcow2.sha256
+            appliance/proxmox-create.sh
+          compression-level: 0
+          if-no-files-found: error
+
   publish:
     name: attach to the release
     if: github.event_name == 'release'
-    needs: [backend, install]
+    needs: [backend, install, image]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -192,6 +279,23 @@ jobs:
           done
           [ "$(ls *.deb | wc -l)" -eq 3 ] || { echo "expected three packages"; exit 1; }
           gh release upload "$TAG" *.deb *.sha256 --clobber -R "$GITHUB_REPOSITORY"
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: image
+          path: image
+
+      - name: Attach the image
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          cd image
+          find . -type f | sort
+          img=$(find . -name "calivi-vm-${TAG#v}.qcow2")
+          [ -n "$img" ] || { echo "no calivi-vm-${TAG#v}.qcow2"; exit 1; }
+          (cd "$(dirname "$img")" && sha256sum -c "$(basename "$img").sha256")
+          gh release upload "$TAG" "$img" "$img.sha256" "$(find . -name proxmox-create.sh)" --clobber -R "$GITHUB_REPOSITORY"
 
   apt:
     name: publish to apt.calivi.ai

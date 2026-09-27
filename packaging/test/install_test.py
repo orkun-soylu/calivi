@@ -19,6 +19,10 @@ and fake_model.py listening on the runner, which the guest reaches as 10.0.2.2. 
   apt repo    (with --apt-url) a signed repository built by packaging/apt/publish.sh: added
               the way apt.calivi.ai documents it, `apt install calivi` brings this build
 
+With --image the VM is a calivi-vm image instead: its first boot is checked (the package it was
+built with, services, kernel, unclaimed, per-machine secrets), then claim, the APT source, the
+host tool and the deferred restart.
+
 Every step prints what it checked; the first failure stops the run with the evidence.
 """
 import argparse
@@ -129,6 +133,27 @@ def text_of(events):
 
 
 # --- the scenario ------------------------------------------------------------------------------
+
+
+def image_boot():
+    step("the calivi-vm image, first boot")
+    subprocess.run(["scp", "-q", "-F", args.ssh_config, args.deb, "vm:/tmp/new.deb"], check=True)
+    wait("calivi answers on :80", up, timeout=180)
+    want = deb_version(args.deb)
+    # With PACKAGE_UPGRADE, cloud-init upgraded packages first, as Proxmox's does: the image's
+    # Calivi must still be the one it was built with (the trap build.sh guards against).
+    check(ssh("dpkg-query -W -f='${Version}' calivi").stdout == want, f"calivi {want} is the package the image carries")
+    for unit in ("calivi.service", "nginx.service", "calivi-firstboot.path"):
+        check(ssh(f"systemctl is-active {unit}", ok=False).stdout.strip() == "active", f"{unit} is active")
+    kernel = ssh("uname -r").stdout.strip()
+    check(not kernel.endswith("-cloud-amd64"), f"the standard kernel runs ({kernel}), not the cloud one")
+    check(ssh("command -v curl", ok=False).returncode == 0, "curl is there")
+    fresh = ssh("sudo sh -c 'test -e /etc/calivi/host-user || test -e /etc/calivi/bootstrap.lock' && echo claimed || echo fresh").stdout.strip()
+    check(fresh == "fresh", "no owner baked in: the image is unclaimed")
+    ids = ssh("cat /etc/machine-id; sudo cat /etc/calivi/secret.env").stdout
+    check(ids.strip() and "CALIVI_SECRET_KEY=" in ids, "machine-id and the session key were made on this boot")
+    status, cfg = request("GET", "/api/auth/config")
+    check(cfg.get("host_setup") is True, "the first account will claim the machine", cfg)
 
 
 def install():
@@ -334,8 +359,19 @@ def main():
     p.add_argument("--previous")
     p.add_argument("--apt-url", help="a test APT repository, as the guest reaches it")
     p.add_argument("--apt-key", help="its public key (binary, for Signed-By)")
+    p.add_argument("--image", action="store_true",
+                   help="the VM was booted from the calivi-vm image built with --deb: no install, "
+                        "no upgrade, no purge")
     args = p.parse_args()
     try:
+        if args.image:
+            image_boot()
+            claim()
+            shipped_source()
+            host_tool()
+            deferred_restart()
+            print("\nall image tests passed")
+            return
         install()
         claim()
         if args.previous:

@@ -1122,6 +1122,14 @@ all three pass. Per distribution, on every pull request, push to `main` and publ
   distribution has a lower version by dpkg's rules. So a pull request that has not bumped the
   version still upgrades from the release it follows, and a release upgrades from the one
   before. Ubuntu has none before 0.6.1, and its upgrade step is skipped until then.
+- **image**: `appliance/build.sh --deb` with this run's Debian 13 package (on a release, the very
+  file that gets attached and published), then `vm.sh` boots the image (`IMAGE=`) and
+  `install_test.py --image` checks the first boot — the package the image was built with, the
+  services, the standard kernel, unclaimed, machine-id and session key made on this boot — then
+  claim, the APT source, the host tool and the deferred restart. On a release the first boot also
+  upgrades packages, as Proxmox's cloud-init does; mutation-checked: an image whose package is
+  older than the published one (a pull request's) is replaced on that first boot, and the test
+  fails at "the package the image carries". The image is attached only if this passed too.
 - **Only a release builds its own version.** Every other run builds `X.Y.Z-1~ciN+<distro>`, which
   dpkg sorts below the release `X.Y.Z-1+<distro>` and above the one before. Without it, every pull
   request between a release and the next version bump carried the published version with other
@@ -1129,8 +1137,8 @@ all three pass. Per distribution, on every pull request, push to `main` and publ
   as a "downgrade" (the first PR after 0.6.2 failed on all three). The same rule as `build.sh`'s
   guard for images.
 - **publish** runs only for a published release and needs every job above for all three
-  distributions. It checks that each package's version matches the tag, then attaches the three
-  `.deb`s and their checksums. A release whose tests fail therefore has no packages.
+  distributions and the image. It checks that each package's version matches the tag, then
+  attaches the three `.deb`s, the image and their checksums, and `proxmox-create.sh`. A release whose tests fail therefore has no packages.
 
 ### The APT repository (`packaging/apt/`, `.github/workflows/apt.yml`)
 
