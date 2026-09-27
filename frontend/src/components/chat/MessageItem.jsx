@@ -1,5 +1,7 @@
 import Markdown from "../Markdown.jsx";
 import { AttachmentChip, CopyButton, DeleteButton, EditButton } from "./MessageActions.jsx";
+import StepTimeline from "./StepTimeline.jsx";
+import { toTimeline } from "../../lib/timeline.js";
 import { formatTs, tokensPerSecLabel } from "../../lib/format.js";
 
 /** A single message bubble (edit mode excluded — that is `MessageEditor`).
@@ -49,6 +51,7 @@ export default function MessageItem({ m, onEdit, onDelete, onImageClick, onInspe
           </div>
         )}
 
+        {!isUser && m.steps?.length > 0 && <StepTimeline items={toTimeline(m.steps)} />}
         {isUser ? <span className="whitespace-pre-wrap">{m.content}</span> : <Markdown content={m.content} />}
 
         {!isUser && m.model_used && (

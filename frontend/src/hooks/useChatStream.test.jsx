@@ -316,6 +316,34 @@ describe("stop vs detach — the reply runs on the server (#85)", () => {
   });
 });
 
+describe("agent mode — the live timeline (#91)", () => {
+  test("a tool call closes the text before it into its own item, as the backend stores it", async () => {
+    const { result } = renderHook(() => useChatStream());
+    const s = await startStream(result, { agent: true });
+    await s.emit({ type: "content", text: "Checking. " });
+    await s.emit({ type: "tool_call", name: "bash", args: { command: "ls" } });
+    expect(result.current.streaming).toBe("");
+    expect(result.current.timeline.map((i) => i.kind)).toEqual(["text", "call"]);
+    expect(result.current.timeline[0].text).toBe("Checking. ");
+    await s.emit({ type: "tool_result", name: "bash", ok: true, output: "a b" });
+    await s.emit({ type: "content", text: "Done." });
+    expect(result.current.timeline[1]).toMatchObject({ status: "ok", output: "a b" });
+    expect(result.current.streaming).toBe("Done.");
+    await s.finish();
+    expect(result.current.timeline).toEqual([]);
+  });
+
+  test("chat mode keeps its single bubble and no timeline", async () => {
+    const { result } = renderHook(() => useChatStream());
+    const s = await startStream(result, {});
+    await s.emit({ type: "content", text: "Checking. " });
+    await s.emit({ type: "tool_call", name: "bash", args: { command: "ls" } });
+    expect(result.current.streaming).toBe("Checking. ");
+    expect(result.current.timeline).toEqual([]);
+    await s.finish();
+  });
+});
+
 describe("flashError", () => {
   test("shows the message, then clears it on its own", async () => {
     vi.useFakeTimers();
@@ -329,5 +357,22 @@ describe("flashError", () => {
     });
     expect(result.current.streaming).toBe("");
     vi.useRealTimers();
+  });
+});
+
+describe("one stream at a time — a second run replaces the first", () => {
+  test("the old connection is dropped, its events and its cleanup are ignored", async () => {
+    const { result } = renderHook(() => useChatStream());
+    const first = await startStream(result, { chatId: 1 });
+    const second = await startStream(result, { chatId: 1 });
+    expect(first.signal().aborted).toBe(true);
+    await first.emit({ type: "content", text: "stale " });
+    await second.emit({ type: "content", text: "live" });
+    expect(result.current.streaming).toBe("live"); // not "stale live": no double timeline/text
+    await first.finish();
+    expect(result.current.sending).toBe(true); // the first run's cleanup did not end the second
+    expect(result.current.streaming).toBe("live");
+    await second.finish();
+    expect(result.current.sending).toBe(false);
   });
 });

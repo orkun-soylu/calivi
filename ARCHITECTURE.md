@@ -1103,7 +1103,7 @@ as an unhandled `IntegrityError` (a 500).
 
 ## Tests
 
-### Frontend — `npm test` (vitest + jsdom, 73 tests)
+### Frontend — `npm test` (vitest + jsdom, 106 tests)
 
 ```bash
 cd frontend && npm install && npm test     # or: npm run test:watch
@@ -1202,6 +1202,30 @@ it, and a fork inherits it.
   remembers the actions, not the outputs.
 - **Live:** in agent mode `tool_result` also carries the clipped output, so the UI can fill the
   step in as it happens.
+
+### The timeline (frontend)
+
+- **One view model for saved and live** (`lib/timeline.js`). `toTimeline(message.steps)` and
+  `applyPiece(items, event)` produce the same items: text between steps, and one row per call
+  with status (running / ok / failed / denied / interrupted), output and approval. A test
+  asserts that a live sequence and its saved form render the same. `useChatStream` moves the
+  streamed text into its own item when a tool call arrives, exactly as the backend splits it.
+- **`StepTimeline`**: the command (shell) or path (file tools) on the row; the arguments and
+  output expand on click. **Arguments and output are plain text in `<pre>`**, the
+  `ToolOutputModal` rule, because both are untrusted. Only the model's own words between steps
+  go through Markdown. The test checks the element is a `<pre>`: the test's Markdown mock
+  renders text too, so "no `<img>`" alone would not catch output routed through Markdown.
+- **The approval card renders in the waiting row.** In agent mode the free-standing card and the
+  activity line are not shown, and a test checks there is exactly one card.
+- **Mode toggle** in the chat header, shown only where `host_tools` is true. Switching back to
+  chat keeps the stored steps but stops replaying them.
+
+> **⚠️ `useChatStream.run` owns the stream state — one run at a time.** A new run aborts the one
+> still being followed, and a stale run's events and cleanup are ignored (a run id). Found in the
+> browser: a reloaded agent reply rendered its whole timeline **twice**. React StrictMode runs the
+> re-attach effect twice in development, so two followers fed the same state. The same race
+> existed since background turns (#86) — doubled text in chat mode, which a length-only check
+> had missed. Production does not double effects, but any repeated attach would have done the same.
 
 ## Background turns (`turns.py`)
 

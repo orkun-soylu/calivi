@@ -4,6 +4,7 @@ import MessageItem from "./MessageItem.jsx";
 import MessageEditor from "./MessageEditor.jsx";
 import { AttachmentChip } from "./MessageActions.jsx";
 import ApprovalCard from "./ApprovalCard.jsx";
+import StepTimeline from "./StepTimeline.jsx";
 import { searchLabel } from "../../lib/format.js";
 import { useT } from "../../i18n.js";
 
@@ -33,7 +34,10 @@ export default function MessageList({
   // and content can grow in between (a code block arriving), so a plain distance-from-bottom check
   // read the list's own scroll as the user leaving. Only moving above this position is the user.
   const autoTopRef = useRef(0);
-  const { streaming, thinking, sending, searchInfo, approval } = stream;
+  const { streaming, thinking, sending, searchInfo, approval, timeline } = stream;
+  // Agent mode (#91): steps, their output and the approval card live in the reply's timeline,
+  // so the chat-mode activity line and the free-standing card are not shown.
+  const agent = chat?.mode === "agent";
   const summarisedUpto = chat?.summary && chat.context_mode !== "full" ? chat.summary_upto_id : null;
 
   const onScroll = () => {
@@ -63,7 +67,7 @@ export default function MessageList({
       el.scrollTop = el.scrollHeight;
       autoTopRef.current = el.scrollTop; // read back: the browser clamps it to the real maximum
     }
-  }, [chat?.messages, streaming, thinking, pending.user]);
+  }, [chat?.messages, streaming, thinking, pending.user, timeline]);
 
   return (
     <div className="relative flex-1 min-h-0">
@@ -137,9 +141,9 @@ export default function MessageList({
           </div>
         )}
 
-        {sending && approval && <ApprovalCard approval={approval} onDecide={onDecide} />}
+        {sending && approval && !agent && <ApprovalCard approval={approval} onDecide={onDecide} />}
 
-        {sending && searchInfo && (
+        {sending && searchInfo && !agent && (
           <div className="flex justify-start">
             <div className="max-w-[88%] md:max-w-[70%] rounded-xl px-3 py-1.5 bg-neutral-900 text-neutral-400 text-xs">
               {searchLabel(t, searchInfo)}
@@ -156,10 +160,11 @@ export default function MessageList({
           </div>
         )}
 
-        {sending && (streaming || !thinking) && (
+        {sending && (streaming || !thinking || (agent && timeline.length > 0)) && (
           <div className="flex justify-start">
             <div className="max-w-[88%] md:max-w-[70%] rounded-2xl px-4 py-2 bg-neutral-800 text-neutral-100">
-              {streaming ? <Markdown content={streaming} /> : "…"}
+              {agent && <StepTimeline items={timeline} approval={approval} onDecide={onDecide} />}
+              {streaming ? <Markdown content={streaming} /> : agent && timeline.length > 0 ? null : "…"}
             </div>
           </div>
         )}

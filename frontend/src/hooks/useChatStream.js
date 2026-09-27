@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api.js";
+import { applyPiece } from "../lib/timeline.js";
+
+const STEP_EVENTS = new Set(["tool_call", "approval_request", "approval_result", "tool_result"]);
 
 /** All state for one NDJSON stream turn: live text, thinking, tool/search events, cancellation.
  *
@@ -23,7 +26,12 @@ export function useChatStream() {
   const [sending, setSending] = useState(false);
   const [searchInfo, setSearchInfo] = useState(null); // last search/tool event of the active stream
   const [approval, setApproval] = useState(null); // pending tool approval, or null
+  // Agent mode (#91): the reply's steps as they happen, in the same shape as a saved reply's.
+  const [timeline, setTimeline] = useState([]);
+  const agentRef = useRef(false);
+  const textRef = useRef(""); // agent mode: text since the last step
   const abortRef = useRef(null);
+  const runIdRef = useRef(0); // which run owns the state (see `run`)
   const chatIdRef = useRef(null); // the chat whose reply is being followed
 
   function stop() {
@@ -53,8 +61,21 @@ export function useChatStream() {
   }, [sending]);
 
   function onPiece(piece) {
+    if (agentRef.current && STEP_EVENTS.has(piece.type)) {
+      // A new step closes the text before it: that text becomes its own timeline item, exactly
+      // as the backend stores it, and the live bubble starts over.
+      const text = piece.type === "tool_call" ? textRef.current : "";
+      if (text) {
+        textRef.current = "";
+        setStreaming("");
+      }
+      setTimeline((prev) => applyPiece(text.trim() ? [...prev, { kind: "text", text }] : prev, piece));
+    }
     if (piece.type === "thinking") setThinking((prev) => prev + piece.text);
-    else if (piece.type === "content") setStreaming((prev) => prev + piece.text);
+    else if (piece.type === "content") {
+      textRef.current += piece.text;
+      setStreaming((prev) => prev + piece.text);
+    }
     else if (piece.type === "search") setSearchInfo(piece);
     // Tool events: the tool the model invoked and its result are shown in the activity line.
     else if (piece.type === "tool_call") setSearchInfo({ status: "tool_running", name: piece.name });
@@ -84,6 +105,8 @@ export function useChatStream() {
   }
 
   function clear() {
+    setTimeline([]);
+    textRef.current = "";
     setStreaming("");
     setThinking("");
     setApproval(null);
@@ -91,25 +114,39 @@ export function useChatStream() {
   }
 
   /** `call({ signal, onPiece })` runs the stream; errors, cancellation and cleanup are handled here. */
-  async function run(call, { chatId = null, beforeClear, afterClear } = {}) {
+  async function run(call, { chatId = null, agent = false, beforeClear, afterClear } = {}) {
+    // One stream at a time. A new run replaces one still being followed — a re-attach racing
+    // another, or React running an effect twice (StrictMode does, on purpose): its connection is
+    // dropped, its events are ignored, and its cleanup must not clear the new run's state.
+    // Without this a reloaded agent reply rendered its whole timeline twice.
+    abortRef.current?.abort();
+    const id = ++runIdRef.current;
+    const current = () => runIdRef.current === id;
     setSending(true);
     clear();
+    agentRef.current = agent;
     const ctrl = new AbortController();
     abortRef.current = ctrl;
     chatIdRef.current = chatId;
     try {
-      await call({ signal: ctrl.signal, onPiece });
+      await call({ signal: ctrl.signal, onPiece: (piece) => current() && onPiece(piece) });
     } catch (e) {
-      await handleStreamError(e);
+      if (current()) await handleStreamError(e);
     } finally {
-      abortRef.current = null;
-      chatIdRef.current = null;
-      if (beforeClear) await beforeClear();
-      setSending(false);
-      clear();
-      if (afterClear) afterClear();
+      if (current()) {
+        abortRef.current = null;
+        chatIdRef.current = null;
+        if (beforeClear) await beforeClear();
+      }
+      // Checked again: `beforeClear` awaits a reload, and a new run may have started meanwhile.
+      if (current()) {
+        setSending(false);
+        clear();
+        if (afterClear) afterClear();
+      }
     }
   }
+
 
   /** For showing non-stream errors (e.g. document extraction) in the same bubble. */
   function flashError(text) {
@@ -118,7 +155,7 @@ export function useChatStream() {
   }
 
   return {
-    streaming, thinking, sending, searchInfo, approval, run, stop, detach, setChatId, flashError,
+    streaming, thinking, sending, searchInfo, approval, timeline, run, stop, detach, setChatId, flashError,
     followedChatId: () => chatIdRef.current,
   };
 }

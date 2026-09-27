@@ -9,6 +9,20 @@ Read this file before upgrading.
 
 ## [Unreleased]
 
+### Added
+
+- **Agent mode** (#91), the default for new chats on calivi-vm. A reply's tool steps are kept:
+  the model remembers what it ran and what came back on later turns, instead of only its own
+  summary. The steps show as a timeline in the reply — each command with its status, and its
+  output one click away. An approval card appears in the step it belongs to, live and after a
+  reload. A toggle in the chat header switches a chat between agent and plain chat. Chats on
+  a normal install stay plain chats.
+
+### Fixed
+
+- Re-attaching to a running reply (after a reload or a chat switch) could show its text, or
+  its steps, twice.
+
 ### Fixed
 
 - One unreachable MCP server could make every MCP server show as unreachable, so the model got

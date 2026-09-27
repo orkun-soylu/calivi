@@ -130,3 +130,40 @@ describe("MessageList scroll following", () => {
     expect(geo.scrollTop).toBe(2500 - CLIENT_HEIGHT);
   });
 });
+
+describe("agent mode (#91)", () => {
+  const approval = { id: "p1", name: "bash", args: { command: "rm -rf /tmp/x" } };
+  const waiting = [{ kind: "call", name: "bash", args: { command: "rm -rf /tmp/x" }, status: "running", output: "", awaiting: true }];
+
+  test("the approval card is in the waiting step — and only there", () => {
+    const view = render(<MessageList {...props({
+      chat: { id: 1, mode: "agent", messages: [] },
+      stream: { ...props().stream, approval, timeline: waiting, searchInfo: { status: "tool_running", name: "bash" } },
+    })} />);
+    expect(view.getAllByText("rm -rf /tmp/x", { exact: false }).length).toBeGreaterThan(0);
+    // One card (in the row), no free-standing duplicate, and no chat-mode activity line.
+    expect(view.container.querySelectorAll("pre").length).toBe(1);
+    expect(view.queryByText(/bash/, { selector: ".text-xs.bg-neutral-900" })).toBeNull();
+  });
+
+  test("chat mode keeps the free-standing card", () => {
+    const view = render(<MessageList {...props({ stream: { ...props().stream, approval, timeline: [] } })} />);
+    expect(view.container.querySelectorAll("pre").length).toBe(1);
+    expect(view.container.querySelector("button[aria-expanded]")).toBeNull();
+  });
+
+  test("a saved agent reply shows its steps before its answer", () => {
+    const m = {
+      id: 9, role: "assistant", content: "It is running.", model_used: "m", server_used: "s", timestamp: "2026-09-27T10:00:00",
+      steps: [
+        { role: "assistant", content: "", tool_calls: [{ id: "a", name: "bash", arguments: { command: "systemctl is-active ollama" } }] },
+        { role: "tool", tool_call_id: "a", content: "active", ok: true, approval: null },
+      ],
+    };
+    const view = render(<MessageList {...props({ chat: { id: 1, mode: "agent", messages: [m] }, stream: { ...props().stream, sending: false } })} />);
+    const text = view.container.textContent;
+    const step = text.indexOf("systemctl is-active ollama");
+    expect(step).toBeGreaterThanOrEqual(0); // present at all — indexOf's -1 would pass the next line
+    expect(step).toBeLessThan(text.indexOf("It is running."));
+  });
+});
