@@ -1130,6 +1130,12 @@ all three pass. Per distribution, on every pull request, push to `main` and publ
   upgrades packages, as Proxmox's cloud-init does; mutation-checked: an image whose package is
   older than the published one (a pull request's) is replaced on that first boot, and the test
   fails at "the package the image carries". The image is attached only if this passed too.
+  On GitHub's Ubuntu runner, `virt-customize --network` needed two things, both measured: passt
+  exits at once there (neither its AppArmor profile nor the user-namespace restriction was the
+  cause), so the job takes it out of the way and libguestfs falls back to QEMU user networking;
+  and the appliance brings eth0 up with a DHCP client copied from the host, which a runner does
+  not have — `isc-dhcp-client` for 24.04's libguestfs, `dhcpcd-base` for 26.04's (both read from
+  `supermin.d/packages`, both installed).
 - **Only a release builds its own version.** Every other run builds `X.Y.Z-1~ciN+<distro>`, which
   dpkg sorts below the release `X.Y.Z-1+<distro>` and above the one before. Without it, every pull
   request between a release and the next version bump carried the published version with other
