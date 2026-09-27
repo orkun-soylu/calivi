@@ -17,6 +17,13 @@ Read this file before upgrading.
   Esc).** While a reply is running, sending, editing, deleting a message and compacting in that
   chat are refused (409).
 
+### Fixed
+
+- **Settings, the sign-in screen and user management in German, Spanish, Italian, Portuguese,
+  Russian, Japanese and Chinese.** 43 texts were missing in each of those seven languages and
+  fell back to Turkish. They are translated now, and a test fails if any language is missing a
+  key, has an empty text or drops a `{variable}`.
+
 ## [0.3.0] — 2026-09-27
 
 calivi-vm. A Proxmox image that boots straight into Calivi and lets the chat model **operate
