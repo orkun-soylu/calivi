@@ -75,6 +75,10 @@ HOST_TOOLS_ENABLED = os.environ.get("CALIVI_HOST_TOOLS") == "1"
 HOST_USER = os.environ.get("CALIVI_HOST_USER", "")
 HOST_USER_FILE = os.environ.get("CALIVI_HOST_USER_FILE", "/etc/calivi/host-user")
 HOST_COMMAND_TIMEOUT = int(os.environ.get("CALIVI_HOST_TIMEOUT", "120"))
+# First registration on the appliance (host_bootstrap.py). The setup code is generated at first
+# boot and shown on the VM console; without it nobody can claim the machine.
+HOST_SETUP_CODE_FILE = os.environ.get("CALIVI_SETUP_CODE_FILE", "/etc/calivi/setup-code")
+HOST_BOOTSTRAP_CMD = ["sudo", "-n", "/usr/local/sbin/calivi-bootstrap-user"]
 OPENAI_PROBE_TIMEOUT = 5.0  # a little longer, since these APIs are remote
 SEARCH_TIMEOUT = 15.0  # SearXNG JSON search
 

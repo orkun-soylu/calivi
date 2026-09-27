@@ -956,6 +956,38 @@ deployment never sets it, so nothing here changes that deployment's security mod
 > dangerous strings only ever go to the pure classifier. "Safe while the guard holds" is not
 > enough — mutation testing exists precisely to run the suite with the guard gone.
 
+### First registration on the appliance — claiming the machine
+
+On calivi-vm the first registration does more than create the super admin: it creates the
+machine's owner, a Linux account with passwordless sudo. `host_bootstrap.py` + the root helper
+`appliance/bootstrap/calivi_bootstrap_user.py`; only with `CALIVI_HOST_TOOLS=1` and no users.
+
+- **The setup code is what stops the LAN from claiming the machine.** Calivi's rule is "the first
+  registration is the super admin"; on an appliance that would mean whoever reaches port 80 first
+  gets a root shell. So the first registration must carry a code generated at first boot and
+  shown on the VM's console (`CALIVI_SETUP_CODE_FILE`). It is checked first — before any other
+  field is looked at — compared in constant time, case-insensitively (it is typed from a
+  console), and a missing code file **fails closed** (503). The code is long enough that
+  guessing it is not a plan, so it has no extra rate limit.
+- **Helper first, Calivi user second.** A failed helper leaves no Calivi user, so the
+  registration can be retried; a Calivi user without a Linux account would hold a
+  `host_tools` flag that points at nothing.
+- **Registration closes behind the owner.** It was open only so the owner could arrive; on a
+  machine whose super admin holds a root shell, further accounts are the owner's decision.
+- **The helper trusts nothing.** It runs as root, re-validates every field (Linux-safe username,
+  not reserved, not existing; no line breaks in the password — `chpasswd` reads lines; hostname;
+  a timezone that exists under zoneinfo; a single public-key line), reads the request from stdin
+  because argv shows in `ps`, checks each sudoers file with `visudo -cf` before it goes live, and
+  writes `/etc/calivi/host-user` **last**, so a half-finished run never looks finished. The
+  service account gets `calivi ALL=(<owner>) NOPASSWD: ALL` — the owner, not root.
+- **One shot.** An `O_EXCL` lock file is created before anything changes. A failure half-way
+  leaves the lock in place on purpose; recovery is on the console: inspect what exists
+  (`getent passwd <name>`, `/etc/sudoers.d/8?-calivi-*`), remove it, delete
+  `/etc/calivi/bootstrap.lock`, register again.
+- Validation is split into a pure `build_plan` and an `execute` that only ever runs on the VM,
+  so the tests can break every check without creating an account — the lesson from the host
+  tools' deny-list test.
+
 ### Playwright MCP — evaluated and declined
 
 Browser automation was the motivating example for building the approval layer. It was then
@@ -1033,7 +1065,7 @@ as an unhandled `IntegrityError` (a 500).
 
 ## Tests
 
-### Frontend — `npm test` (vitest + jsdom, 64 tests)
+### Frontend — `npm test` (vitest + jsdom, 66 tests)
 
 ```bash
 cd frontend && npm install && npm test     # or: npm run test:watch
@@ -1056,7 +1088,7 @@ button, back gesture; `matchMedia` is mocked since jsdom has none),
 Fake timers (`vi.useFakeTimers`) deadlock with RTL's async `act` wrapper; the two tests that verify
 delay behaviour deliberately use **real** timers (~3s).
 
-### Backend — pytest (282 tests)
+### Backend — pytest (329 tests)
 
 `backend/tests/` — pytest + `httpx.ASGITransport` (a real HTTP layer, no live server needed). They
 do not ship in the prod image: the `Dockerfile` installs only `requirements.txt`, and the test
@@ -1081,7 +1113,9 @@ in the raw column, legacy plaintext, key rotation), `test_tools_registry.py` (th
 the registry the right caller: id 1 only, no approval card for a hidden tool),
 `test_host_tools.py` (the shell policy in both directions, real bash in a temporary home, the
 file tools), `test_ask_every_tool.py` (strict mode from all three streaming endpoints, and
-`/me`'s `host_tools`), `test_tool_loop.py` (the agentic loop's `tool_result.ok` flag — the error-prefix
+`/me`'s `host_tools`), `test_host_bootstrap.py` (the appliance's first registration: setup code,
+ordering, registration closing), `test_bootstrap_helper.py` (the root helper's validation —
+planning only, nothing is executed), `test_tool_loop.py` (the agentic loop's `tool_result.ok` flag — the error-prefix
 contract above), `test_compaction.py` (what reaches the model before/after compaction, full mode,
 edit/delete/fork invalidation, the save race, the column migration).
 
