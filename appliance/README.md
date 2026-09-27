@@ -68,21 +68,23 @@ front of it and set `COOKIE_SECURE=true` in `/etc/calivi/calivi.env`.
 
 ## Build the image
 
-On an x86-64 Debian/Ubuntu host with `libguestfs-tools`, `qemu-utils`, and `npm` or Docker
+On an x86-64 Debian/Ubuntu host with `libguestfs-tools`, `qemu-utils` and Docker
 (`/dev/kvm` makes it minutes instead of tens of minutes):
 
 ```sh
-appliance/build.sh        # → appliance/out/calivi-vm-<version>.qcow2 (+ .sha256)
+appliance/build.sh                                   # builds the Debian 13 package first
+appliance/build.sh --deb calivi_X.Y.Z-1+deb13_amd64.deb   # or uses a given one, e.g. a release's
+# → appliance/out/calivi-vm-<version>.qcow2 (+ .sha256)
 ```
 
-It verifies the Debian 13 genericcloud image against Debian's SHA512SUMS, builds the frontend,
-runs [`install.sh`](install.sh) inside the image, swaps the cloud kernel for the standard one
-(the cloud kernel has no GPU drivers), and resets the machine identity. Secrets are never in the
-image: the session key and the setup code are generated on each VM's first boot.
+It verifies the Debian 13 genericcloud image against Debian's SHA512SUMS, `apt install`s the
+calivi package inside it — the same package, and the same APT source, as any other machine —
+swaps the cloud kernel for the standard one (the cloud kernel has no GPU drivers), and resets
+the machine identity. Secrets are never in the image: the session key and the setup code are
+generated on each VM's first boot.
 
-`install.sh` also works on an existing Debian 13 machine. Stage the tree at `/opt/calivi` the
-way `build.sh` does, then run it as root. Running it again updates Calivi in place and keeps
-`/var/lib/calivi`.
+On an existing Debian 13 or Ubuntu 24.04/26.04 machine, install the package instead of the
+image; see below.
 
 ## Updating
 

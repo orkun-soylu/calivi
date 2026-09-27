@@ -992,9 +992,18 @@ machine's owner, a Linux account with passwordless sudo. `host_bootstrap.py` + t
 
 ### The appliance image (`appliance/`)
 
-`build.sh` turns Debian 13 genericcloud into calivi-vm with `virt-customize`. `install.sh` does
-the actual install and also works on a running Debian 13 machine. `proxmox-create.sh` creates a
-VM from the image. Decisions that are easy to undo by accident:
+`build.sh` turns Debian 13 genericcloud into calivi-vm with `virt-customize`: it `apt install`s
+the Debian 13 package (for a release, the release's own `+deb13` asset, so the image holds the
+bytes that were tested and published), swaps the kernel and resets the machine identity.
+`proxmox-create.sh` creates a VM from the image.
+
+- **An image must not carry a published version with other bytes.** A VM's first boot runs
+  apt (Proxmox's cloud-init upgrades packages), and apt takes a published package with the same
+  version but a different hash as an upgrade. Found by booting an image built from a branch
+  whose version equalled the published 0.6.1: first boot replaced its Calivi with the published
+  one, and since that one ships no keyring, the VM's own updates broke. `build.sh` now compares
+  the package with apt.calivi.ai's index and stops; build a pre-release image with a new
+  revision (`DEB_REVISION=2`), and a release image with `--deb` and the release's asset. Decisions that are easy to undo by accident:
 
 - **Native, not Docker.** A containerised backend cannot reach the host's shell without an escape
   hatch. On a single-purpose VM the container layer only gets in the way. nginx's site is
@@ -1048,13 +1057,14 @@ exists, the `.deb` is a release asset and is installed with `apt install ./caliv
   - a 10 ms timing test that failed on fast machines.
 
   All fixed. The backend suite passes on all three Pythons.
-- **One configure step for both paths.** `/usr/lib/calivi/configure` holds everything that turns
-  the files into a running service: account, data dirs, default config, the nginx site derived
-  from `frontend/nginx.conf`, units, (re)start. The `.deb`'s `postinst` and `install.sh` (image
-  build, manual install) both run it, and both install the same files at the same paths, so the
-  package can take over an image's install. Paths are Debian's (`/usr/sbin`, `/usr/lib/calivi`,
+- **One install path.** `/usr/lib/calivi/configure`, run by `postinst`, holds everything that
+  turns the files into a running service: account, data dirs, default config, the nginx site
+  derived from `frontend/nginx.conf`, units, (re)start. Until 0.6.2 the image had a second path,
+  `install.sh`, which installed the same files at the same paths; since then the image installs
+  the package too, and `install.sh` is gone. `configure` exits before starting anything when
+  there is no running systemd, which is how it runs inside `virt-customize`. Paths are Debian's (`/usr/sbin`, `/usr/lib/calivi`,
   `/usr/lib/systemd/system`), not `/usr/local`, which a package may not use.
-- **Taking over an older image** (0.3–0.5, `install.sh` layout): `preinst` moves an unowned
+- **Taking over an older image** (0.3–0.5, the old `install.sh` layout): `preinst` moves an unowned
   `/opt/calivi` aside, so no stale venv files survive; `postinst` deletes it once configured.
   `configure` removes the old unit copies in `/etc/systemd/system` — they would override the
   package's forever — and the `/usr/local` copies.
