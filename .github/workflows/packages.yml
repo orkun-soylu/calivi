@@ -77,6 +77,13 @@ jobs:
           [ "$fprs" = "$(cat packaging/apt/fingerprint)" ]
 
       - name: Build the package
+        env:
+          # Only a release builds the version it publishes. Everything else gets a ~ci revision,
+          # which dpkg sorts below the release: a pull request built at an already published
+          # version (every one between a release and the next bump) would otherwise carry the
+          # same version as apt.calivi.ai's package with other bytes, and apt in the test VM —
+          # which has apt.calivi.ai as a source — refuses to reinstall it as a "downgrade".
+          DEB_REVISION: ${{ github.event_name == 'release' && '1' || format('1~ci{0}', github.run_number) }}
         run: packaging/build-deb.sh --distro ${{ matrix.distro }}
 
       - uses: actions/upload-artifact@v7

@@ -1122,6 +1122,12 @@ all three pass. Per distribution, on every pull request, push to `main` and publ
   distribution has a lower version by dpkg's rules. So a pull request that has not bumped the
   version still upgrades from the release it follows, and a release upgrades from the one
   before. Ubuntu has none before 0.6.1, and its upgrade step is skipped until then.
+- **Only a release builds its own version.** Every other run builds `X.Y.Z-1~ciN+<distro>`, which
+  dpkg sorts below the release `X.Y.Z-1+<distro>` and above the one before. Without it, every pull
+  request between a release and the next version bump carried the published version with other
+  bytes, and once the test VM had apt.calivi.ai as a source, apt refused to reinstall the build
+  as a "downgrade" (the first PR after 0.6.2 failed on all three). The same rule as `build.sh`'s
+  guard for images.
 - **publish** runs only for a published release and needs every job above for all three
   distributions. It checks that each package's version matches the tag, then attaches the three
   `.deb`s and their checksums. A release whose tests fail therefore has no packages.
