@@ -1,0 +1,9 @@
+# Tool layer config for calivi-vm — hot-reloaded (read on every request).
+enabled: true
+# Operating a machine takes far more steps than a documentation lookup: installing and
+# configuring one service is easily 20-40 tool calls.
+max_iterations: 60
+tools:
+  # No bundled SearXNG on the appliance. The model can still fetch pages with curl.
+  web_search:
+    enabled: false

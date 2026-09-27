@@ -111,7 +111,9 @@ class ToolRegistry:
         if tool is None:
             return f"{ERROR_PREFIX} no tool named '{name}'.{self._name_hint(name, privileged)}"
         if (strict or tool.requires_approval(args)) and not approved:
-            return f"{ERROR_PREFIX} tool '{name}' changes state and was not approved."
+            # Not "changes state": under strict mode a harmless `uptime` lands here too, and a
+            # model told it changed state explains the refusal wrongly (seen on calivi-vm).
+            return f"{ERROR_PREFIX} the user did not approve this call to '{name}'; it was not run."
         return await tool.handler(args)
 
     def _name_hint(self, name: str, privileged: bool = False) -> str:

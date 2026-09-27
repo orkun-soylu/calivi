@@ -1,0 +1,13 @@
+[Unit]
+Description=Calivi: per-machine secrets and the console banner
+# Before the login prompt, so the console shows the address and setup code from the start.
+Before=getty.target calivi.service
+After=local-fs.target network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/calivi/firstboot
+
+[Install]
+WantedBy=multi-user.target

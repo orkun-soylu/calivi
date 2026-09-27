@@ -47,6 +47,7 @@ def test_minimal_plan():
     # The marker the backend reads comes last, so a half-finished run never looks finished.
     assert p[-1] == ("write", helper.HOST_USER_FILE, "owner\n", 0o644, None)
     assert not any(a[0] in ("hostnamectl", "timedatectl", "install") for a in runs(p))
+    assert helper.CLOUD_HOSTNAME_CFG not in w
 
 
 def test_the_password_never_reaches_argv():
@@ -58,6 +59,7 @@ def test_optional_steps_only_when_given():
     p = plan(hostname="calivi-vm", timezone="Europe/Istanbul", ssh_key=KEY + "\n")
     assert ["hostnamectl", "set-hostname", "calivi-vm"] in runs(p)
     assert ["timedatectl", "set-timezone", "Europe/Istanbul"] in runs(p)
+    assert writes(p)[helper.CLOUD_HOSTNAME_CFG][2] == "preserve_hostname: true\n"
     key = writes(p)["/home/owner/.ssh/authorized_keys"]
     assert key[2] == KEY + "\n" and key[3] == 0o600 and key[4] == "owner"
     assert p[-1][1] == helper.HOST_USER_FILE

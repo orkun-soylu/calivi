@@ -1,0 +1,43 @@
+#!/bin/sh
+# Per-machine state that must never be baked into the image, created on first boot:
+#
+#  - CALIVI_SECRET_KEY: signs sessions and encrypts stored secrets. One key in a published
+#    image would let anyone forge a session on every calivi-vm.
+#  - The setup code: the first registration must present it (backend/app/host_bootstrap.py),
+#    so that reaching port 80 first is not enough to claim the machine.
+#
+# Also writes the console banner. Re-run by calivi-firstboot.path when the owner appears: the
+# code is then deleted and the banner loses it.
+set -eu
+umask 027
+DIR=/etc/calivi
+ISSUE=/etc/issue.d/calivi.issue
+
+new_file() { # path content — written atomically, root:calivi 0640
+    tmp="$1.tmp.$$"
+    printf '%s\n' "$2" > "$tmp"
+    chown root:calivi "$tmp"
+    chmod 0640 "$tmp"
+    mv "$tmp" "$1"
+}
+
+if [ ! -s "$DIR/secret.env" ]; then
+    new_file "$DIR/secret.env" "CALIVI_SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_hex(32))')"
+fi
+
+mkdir -p /etc/issue.d
+if [ -s "$DIR/host-user" ]; then
+    rm -f "$DIR/setup-code"
+    banner="  Calivi:  http://\4/"
+else
+    if [ ! -s "$DIR/setup-code" ]; then
+        # 80 bits, Crockford-ish base32 without look-alikes, grouped for reading off a console.
+        code=$(python3 -c 'import secrets; a="ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; s="".join(secrets.choice(a) for _ in range(16)); print("-".join(s[i:i+4] for i in range(0, 16, 4)))')
+        new_file "$DIR/setup-code" "$code"
+    fi
+    banner="  Calivi:  http://\4/
+  Setup code:  $(cat "$DIR/setup-code")   (asked for when you create the first account)"
+fi
+umask 022
+printf '\n%s\n\n' "$banner" > "$ISSUE.tmp"
+mv "$ISSUE.tmp" "$ISSUE"
