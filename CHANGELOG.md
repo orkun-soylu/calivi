@@ -9,6 +9,16 @@ Read this file before upgrading.
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-09-27
+
+Replies that outlive the tab. A reply now runs on the server, so closing the tab, reloading,
+losing the connection or switching chats no longer stops it — and opening the chat again picks
+it up where it is. This is what calivi-vm needed for long, multi-step jobs, and it applies to
+every install.
+
+> **Upgrading:** no schema change. **Closing the tab no longer stops a reply — Stop (or Esc)
+> does.** A reply that is running when the backend restarts is lost, as before.
+
 ### Changed
 
 - **A reply keeps running when you close the tab** (#85). It runs on the server as a background
@@ -205,7 +215,8 @@ someone can install and stay on, instead of tracking `main`.
 - **About 700 MB on disk for the whole stack**, web search included — backend 230 MB, frontend
   95.8 MB, SearXNG 372 MB (measured on arm64).
 
-[Unreleased]: https://github.com/orkun-soylu/calivi/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/orkun-soylu/calivi/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/orkun-soylu/calivi/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/orkun-soylu/calivi/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/orkun-soylu/calivi/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/orkun-soylu/calivi/releases/tag/v0.1.0
