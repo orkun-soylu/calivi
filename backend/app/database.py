@@ -58,6 +58,8 @@ def _migrate():
             conn.exec_driver_sql("ALTER TABLE chats ADD COLUMN summary_upto_id INTEGER")
         if "context_mode" not in cols:
             conn.exec_driver_sql("ALTER TABLE chats ADD COLUMN context_mode VARCHAR(10) NOT NULL DEFAULT 'compact'")
+        if "mode" not in cols:
+            conn.exec_driver_sql("ALTER TABLE chats ADD COLUMN mode VARCHAR(10) NOT NULL DEFAULT 'chat'")
 
         # Create the single settings row if absent (registration open by default).
         conn.exec_driver_sql(
@@ -101,6 +103,8 @@ def _migrate():
             conn.exec_driver_sql("ALTER TABLE messages ADD COLUMN images JSON")
         if "attachments" not in mcols:
             conn.exec_driver_sql("ALTER TABLE messages ADD COLUMN attachments JSON")
+        if "steps" not in mcols:
+            conn.exec_driver_sql("ALTER TABLE messages ADD COLUMN steps JSON")
 
         _encrypt_existing_secrets(conn)
         conn.commit()
