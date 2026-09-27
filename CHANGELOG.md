@@ -9,6 +9,12 @@ Read this file before upgrading.
 
 ## [Unreleased]
 
+### Added
+
+- **The model can look at images on calivi-vm**: a new host tool, `view_image`, shows it an image
+  file on the machine (a screenshot it took, a chart it drew). The image reaches the model only
+  when the selected model can see images; otherwise the tool result says so.
+
 ## [0.6.3] — 2026-09-27
 
 calivi-vm remembers its machine. The owner's `~/.calivi/AGENTS.md` is read into every chat that

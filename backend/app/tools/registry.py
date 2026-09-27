@@ -25,6 +25,22 @@ from typing import Awaitable, Callable
 ERROR_PREFIX = "ERROR:"
 
 
+class ToolResult(str):
+    """A text result that also carries images (data URIs) for the model to look at.
+
+    A `str`, so everything that handles results — the error-prefix test, clipping, the saved
+    steps — keeps working on the text. Only the agentic loop reads `images`: tool messages
+    carry text alone, so it attaches them to the next model call when the model can see.
+    """
+
+    images: list[str]
+
+    def __new__(cls, text: str, images: list[str] | None = None):
+        obj = super().__new__(cls, text)
+        obj.images = list(images or [])
+        return obj
+
+
 @dataclass
 class Tool:
     name: str
