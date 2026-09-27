@@ -9,6 +9,14 @@ Read this file before upgrading.
 
 ## [Unreleased]
 
+## [0.6.4] — 2026-09-28
+
+calivi-vm's model can look at images: a screenshot it took of a page, a chart it drew.
+
+> **Upgrading:** `apt upgrade` on a machine with apt.calivi.ai, or install
+> `calivi_0.6.4-1+<distro>_amd64.deb` from this release. Seeing needs a vision model; with any
+> other model the new tool says so. Docker installs: rebuild as usual; no schema change.
+
 ### Added
 
 - **The model can look at images on calivi-vm**: a new host tool, `view_image`, shows it an image
@@ -366,7 +374,8 @@ someone can install and stay on, instead of tracking `main`.
 - **About 700 MB on disk for the whole stack**, web search included — backend 230 MB, frontend
   95.8 MB, SearXNG 372 MB (measured on arm64).
 
-[Unreleased]: https://github.com/orkun-soylu/calivi/compare/v0.6.3...HEAD
+[Unreleased]: https://github.com/orkun-soylu/calivi/compare/v0.6.4...HEAD
+[0.6.4]: https://github.com/orkun-soylu/calivi/compare/v0.6.3...v0.6.4
 [0.6.3]: https://github.com/orkun-soylu/calivi/compare/v0.6.2...v0.6.3
 [0.6.2]: https://github.com/orkun-soylu/calivi/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/orkun-soylu/calivi/compare/v0.6.0...v0.6.1
