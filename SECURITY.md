@@ -8,7 +8,7 @@ next release; older releases do not get backports.
 | Version | Supported |
 |---|---|
 | `main` | ✅ |
-| Latest release (currently `v0.6.2`) | ✅ until the next release |
+| Latest release (currently `v0.6.3`) | ✅ until the next release |
 | Anything older | ❌ |
 
 If you run Calivi, run the latest release or `main`.

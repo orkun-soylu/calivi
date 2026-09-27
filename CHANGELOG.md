@@ -9,6 +9,17 @@ Read this file before upgrading.
 
 ## [Unreleased]
 
+## [0.6.3] — 2026-09-27
+
+calivi-vm remembers its machine. The owner's `~/.calivi/AGENTS.md` is read into every chat that
+can operate the machine, and the model keeps it up to date, asking the owner before each change.
+Also the first release whose calivi-vm image CI builds, boots and tests before attaching it.
+
+> **Upgrading:** `apt upgrade` on a machine with apt.calivi.ai (0.6.2 or later adds it), or
+> install `calivi_0.6.3-1+<distro>_amd64.deb` from this release. A machine claimed before 0.6.3
+> has no notes file yet; the model creates it, with your approval, when there is first something
+> to keep. Docker installs: rebuild as usual; no schema change.
+
 ### Added
 
 - **Machine notes on calivi-vm** (#110): `~/.calivi/AGENTS.md` in the owner's home is read into
@@ -349,7 +360,8 @@ someone can install and stay on, instead of tracking `main`.
 - **About 700 MB on disk for the whole stack**, web search included — backend 230 MB, frontend
   95.8 MB, SearXNG 372 MB (measured on arm64).
 
-[Unreleased]: https://github.com/orkun-soylu/calivi/compare/v0.6.2...HEAD
+[Unreleased]: https://github.com/orkun-soylu/calivi/compare/v0.6.3...HEAD
+[0.6.3]: https://github.com/orkun-soylu/calivi/compare/v0.6.2...v0.6.3
 [0.6.2]: https://github.com/orkun-soylu/calivi/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/orkun-soylu/calivi/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/orkun-soylu/calivi/compare/v0.5.0...v0.6.0
