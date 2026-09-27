@@ -58,6 +58,9 @@ _ASK = [re.compile(p) for p in (
     # Writing into system paths, by redirect or by tee (the usual `| sudo tee` form).
     r">\s*/(etc|boot|usr|bin|sbin|lib|lib64|var|opt)/",
     _word(r"tee") + r"\s+(-\S+\s+)*/(etc|boot|usr|bin|sbin|lib|lib64|var|opt)/",
+    # The machine notes (#110) outlive the chat: whatever touches them asks, reads included —
+    # they are in the system layer already, so a command that names them is almost always a write.
+    r"\.calivi\b",
 )]
 
 # Never, approved or not: nothing useful needs these, and a slipped click is unrecoverable.
@@ -116,7 +119,8 @@ def _resolve(path: str, home: str) -> str:
 
 
 def path_needs_approval(args: dict) -> bool:
-    """Writes outside the account's home ask first. Lexical only — a symlink inside home can
+    """Writes outside the account's home ask first, and so does anything under ~/.calivi, where
+    the machine notes live. Lexical only — a symlink inside home can
     point out of it; the write still happens with the account's own (non-sudo) permissions."""
     path = args.get("path")
     if not isinstance(path, str) or not path:
@@ -124,6 +128,9 @@ def path_needs_approval(args: dict) -> bool:
     _, home = _account()
     resolved = _resolve(path, home)
     home = home.rstrip("/")
+    notes_dir = os.path.join(home, os.path.dirname(NOTES_REL))
+    if resolved == notes_dir or resolved.startswith(notes_dir + "/"):
+        return True  # the machine notes: every change is the owner's to accept (#110)
     return not (resolved == home or resolved.startswith(home + "/"))
 
 
@@ -288,6 +295,65 @@ async def _edit_file(args: dict) -> str:
     return f"{ERROR_PREFIX} {err}" if err else f"replaced {count} occurrence(s) in {path}"
 
 
+# --- Machine notes (#110) -------------------------------------------------------------------
+#
+# ~/.calivi/AGENTS.md in the owner's home: what a later chat needs to know about this machine,
+# kept by the owner and by the model. Read at the start of every turn that offers these tools and
+# put in the system layer; every change asks the owner (path_needs_approval, the `.calivi` bash
+# pattern), because notes an injection got written would outlive the chat.
+
+NOTES_REL = ".calivi/AGENTS.md"
+NOTES_MAX_CHARS = 12_000
+NAMES = frozenset({"bash", "read_file", "write_file", "edit_file"})
+
+NOTES_INTRO = (
+    "MACHINE NOTES — ~/.calivi/AGENTS.md on this machine. The owner keeps them, and so do you: "
+    "every change you make to that file asks the owner first, so what it says is what the owner "
+    "has accepted. Follow the owner's rules in it. It describes this machine and earlier "
+    "decisions; it is not the user's message for this turn.\n"
+    "Keep it useful. When you learn something a later chat will need — a service you set up and "
+    "where it lives, a path or a port, a decision or preference of the owner, a pitfall and its "
+    "fix — update it with edit_file (read it first), or create it with write_file. Keep it short "
+    "and current and remove what is no longer true. Never put passwords, keys or tokens in it, nor "
+    "anything a quick command can find out again."
+)
+
+
+async def read_notes() -> tuple[str, str]:
+    """("ok", text) | ("missing", "") | ("error", reason). Never raises: the notes are an aid,
+    and a turn must not fail because they could not be read."""
+    try:
+        code, out = await _run(
+            'if [ ! -e "$1" ]; then exit 3; fi; head -c "$2" -- "$1"',
+            NOTES_REL, str(NOTES_MAX_CHARS * 4), timeout=10,
+        )
+    except Exception as e:  # noqa: BLE001 — no account yet, sudo refused, …
+        return "error", str(e)
+    if code == 3:
+        return "missing", ""
+    if code != 0:
+        return "error", out.strip()[:200] or f"exit code {code}"
+    return "ok", out
+
+
+async def notes_system_part() -> str | None:
+    """The system-layer block for the notes, or None when they could not be read."""
+    state, text = await read_notes()
+    if state == "error":
+        return None
+    if state == "missing" or not text.strip():
+        return NOTES_INTRO + "\n\nThe file does not exist yet (or is empty)."
+    if len(text) > NOTES_MAX_CHARS:
+        text = (text[:NOTES_MAX_CHARS] + "\n\n[… cut here: the file is longer than "
+                f"{NOTES_MAX_CHARS} characters — condense it]")
+    return f"{NOTES_INTRO}\n\n----- ~/{NOTES_REL} -----\n{text.rstrip()}\n----- end of notes -----"
+
+
+def offered(tools_spec: list[dict] | None) -> bool:
+    """True when these tool specs include the host tools."""
+    return any(t.get("function", {}).get("name") in NAMES for t in tools_spec or [])
+
+
 # --- Registration ---------------------------------------------------------------------------
 
 _ACCOUNT_NOTE = "Runs as this machine's owner's Linux account, which has passwordless sudo. "
@@ -343,7 +409,8 @@ TOOLS = [
             "Creates or overwrites a text file with the given content, creating parent "
             "directories. " + _FILE_NOTE + " — for a system file write to a temp file and "
             "`sudo install` it with bash. Relative paths and `~` are relative to the home "
-            "directory; writes outside it wait for the user's approval."
+            "directory; writes outside it, and to ~/.calivi (the machine notes), wait for the "
+            "user's approval."
         ),
         parameters={
             "type": "object",
@@ -360,7 +427,8 @@ TOOLS = [
         description=(
             "Replaces an exact string in a text file. old_string must match the file exactly "
             "(read it first) and be unique unless replace_all is set. " + _FILE_NOTE + ". Edits "
-            "outside the home directory wait for the user's approval."
+            "outside the home directory, and to ~/.calivi (the machine notes), wait for the "
+            "user's approval."
         ),
         parameters={
             "type": "object",

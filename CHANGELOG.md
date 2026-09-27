@@ -9,6 +9,13 @@ Read this file before upgrading.
 
 ## [Unreleased]
 
+### Added
+
+- **Machine notes on calivi-vm** (#110): `~/.calivi/AGENTS.md` in the owner's home is read into
+  every turn that can operate the machine, and the model keeps it up to date: services, paths,
+  the owner's rules, pitfalls and fixes. Every change to it asks the owner first. New machines
+  get a skeleton at claim; older ones get the file the first time there is something to keep.
+
 ### Changed
 
 - The calivi-vm image is built by CI from the release's own Debian 13 package, booted and tested
