@@ -1,0 +1,9 @@
+#!/bin/sh
+# An image built before the package (calivi-vm 0.3–0.5) has /opt/calivi from install.sh, owned
+# by no package. Unpacking over it would leave the old venv's files next to the new ones, so a
+# first install moves it aside; postinst deletes it once the package is configured.
+set -e
+if [ "$1" = install ] && [ -d /opt/calivi ] && ! dpkg -S /opt/calivi/venv >/dev/null 2>&1; then
+    mv /opt/calivi /opt/calivi.pre-deb
+fi
+exit 0

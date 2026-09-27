@@ -7,7 +7,7 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
-ExecStart=/usr/local/lib/calivi/firstboot
+ExecStart=/usr/lib/calivi/firstboot
 
 [Install]
 WantedBy=multi-user.target

@@ -1,0 +1,11 @@
+#!/bin/sh
+set -e
+case "$1" in
+    configure)
+        /usr/lib/calivi/configure
+        # The pre-package tree preinst moved aside (0.3–0.5 images). The running old process
+        # still holds its files open until the restart above; the directory itself can go.
+        rm -rf /opt/calivi.pre-deb
+        ;;
+esac
+exit 0

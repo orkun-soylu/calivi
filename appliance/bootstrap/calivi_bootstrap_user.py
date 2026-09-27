@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 """calivi-bootstrap-user — turns Calivi's first registration into the machine's owner account.
 
-Installed as `/usr/local/sbin/calivi-bootstrap-user` on the calivi-vm appliance. The backend
+Installed as `/usr/sbin/calivi-bootstrap-user` on the calivi-vm appliance. The backend
 runs as an unprivileged service account; this script is the **only** thing it may run as root
 (one sudoers line). It reads one JSON object on stdin — never argv, where a password would show
 up in `ps` — and:

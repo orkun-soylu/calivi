@@ -25,3 +25,4 @@ stdio-bridge/servers.json
 # calivi-vm image build
 appliance/out/
 appliance/.cache/
+packaging/out/

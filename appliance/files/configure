@@ -1,0 +1,81 @@
+#!/bin/sh
+# Turns the installed calivi-vm files into a running service. Shared by the .deb's postinst and
+# by install.sh (image build, manual install), so there is one copy of this logic.
+# Installed as /usr/lib/calivi/configure. Idempotent: every upgrade runs it again.
+#
+# Expects in place: /opt/calivi/{backend,frontend,venv}, /usr/lib/calivi/firstboot,
+# /usr/sbin/calivi-bootstrap-user, the units in /usr/lib/systemd/system, /etc/calivi/calivi.env,
+# /etc/sudoers.d/70-calivi-bootstrap and /usr/share/calivi/tools.yml.
+set -eu
+
+DATA=/var/lib/calivi
+SITE=/etc/nginx/sites-available/calivi
+UNITS="calivi-firstboot.service calivi-firstboot.path calivi.service"
+
+# The service account. No shell, no password; its home is the data directory.
+id calivi >/dev/null 2>&1 || \
+    useradd --system --home-dir "$DATA" --shell /usr/sbin/nologin --user-group calivi
+
+install -d -m 0750 -o calivi -g calivi "$DATA" "$DATA/config"
+for f in search.yml vision_models.yml system_prompts.yml; do
+    [ -e "$DATA/config/$f" ] || install -m 0640 -o calivi -g calivi "/opt/calivi/backend/app/defaults/$f" "$DATA/config/$f"
+done
+[ -e "$DATA/config/tools.yml" ] || install -m 0640 -o calivi -g calivi /usr/share/calivi/tools.yml "$DATA/config/tools.yml"
+
+# A broken sudoers file locks sudo out for everyone: check before anything relies on it.
+visudo -cf /etc/sudoers.d/70-calivi-bootstrap >/dev/null
+
+# Images 0.3–0.5 put these under /etc and /usr/local. Units in /etc/systemd/system override the
+# ones in /usr/lib, so leaving them would keep running the old unit files forever.
+for u in $UNITS; do
+    if [ -f "/etc/systemd/system/$u" ] && [ ! -L "/etc/systemd/system/$u" ]; then
+        systemctl disable -q "$u" 2>/dev/null || true
+        rm -f "/etc/systemd/system/$u"
+    fi
+done
+rm -f /usr/local/sbin/calivi-bootstrap-user /usr/local/lib/calivi/firstboot
+rmdir /usr/local/lib/calivi 2>/dev/null || true
+
+# nginx: derived from the Docker frontend's config, so the CSP and the proxy timeouts have a
+# single source. Each substitution must hit, or this stops — silent drift would ship a site
+# that proxies to a hostname that does not exist.
+conf=$(cat /opt/calivi/frontend/nginx.conf.source)
+for pat in 'http://calivi-backend:8000' '/usr/share/nginx/html' 'listen 80;'; do
+    printf '%s' "$conf" | grep -qF "$pat" || { echo "calivi configure: nginx.conf no longer contains '$pat'" >&2; exit 1; }
+done
+printf '%s\n' "$conf" \
+    | sed -e 's#http://calivi-backend:8000#http://127.0.0.1:8000#g' \
+          -e 's#/usr/share/nginx/html#/opt/calivi/frontend#g' \
+          -e 's#listen 80;#listen 80 default_server;\n    listen [::]:80 default_server;#' \
+    > "$SITE"
+ln -sf "$SITE" /etc/nginx/sites-enabled/calivi
+rm -f /etc/nginx/sites-enabled/default
+nginx -t -q
+
+systemctl daemon-reload
+# shellcheck disable=SC2086
+systemctl enable -q $UNITS nginx
+systemctl enable -q qemu-guest-agent 2>/dev/null || true
+
+# Inside an image build there is no running systemd; the units start on first boot.
+[ -d /run/systemd/system ] || exit 0
+
+systemctl start calivi-firstboot.service calivi-firstboot.path
+systemctl reload-or-restart nginx
+
+if ! systemctl is-active -q calivi.service; then
+    systemctl start calivi.service
+elif [ ! -e /run/calivi/busy ]; then
+    systemctl restart calivi.service
+else
+    # A reply is running, and replies live in memory: restarting now would cut it (#95).
+    # Hand the restart to a transient unit that waits for the busy marker to go — at most
+    # 30 minutes, then it restarts anyway. Until then nginx already serves the new frontend
+    # against the old backend.
+    echo "calivi: a reply is running; the restart waits for it to finish (at most 30 minutes)."
+    systemctl stop calivi-restart-when-idle.service 2>/dev/null || true
+    # shellcheck disable=SC2016  # expanded by the inner sh, not here
+    systemd-run --quiet --collect --unit=calivi-restart-when-idle \
+        --description="Restart Calivi once no reply is running" \
+        sh -c 'i=0; while [ -e /run/calivi/busy ] && [ "$i" -lt 360 ]; do sleep 5; i=$((i+1)); done; systemctl restart calivi.service'
+fi

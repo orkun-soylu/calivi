@@ -1,0 +1,11 @@
+#!/bin/sh
+# Removal stops the service. An upgrade does not: postinst restarts it once no reply is running.
+set -e
+case "$1" in
+    remove|deconfigure)
+        if [ -d /run/systemd/system ]; then
+            systemctl disable --now -q calivi.service calivi-firstboot.path calivi-firstboot.service 2>/dev/null || true
+        fi
+        ;;
+esac
+exit 0
