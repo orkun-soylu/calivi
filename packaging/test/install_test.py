@@ -26,6 +26,7 @@ import hashlib
 import http.cookiejar
 import json
 import os
+import re
 import subprocess
 import sys
 import threading
@@ -213,12 +214,20 @@ def upgrade():
     check(ssh("sudo cat /etc/calivi/host-user").stdout.strip() == OWNER, "the owner marker survived")
 
 
+def _policy_source(policy, url, suite):
+    """True if `apt-cache policy` lists the package from exactly this repository and suite — a
+    whole line of its version table, not a substring somewhere in the output."""
+    line = re.compile(rf"^\s+\d+ {re.escape(url)} {re.escape(suite)}/main amd64 Packages$", re.M)
+    return bool(line.search(policy))
+
+
 def shipped_source():
     step("the package's own APT source")
     suite = ssh(". /etc/os-release; echo $VERSION_CODENAME").stdout.strip()
     sources = ssh("cat /etc/apt/sources.list.d/calivi.sources").stdout
-    check(f"Suites: {suite}\n" in sources and "URIs: https://apt.calivi.ai\n" in sources,
-          f"calivi.sources points at apt.calivi.ai, suite {suite}", sources)
+    want_lines = ["Types: deb", "URIs: https://apt.calivi.ai", f"Suites: {suite}", "Components: main",
+                  "Signed-By: /usr/share/keyrings/calivi.gpg"]
+    check(sources.splitlines() == want_lines, f"calivi.sources points at apt.calivi.ai, suite {suite}", sources)
     here = os.path.dirname(os.path.abspath(__file__))
     with open(os.path.join(here, "..", "apt", "calivi.gpg"), "rb") as f:
         want = hashlib.sha256(f.read()).hexdigest()
@@ -228,7 +237,8 @@ def shipped_source():
     p = ssh("sudo apt-get -o DPkg::Lock::Timeout=600 update 2>&1", ok=False)
     bad = [ln for ln in p.stdout.splitlines() if ln.startswith(("W:", "E:")) and "calivi" in ln]
     check(p.returncode == 0 and not bad, "apt update against https://apt.calivi.ai verifies", "\n".join(bad) or p.stdout[-1500:])
-    check("https://apt.calivi.ai" in ssh("apt-cache policy calivi").stdout, "apt sees calivi in apt.calivi.ai")
+    policy = ssh("apt-cache policy calivi").stdout
+    check(_policy_source(policy, "https://apt.calivi.ai", suite), "apt sees calivi in apt.calivi.ai", policy)
 
 
 def host_tool():
@@ -306,7 +316,8 @@ def apt_repo():
           f"apt update accepts the signed '{suite}' suite", p.stdout[-2000:])
     policy = ssh("apt-cache policy calivi").stdout
     want = deb_version(args.deb)
-    check(f"Candidate: {want}" in policy and args.apt_url in policy, f"the candidate is {want}, from the test repository", policy)
+    check(f"Candidate: {want}" in policy.splitlines()[2] and _policy_source(policy, args.apt_url, suite),
+          f"the candidate is {want}, from the test repository", policy)
     ssh("sudo DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=600 install -y -q calivi")
     check(ssh("test -f /etc/apt/sources.list.d/calivi.sources", ok=False).returncode == 0,
           "the reinstall put the package's own source back")
