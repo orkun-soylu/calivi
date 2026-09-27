@@ -187,9 +187,11 @@ jobs:
             libguestfs-tools qemu-system-x86 qemu-utils cloud-image-utils >/dev/null
           # libguestfs boots the host's kernel, which Ubuntu keeps readable by root only.
           sudo chmod 0644 /boot/vmlinuz-*
-          # virt-customize --network runs passt, which sandboxes itself in a user namespace, and
-          # Ubuntu restricts unprivileged ones ("passt exited with status 1").
-          sudo sysctl -q -w kernel.apparmor_restrict_unprivileged_userns=0
+          # virt-customize --network uses passt when it can run it, and on the runner passt exits
+          # at once ("passt exited with status 1") — neither unloading its AppArmor profile nor
+          # allowing unprivileged user namespaces helped. Without it, libguestfs falls back to
+          # QEMU's own user networking, which is what ai-dev-01's builds use.
+          if command -v passt >/dev/null; then sudo mv "$(command -v passt)" /usr/local/passt.disabled; fi
 
       - uses: actions/download-artifact@v8
         with:
@@ -203,7 +205,10 @@ jobs:
 
       - name: libguestfs diagnostics
         if: failure()
-        run: libguestfs-test-tool 2>&1 | tail -60
+        run: |
+          qemu-img create -q -f qcow2 "$RUNNER_TEMP/t.qcow2" 1G
+          LIBGUESTFS_DEBUG=1 LIBGUESTFS_TRACE=1 virt-customize -a "$RUNNER_TEMP/t.qcow2" --network \
+            --run-command true 2>&1 | grep -iE "passt|slirp|netdev|error" | head -40 || true
 
       - name: Boot it and test
         env:
