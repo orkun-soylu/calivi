@@ -9,6 +9,17 @@ Read this file before upgrading.
 
 ## [Unreleased]
 
+## [0.6.2] — 2026-09-27
+
+Calivi updates itself. Releases are published to a signed APT repository, https://apt.calivi.ai,
+and the package adds that repository on install, so after one `apt install` a machine — and
+every calivi-vm — takes new versions with `apt upgrade` (or timar's update run).
+
+> **Upgrading:** install `calivi_0.6.2-1+<distro>_amd64.deb` from this release once
+> (`sudo apt install ./calivi_0.6.2-1+deb13_amd64.deb` on calivi-vm). After that, updates come
+> through apt. A machine where apt.calivi.ai was added by hand is taken over without a question.
+> Docker installs: rebuild as usual; no schema change.
+
 ### Added
 
 - **APT repository: https://apt.calivi.ai** (#95). Suites for Debian 13, Ubuntu 24.04 and
@@ -21,7 +32,6 @@ Read this file before upgrading.
   signing key as `/usr/share/keyrings/calivi.gpg`. One `apt install ./calivi_….deb` is enough;
   from then on `apt upgrade` updates Calivi. A machine where the repository was added by hand
   takes the package's copies over without a question.
-
 - **The calivi-vm image installs the package** (#95): `appliance/build.sh` `apt install`s the
   Debian 13 `.deb` — for a release, the release's own asset — instead of running a separate
   install script. The image and every other machine now run the same bytes, and a VM from the
@@ -326,7 +336,8 @@ someone can install and stay on, instead of tracking `main`.
 - **About 700 MB on disk for the whole stack**, web search included — backend 230 MB, frontend
   95.8 MB, SearXNG 372 MB (measured on arm64).
 
-[Unreleased]: https://github.com/orkun-soylu/calivi/compare/v0.6.1...HEAD
+[Unreleased]: https://github.com/orkun-soylu/calivi/compare/v0.6.2...HEAD
+[0.6.2]: https://github.com/orkun-soylu/calivi/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/orkun-soylu/calivi/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/orkun-soylu/calivi/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/orkun-soylu/calivi/compare/v0.4.0...v0.5.0
