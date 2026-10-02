@@ -9,6 +9,12 @@ Read this file before upgrading.
 
 ## [Unreleased]
 
+### Security
+
+- Dependency updates for published advisories: pypdf 6.16.1 → 6.19.0 (crafted-PDF runtime and
+  memory exhaustion, reachable through the document upload) and PyJWT 2.13.0 → 2.15.1 (key
+  confusion, JWKS and recursion denial-of-service advisories).
+
 ## [0.6.5] — 2026-09-28
 
 A fix for a browser console error on every page load.
