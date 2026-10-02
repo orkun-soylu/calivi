@@ -23,7 +23,7 @@ python-docx==1.1.2
 # and Content-Length abuse) — the parser sits in front of /api/extract.
 python-multipart==0.0.31
 bcrypt==4.2.1
-PyJWT==2.13.0
+PyJWT==2.15.0
 # MCP client (Streamable HTTP + the older HTTP+SSE transport). Pulls pyjwt[crypto], so
 # `cryptography` is now available without adding a dependency of its own.
 mcp==1.28.1
