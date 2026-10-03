@@ -164,9 +164,9 @@ export default function ChatView({ chat, servers, hostTools, onMessageSent, onFo
 
   // Answers a pending tool approval. The stream is still open and resumes on its own once the
   // backend records the decision, so there is nothing to do with the response here.
-  async function handleApprovalDecision(approvalId, approved) {
+  async function handleApprovalDecision(approvalId, approved, rule) {
     if (!chat) return;
-    await api.respondToApproval(chat.id, approvalId, approved);
+    await api.respondToApproval(chat.id, approvalId, approved, rule);
   }
 
   async function handleDeleteMessage(id) {

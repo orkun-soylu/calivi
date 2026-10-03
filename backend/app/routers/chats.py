@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from app import auth, compaction, config, models, schemas, llm, tools_config
 from app.database import get_db, SessionLocal
 from app.system_prompts import get_system_prompt
-from app import approvals, audit, turns
+from app import approval_rules, approvals, audit, turns
 from app.config import APPROVAL_HEARTBEAT, APPROVAL_TIMEOUT
 from app.tools import ERROR_PREFIX, host, mcp_client, registry
 from app.routers.users import SUPER_ADMIN_ID
@@ -297,16 +297,32 @@ def build_stream_response(
                     # while a person decides and proxies time out on idle connections
                     # (Traefik's default is 180s).
                     approved = False
-                    approval = None  # display only: "approved" / "denied" when a card was shown
+                    approval = None  # display only: "approved" / "denied" / "rule"
                     tool = registry.lookup(call["name"], privileged=privileged)
                     needs_yes = tool is not None and (ask_every_tool or tool.requires_approval(args))
-                    if needs_yes and user_id is not None:
+                    # "Always allow" (#113): a rule of the owner's may answer for a host tool —
+                    # never under 🛡, which asks for everything whatever the rules say.
+                    rules_apply = (needs_yes and user_id is not None and not ask_every_tool
+                                   and tool.source == host.SOURCE)
+                    rule = approval_rules.find(user_id, call["name"], args) if rules_apply else None
+                    if rule is not None:
+                        approved = True
+                        approval = "rule"
+                        yield json.dumps({
+                            "type": "approval_result", "name": call["name"], "approved": True,
+                            "rule": rule,
+                        }) + "\n"
+                    elif needs_yes and user_id is not None:
                         approval_id = approvals.create(chat_id, user_id, call["name"], args)
+                        ask = {
+                            "type": "approval_request", "id": approval_id,
+                            "name": call["name"], "args": args,
+                        }
+                        suggestion = approval_rules.suggest(call["name"], args) if rules_apply else None
+                        if suggestion:
+                            ask["rule_suggestion"] = suggestion
                         try:
-                            yield json.dumps({
-                                "type": "approval_request", "id": approval_id,
-                                "name": call["name"], "args": args,
-                            }) + "\n"
+                            yield json.dumps(ask) + "\n"
                             async for decision in approvals.wait(
                                 approval_id, APPROVAL_TIMEOUT, APPROVAL_HEARTBEAT
                             ):
@@ -329,8 +345,9 @@ def build_stream_response(
                     if tool is not None and tool.source == host.SOURCE:
                         audit_id = audit.record_call(
                             chat_id=chat_id, user_id=user_id, server=server_name, model=model,
-                            tool=call["name"], args=args,
-                            approval="auto" if not needs_yes else ("owner" if approved else "denied"),
+                            tool=call["name"], args=args, rule=rule,
+                            approval="rule" if rule else "auto" if not needs_yes
+                            else ("owner" if approved else "denied"),
                         )
                         if not approved and needs_yes:
                             audit_id = None  # not run: the `call` line says so, no `result` follows
@@ -374,6 +391,7 @@ def build_stream_response(
                         steps.append({
                             "role": "tool", "name": call["name"], "tool_call_id": call["id"],
                             "content": _clip(result), "ok": ok, "approval": approval,
+                            **({"rule": rule} if rule else {}),
                         })
                     yield json.dumps(event) + "\n"
                     if ok and not agent:
@@ -777,8 +795,33 @@ def respond_to_approval(
     chat = db.get(models.Chat, chat_id)
     if not chat or chat.user_id != user.id:
         raise HTTPException(404, "Chat not found")
+    if payload.rule is not None:
+        _save_rule_for(approval_id, chat_id, user, payload, db)
     if not approvals.resolve(approval_id, chat_id, user.id, payload.approved):
         raise HTTPException(404, "Approval not found")
+
+
+def _save_rule_for(approval_id: str, chat_id: int, user: models.User,
+                   payload: schemas.ApprovalDecision, db: Session) -> None:
+    """"Always allow…" (#113): the rule is saved only if it is allowed at all, and only if it
+    covers the very call on the card — a rule the owner believes approved this call must not
+    silently be about something else."""
+    pending = approvals.get(approval_id)
+    if pending is None or pending.user_id != user.id or pending.chat_id != chat_id:
+        raise HTTPException(404, "Approval not found")
+    tool = registry.lookup(pending.tool, privileged=user.id == SUPER_ADMIN_ID)
+    if not payload.approved or tool is None or tool.source != host.SOURCE:
+        raise HTTPException(400, "A rule can only approve a host-tool call")
+    try:
+        pattern = approval_rules.validate(pending.tool, payload.rule.kind, payload.rule.pattern)
+        if not approval_rules.matches(pending.tool, payload.rule.kind, pattern, pending.args):
+            raise approval_rules.RuleError("this rule does not cover the call on the card")
+    except approval_rules.RuleError as e:
+        raise HTTPException(400, str(e))
+    except LookupError as e:
+        raise HTTPException(400, str(e))
+    rule = approval_rules.add(db, user.id, pending.tool, payload.rule.kind, pattern)
+    audit.record_rule("rule_added", user.id, approval_rules.describe(rule))
 
 
 @router.post("/{chat_id}/compact")

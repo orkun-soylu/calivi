@@ -133,3 +133,18 @@ class Message(Base):
     timestamp: Mapped[datetime.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     chat: Mapped["Chat"] = relationship(back_populates="messages")
+
+
+class ApprovalRule(Base):
+    """An "always allow" rule for a host tool (approval_rules.py, #113). The owner's alone."""
+
+    __tablename__ = "approval_rules"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    tool: Mapped[str] = mapped_column(String(50))  # bash | write_file | edit_file
+    kind: Mapped[str] = mapped_column(String(10))  # exact | prefix (bash) — dir (file tools)
+    pattern: Mapped[str] = mapped_column(String(500))
+    uses: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    last_used_at: Mapped[datetime.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

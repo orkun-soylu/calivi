@@ -72,6 +72,7 @@ _ASK = [re.compile(p) for p in (
     # they are in the system layer already, so a command that names them is almost always a write.
     r"\.calivi\b",
 )]
+NOTES_PATTERN = _ASK[-1]  # approval_rules.py: a command naming the notes is never covered by a rule
 
 # Never, approved or not: nothing useful needs these, and a slipped click is unrecoverable.
 _DENY = [re.compile(p) for p in (
