@@ -9,6 +9,14 @@ Read this file before upgrading.
 
 ## [Unreleased]
 
+## [0.6.6] — 2026-10-03
+
+Dependency updates for published advisories; no other change.
+
+> **Upgrading:** `apt upgrade` on a machine with apt.calivi.ai, or install
+> `calivi_0.6.6-1+<distro>_amd64.deb` from this release. Docker installs: rebuild as usual; no
+> schema change.
+
 ### Security
 
 - Dependency updates for published advisories: pypdf 6.16.1 → 6.19.0 (crafted-PDF runtime and
@@ -395,7 +403,8 @@ someone can install and stay on, instead of tracking `main`.
 - **About 700 MB on disk for the whole stack**, web search included — backend 230 MB, frontend
   95.8 MB, SearXNG 372 MB (measured on arm64).
 
-[Unreleased]: https://github.com/orkun-soylu/calivi/compare/v0.6.5...HEAD
+[Unreleased]: https://github.com/orkun-soylu/calivi/compare/v0.6.6...HEAD
+[0.6.6]: https://github.com/orkun-soylu/calivi/compare/v0.6.5...v0.6.6
 [0.6.5]: https://github.com/orkun-soylu/calivi/compare/v0.6.4...v0.6.5
 [0.6.4]: https://github.com/orkun-soylu/calivi/compare/v0.6.3...v0.6.4
 [0.6.3]: https://github.com/orkun-soylu/calivi/compare/v0.6.2...v0.6.3
