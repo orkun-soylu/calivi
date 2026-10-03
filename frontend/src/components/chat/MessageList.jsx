@@ -24,6 +24,7 @@ export default function MessageList({
   onDeleteMessage,
   onDecide,
   onInspect,
+  planActions = null,
 }) {
   const t = useT();
   const scrollRef = useRef(null);
@@ -76,7 +77,7 @@ export default function MessageList({
         onScroll={onScroll}
         className="themed-scroll h-full overflow-y-auto px-3 py-4 md:px-6 md:py-6 space-y-4"
       >
-        {chat?.messages.map((m) => [
+        {chat?.messages.map((m, i) => [
           m.role === "user" && edit.editingId === m.id ? (
             <MessageEditor
               key={m.id}
@@ -97,6 +98,8 @@ export default function MessageList({
               onDelete={() => onDeleteMessage(m.id)}
               onImageClick={onImageClick}
               onInspect={onInspect}
+              // A plan can be decided only while it is the chat's last word and nothing runs.
+              planActions={planActions && !sending && i === chat.messages.length - 1 ? planActions : null}
             />
           ),
           // Where the model's verbatim context starts: everything above is only in the summary.

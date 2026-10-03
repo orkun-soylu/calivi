@@ -105,6 +105,8 @@ def _migrate():
             conn.exec_driver_sql("ALTER TABLE messages ADD COLUMN attachments JSON")
         if "steps" not in mcols:
             conn.exec_driver_sql("ALTER TABLE messages ADD COLUMN steps JSON")
+        if "plan" not in mcols:
+            conn.exec_driver_sql("ALTER TABLE messages ADD COLUMN plan JSON")
 
         _encrypt_existing_secrets(conn)
         conn.commit()

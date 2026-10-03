@@ -72,3 +72,32 @@ describe("always-allow rules (#113)", () => {
     expect(saved[0]).toMatchObject({ status: "ok", approval: "rule", rule });
   });
 });
+
+describe("plan mode (#114)", () => {
+  test("the plan call is its card, not a row", () => {
+    const items = toTimeline([
+      { role: "assistant", content: "", tool_calls: [
+        { id: "a", name: "bash", arguments: { command: "df -h" } },
+        { id: "p", name: "propose_plan", arguments: { summary: "x", steps: [] } },
+      ] },
+      { role: "tool", tool_call_id: "a", content: "disk", ok: true, approval: null },
+      { role: "tool", tool_call_id: "p", content: "Plan submitted.", ok: true, approval: null },
+    ]);
+    expect(items.map((i) => i.name)).toEqual(["bash"]);
+  });
+
+  test("off-plan and plan-approved calls are marked, live and reloaded", () => {
+    let items = applyPiece([], { type: "tool_call", name: "bash", args: { command: "x" }, off_plan: true });
+    expect(items[0].offPlan).toBe(true);
+    items = applyPiece(items, { type: "tool_call", name: "bash", args: { command: "y" } });
+    items = applyPiece(items, { type: "approval_result", name: "bash", approved: true, plan: true });
+    expect(items[1]).toMatchObject({ approval: "plan" });
+    expect(items[1].offPlan).toBeUndefined();
+
+    const saved = toTimeline([
+      { role: "assistant", content: "", tool_calls: [{ id: "c", name: "bash", arguments: { command: "x" } }] },
+      { role: "tool", tool_call_id: "c", content: "", ok: true, approval: null, off_plan: true },
+    ]);
+    expect(saved[0].offPlan).toBe(true);
+  });
+});

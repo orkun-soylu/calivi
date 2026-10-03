@@ -90,6 +90,8 @@ export const api = {
       body: JSON.stringify(rule ? { approved, rule } : { approved }),
     }),
   listApprovalRules: () => request("/approval-rules"),
+  // The plan card's Cancel (#114). Run goes through sendMessage with runPlan.
+  cancelPlan: (chatId, messageId) => request(`/chats/${chatId}/messages/${messageId}/plan/cancel`, { method: "POST" }),
   deleteApprovalRule: (id) => request(`/approval-rules/${id}`, { method: "DELETE" }),
 
   listMcpServers: (refresh) => request(`/mcp${refresh ? "?refresh=1" : ""}`),
@@ -121,7 +123,8 @@ export const api = {
     return resp.json();
   },
 
-  async sendMessage(chatId, { content, images, attachments, serverId, model, useTools, askEveryTool, signal }, onPiece) {
+  // planMode: 📋 (#114). runPlan: the id of the reply whose plan this turn carries out.
+  async sendMessage(chatId, { content, images, attachments, serverId, model, useTools, askEveryTool, planMode, runPlan, signal }, onPiece) {
     const resp = await fetch(`${BASE}/chats/${chatId}/messages`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -132,6 +135,8 @@ export const api = {
         attachments: attachments || [],
         use_tools: !!useTools,
         ask_every_tool: !!askEveryTool,
+        plan_mode: !!planMode,
+        ...(runPlan ? { run_plan: runPlan } : {}),
         ...normalizeTarget(serverId, model),
       }),
       signal,
@@ -140,13 +145,14 @@ export const api = {
   },
 
   // Edit a user message / reroute it to a different model → truncate + regen (same chat).
-  async editMessage(chatId, messageId, { content, serverId, model, useTools, askEveryTool, signal }, onPiece) {
+  async editMessage(chatId, messageId, { content, serverId, model, useTools, askEveryTool, planMode, signal }, onPiece) {
     const resp = await fetch(`${BASE}/chats/${chatId}/messages/${messageId}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
       body: JSON.stringify({
-        content, use_tools: !!useTools, ask_every_tool: !!askEveryTool, ...normalizeTarget(serverId, model),
+        content, use_tools: !!useTools, ask_every_tool: !!askEveryTool, plan_mode: !!planMode,
+        ...normalizeTarget(serverId, model),
       }),
       signal,
     });
@@ -186,14 +192,14 @@ export const api = {
   },
 
   // Fork a new chat from history. onChatId(newId) comes from the header, then the stream flows.
-  async forkChat(chatId, { messageId, content, serverId, model, useTools, askEveryTool, signal }, onChatId, onPiece) {
+  async forkChat(chatId, { messageId, content, serverId, model, useTools, askEveryTool, planMode, signal }, onChatId, onPiece) {
     const resp = await fetch(`${BASE}/chats/${chatId}/fork`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
       body: JSON.stringify({
         message_id: messageId, content, use_tools: !!useTools, ask_every_tool: !!askEveryTool,
-        ...normalizeTarget(serverId, model),
+        plan_mode: !!planMode, ...normalizeTarget(serverId, model),
       }),
       signal,
     });

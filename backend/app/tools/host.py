@@ -25,6 +25,7 @@ import tempfile
 import time
 
 from app import config
+from app.tools.readonly import read_only as _read_only
 from app.tools.registry import ERROR_PREFIX, Tool, ToolResult, registry
 
 SOURCE = "host"
@@ -436,6 +437,7 @@ TOOLS = [
         source=SOURCE,
         needs_approval=bash_needs_approval,
         privileged=True,
+        plan_safe=lambda args: _read_only(args.get("command")),
     ),
     Tool(
         name="read_file",
@@ -456,6 +458,7 @@ TOOLS = [
         handler=_read_file,
         source=SOURCE,
         privileged=True,
+        plan_safe=True,
     ),
     Tool(
         name="write_file",
@@ -516,6 +519,7 @@ TOOLS = [
         handler=_view_image,
         source=SOURCE,
         privileged=True,
+        plan_safe=True,
     ),
 ]
 

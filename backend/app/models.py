@@ -130,6 +130,9 @@ class Message(Base):
     # Agent mode: the turn's tool traffic in provider shape, in order — assistant tool-call
     # turns and tool results (+ display fields `ok`, `approval`). `content` is the final answer.
     steps: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    # Plan mode (#114): the plan this reply proposed — summary, steps, risks, rollback and its
+    # status: proposed | approved | cancelled. Replace the dict to change it (JSON is not mutable-tracked).
+    plan: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     timestamp: Mapped[datetime.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     chat: Mapped["Chat"] = relationship(back_populates="messages")

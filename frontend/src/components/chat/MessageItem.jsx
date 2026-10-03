@@ -1,6 +1,7 @@
 import Markdown from "../Markdown.jsx";
 import { AttachmentChip, CopyButton, DeleteButton, EditButton } from "./MessageActions.jsx";
 import StepTimeline from "./StepTimeline.jsx";
+import PlanCard from "./PlanCard.jsx";
 import { toTimeline } from "../../lib/timeline.js";
 import { formatTs, tokensPerSecLabel } from "../../lib/format.js";
 
@@ -10,7 +11,7 @@ import { formatTs, tokensPerSecLabel } from "../../lib/format.js";
  * that field can be empty, and in that case the copy/delete buttons were not shown either —
  * the behaviour is preserved.
  */
-export default function MessageItem({ m, onEdit, onDelete, onImageClick, onInspect }) {
+export default function MessageItem({ m, onEdit, onDelete, onImageClick, onInspect, planActions = null }) {
   const isUser = m.role === "user";
   return (
     <div className={`group flex ${isUser ? "justify-end" : "justify-start"}`}>
@@ -53,6 +54,12 @@ export default function MessageItem({ m, onEdit, onDelete, onImageClick, onInspe
 
         {!isUser && m.steps?.length > 0 && <StepTimeline items={toTimeline(m.steps)} />}
         {isUser ? <span className="whitespace-pre-wrap">{m.content}</span> : <Markdown content={m.content} />}
+        {!isUser && m.plan && (
+          <PlanCard
+            plan={m.plan}
+            actions={planActions && { onRun: () => planActions.onRun(m.id), onCancel: () => planActions.onCancel(m.id) }}
+          />
+        )}
 
         {!isUser && m.model_used && (
           <div className="flex items-center justify-between gap-3 mt-2 py-1.5 text-xs text-neutral-400">

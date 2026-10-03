@@ -12,6 +12,12 @@ export function loadAskEveryTool() {
   return localStorage.getItem(ASK_EVERY_TOOL_KEY) === "1";
 }
 
+export const PLAN_MODE_KEY = "calivi_plan_mode";
+
+export function loadPlanMode() {
+  return localStorage.getItem(PLAN_MODE_KEY) === "1";
+}
+
 export function loadUseTools() {
   const v = localStorage.getItem(USE_TOOLS_KEY);
   if (v !== null) return v === "1";

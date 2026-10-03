@@ -55,6 +55,24 @@ class Tool:
     # is set (that already means "always").
     needs_approval: Callable[[dict], bool] | None = None
     privileged: bool = False  # True → invisible and unrunnable for a non-privileged caller
+    # Plan mode (#114): may this call run while the model only proposes? True / False, or a
+    # per-call check (bash: the read-only list). None → the default: a tool that changes nothing
+    # by its own declaration (not `mutating`, not a host tool) may; anything else may not.
+    plan_safe: bool | Callable[[dict], bool] | None = None
+
+    def offered_in_plan(self) -> bool:
+        """Listed for the model in plan mode at all (a per-call check still decides each call)."""
+        if self.plan_safe is None:
+            return not self.mutating and self.source != "host"
+        return bool(self.plan_safe)  # a function is truthy: offered, then checked per call
+
+    def allowed_in_plan(self, args: dict) -> bool:
+        if not callable(self.plan_safe):
+            return self.offered_in_plan()
+        try:
+            return bool(self.plan_safe(args))
+        except Exception:
+            return False  # a check that cannot decide must not allow
 
     def requires_approval(self, args: dict) -> bool:
         if self.mutating:
@@ -93,10 +111,12 @@ class ToolRegistry:
     def names(self) -> list[str]:
         return list(self._tools)
 
-    def specs(self, names: list[str] | None = None, privileged: bool = False) -> list[dict]:
-        """Native tool-calling wire format (Ollama and OpenAI share the same schema)."""
+    def specs(self, names: list[str] | None = None, privileged: bool = False,
+              plan: bool = False) -> list[dict]:
+        """Native tool-calling wire format (Ollama and OpenAI share the same schema).
+        `plan`: only the tools plan mode can use (#114)."""
         tools = self._tools.values() if names is None else [self._tools[n] for n in names if n in self._tools]
-        tools = [t for t in tools if privileged or not t.privileged]
+        tools = [t for t in tools if (privileged or not t.privileged) and (not plan or t.offered_in_plan())]
         return [
             {
                 "type": "function",
@@ -107,7 +127,7 @@ class ToolRegistry:
 
     async def execute(
         self, name: str, args: dict, approved: bool = False, privileged: bool = False,
-        strict: bool = False,
+        strict: bool = False, plan: bool = False,
     ) -> str:
         """Runs the tool and returns a plain-text result. Unknown/unapproved-mutating tool → an
         error string rather than an exception, so the model can recover and the loop survives.
@@ -123,11 +143,18 @@ class ToolRegistry:
         `strict` is the user's "ask before every tool" mode: every call needs `approved`,
         whatever the tool's own classification says. It can only add a question, never
         remove one.
+
+        `plan` is plan mode (#114): only what the tool's `plan_safe` allows runs, approved or
+        not — the model proposes, nothing changes. Checked here for the same reason as above.
         """
         args = args or {}
         tool = self.lookup(name, privileged)
         if tool is None:
             return f"{ERROR_PREFIX} no tool named '{name}'.{self._name_hint(name, privileged)}"
+        if plan and not tool.allowed_in_plan(args):
+            return (f"{ERROR_PREFIX} plan mode: '{name}' was not run — only commands that change "
+                    "nothing can run while you plan. Put this step in the plan (propose_plan) "
+                    "instead; it runs once the owner approves.")
         if (strict or tool.requires_approval(args)) and not approved:
             # Not "changes state": under strict mode a harmless `uptime` lands here too, and a
             # model told it changed state explains the refusal wrongly (seen on calivi-vm).

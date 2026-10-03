@@ -8,7 +8,9 @@ import { CompactIcon, SettingsIcon } from "./icons.jsx";
 import { useChatStream } from "../hooks/useChatStream.js";
 import { useServerModel } from "../hooks/useServerModel.js";
 import { fileToScaledDataUrl } from "../lib/images.js";
-import { ASK_EVERY_TOOL_KEY, USE_TOOLS_KEY, loadAskEveryTool, loadUseTools } from "../lib/modelPrefs.js";
+import {
+  ASK_EVERY_TOOL_KEY, PLAN_MODE_KEY, USE_TOOLS_KEY, loadAskEveryTool, loadPlanMode, loadUseTools,
+} from "../lib/modelPrefs.js";
 import { api } from "../api.js";
 import { useT } from "../i18n.js";
 
@@ -32,6 +34,9 @@ export default function ChatView({ chat, servers, hostTools, onMessageSent, onFo
   // Only in effect where the toggle is visible — a preference left over in this browser must
   // not put cards on a user who cannot see the switch that caused them.
   const askEveryTool = !!hostTools && askEveryToolPref;
+  // 📋 plan mode (#114): the same rule — only where the model can operate the machine.
+  const [planModePref, setPlanMode] = useState(loadPlanMode);
+  const planMode = !!hostTools && planModePref;
 
   const [editingId, setEditingId] = useState(null);
   const [editContent, setEditContent] = useState("");
@@ -47,6 +52,10 @@ export default function ChatView({ chat, servers, hostTools, onMessageSent, onFo
   useEffect(() => {
     localStorage.setItem(ASK_EVERY_TOOL_KEY, askEveryToolPref ? "1" : "0");
   }, [askEveryToolPref]);
+
+  useEffect(() => {
+    localStorage.setItem(PLAN_MODE_KEY, planModePref ? "1" : "0");
+  }, [planModePref]);
 
   // Clear attached images if the model does not support vision (they cannot be sent).
   useEffect(() => {
@@ -136,7 +145,7 @@ export default function ChatView({ chat, servers, hostTools, onMessageSent, onFo
       ({ signal, onPiece }) =>
         api.sendMessage(
           chat.id,
-          { content, images: imgs, attachments: atts, serverId, model, useTools, askEveryTool, signal },
+          { content, images: imgs, attachments: atts, serverId, model, useTools, askEveryTool, planMode, signal },
           onPiece
         ),
       {
@@ -149,6 +158,36 @@ export default function ChatView({ chat, servers, hostTools, onMessageSent, onFo
         },
       }
     );
+  }
+
+  // The plan card (#114). Run sends the next turn carrying the plan: the backend marks it approved
+  // and runs that turn outside plan mode. "Change it" is just a reply, so it needs no button.
+  async function handleRunPlan(messageId) {
+    if (stream.sending || !serverId || !model) return;
+    const content = t("plan.runMessage");
+    setPending({ user: content, images: [], attachments: [] });
+    await stream.run(
+      ({ signal, onPiece }) =>
+        api.sendMessage(
+          chat.id,
+          { content, serverId, model, useTools: true, askEveryTool, planMode, runPlan: messageId, signal },
+          onPiece
+        ),
+      {
+        chatId: chat.id,
+        agent: chat.mode === "agent",
+        beforeClear: async () => {
+          await onMessageSent();
+          setPending({ user: null, images: [], attachments: [] });
+        },
+      }
+    );
+  }
+
+  async function handleCancelPlan(messageId) {
+    if (stream.sending) return;
+    await api.cancelPlan(chat.id, messageId);
+    await onMessageSent();
   }
 
   function startEdit(m) {
@@ -183,7 +222,7 @@ export default function ChatView({ chat, servers, hostTools, onMessageSent, onFo
     cancelEdit();
     await stream.run(
       ({ signal, onPiece }) =>
-        api.editMessage(chat.id, mid, { content, ...editTarget, useTools, askEveryTool, signal }, onPiece),
+        api.editMessage(chat.id, mid, { content, ...editTarget, useTools, askEveryTool, planMode, signal }, onPiece),
       { chatId: chat.id, agent: chat.mode === "agent", afterClear: () => onMessageSent() }
     );
   }
@@ -197,7 +236,7 @@ export default function ChatView({ chat, servers, hostTools, onMessageSent, onFo
       ({ signal, onPiece }) =>
         api.forkChat(
           chat.id,
-          { messageId: mid, content, ...editTarget, useTools, askEveryTool, signal },
+          { messageId: mid, content, ...editTarget, useTools, askEveryTool, planMode, signal },
           (newId) => {
             // Follow the new chat *before* switching to it, so the switch does not detach.
             stream.setChatId(newId);
@@ -331,6 +370,7 @@ export default function ChatView({ chat, servers, hostTools, onMessageSent, onFo
         onDeleteMessage={handleDeleteMessage}
         onDecide={handleApprovalDecision}
         onInspect={setInspecting}
+        planActions={hostTools ? { onRun: handleRunPlan, onCancel: handleCancelPlan } : null}
       />
 
       <Composer
@@ -351,6 +391,8 @@ export default function ChatView({ chat, servers, hostTools, onMessageSent, onFo
         hostTools={!!hostTools}
         askEveryTool={askEveryTool}
         onToggleAskEveryTool={() => setAskEveryTool((v) => !v)}
+        planMode={planMode}
+        onTogglePlanMode={() => setPlanMode((v) => !v)}
       />
 
       <ToolOutputModal tool={inspecting} onClose={() => setInspecting(null)} />

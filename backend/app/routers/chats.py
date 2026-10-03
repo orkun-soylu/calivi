@@ -11,6 +11,7 @@ from app import auth, compaction, config, models, schemas, llm, tools_config
 from app.database import get_db, SessionLocal
 from app.system_prompts import get_system_prompt
 from app import approval_rules, approvals, audit, turns
+from app import plan_mode as planning
 from app.config import APPROVAL_HEARTBEAT, APPROVAL_TIMEOUT
 from app.tools import ERROR_PREFIX, host, mcp_client, registry
 from app.routers.users import SUPER_ADMIN_ID
@@ -190,6 +191,7 @@ def build_stream_response(
     chat_id: int, target: dict, model: str, history: list[dict],
     use_tools: bool = False, extra_headers: dict | None = None, user_id: int | None = None,
     summary: str | None = None, ask_every_tool: bool = False, agent: bool = False,
+    plan_mode: bool = False, run_plan: dict | None = None,
 ) -> StreamingResponse:
     """Injects the system prompt (and optional tools), returns the NDJSON stream and saves the
     assistant message at the end.
@@ -207,6 +209,10 @@ def build_stream_response(
     reply and replayed on later turns (`_context_of`); the reply's own `content` is then only
     the text after the last step, since the text between steps lives in those steps. Chips
     are not written — the timeline replaces them.
+
+    `plan_mode` (📋, #114): only tools that change nothing, plus `propose_plan`, which ends the
+    turn with the plan saved on the reply. `run_plan`: the plan the owner just approved — its
+    calls run without a card, anything else is flagged off-plan. See plan_mode.py.
     """
     server_name = target["name"]
     # Privileged tools (the host's own shell, on an appliance install) belong to the instance
@@ -221,9 +227,15 @@ def build_stream_response(
 
         # Tool layer: if 🔍 is on and the master switch is on, offer the enabled tools.
         tools_spec = None
+        planning_turn = False
         if use_tools and tools_config.is_enabled():
             enabled = [n for n in registry.names() if tools_config.tool_enabled(n)]
             tools_spec = registry.specs(enabled, privileged=privileged) or None
+            # Plan mode only means something where the model can operate the machine.
+            planning_turn = plan_mode and privileged and host.offered(tools_spec)
+            if planning_turn:
+                tools_spec = [*registry.specs(enabled, privileged=True, plan=True), planning.PLAN_TOOL]
+        matcher = planning.Matcher(run_plan) if run_plan and privileged else None
         # Tool output will be untrusted, so keep the guard in place from the first turn.
         if tools_spec:
             has_untrusted = True
@@ -245,6 +257,10 @@ def build_stream_response(
                 system_parts.append(notes)
         if summary:
             system_parts.append(f"{compaction.SUMMARY_CONTEXT_HEADER}\n\n{summary}")
+        if planning_turn:
+            system_parts.append(planning.PLANNING_NOTE)
+        if matcher:
+            system_parts.append(planning.RUN_NOTE + json.dumps(planning.public(run_plan), ensure_ascii=False, indent=1))
         if system_parts:
             messages = [{"role": "system", "content": "\n\n".join(system_parts)}, *messages]
 
@@ -256,6 +272,7 @@ def build_stream_response(
         tail_text = ""  # agent mode: text since the last step — the reply's own content
         chipped_calls: set[str] = set()  # _call_key of every call that already has a chip
         can_see = None  # whether the model takes images; asked once, when a tool returns one
+        proposed_plan = None  # plan mode: the plan propose_plan submitted, saved with the reply
         try:
             max_iter = tools_config.get_max_iterations() if tools_spec else 1
             for i in range(max_iter):
@@ -289,7 +306,30 @@ def build_stream_response(
                 step_images: list[str] = []
                 for call in turn_calls:
                     args = call.get("arguments") or {}
-                    yield json.dumps({"type": "tool_call", "name": call["name"], "args": args}) + "\n"
+                    if planning_turn and (proposed_plan is not None or call["name"] == planning.TOOL_NAME):
+                        # The plan ends the turn: it is the owner's move now. Calls after it in the
+                        # same message are answered, not run, so a replayed step stays well-formed.
+                        if proposed_plan is not None:
+                            note = "Not run: you already submitted a plan. Wait for the owner."
+                        else:
+                            try:
+                                proposed_plan = planning.validate(args)
+                                note = "Plan submitted. The owner sees it now; stop and wait for their decision."
+                                yield json.dumps({"type": "plan", "plan": proposed_plan}) + "\n"
+                            except planning.PlanError as e:
+                                note = f"{ERROR_PREFIX} the plan was not accepted: {e}. Fix it and call {planning.TOOL_NAME} again."
+                        messages.append({"role": "tool", "tool_call_id": call["id"], "name": call["name"], "content": note})
+                        if agent:
+                            steps.append({"role": "tool", "name": call["name"], "tool_call_id": call["id"],
+                                          "content": note, "ok": not note.startswith(ERROR_PREFIX), "approval": None})
+                        continue
+                    tool = registry.lookup(call["name"], privileged=privileged)
+                    off_plan = bool(matcher and tool is not None and tool.source == host.SOURCE
+                                    and matcher.off_plan(call["name"], args))
+                    call_event = {"type": "tool_call", "name": call["name"], "args": args}
+                    if off_plan:
+                        call_event["off_plan"] = True
+                    yield json.dumps(call_event) + "\n"
 
                     # Human-in-the-loop: a `mutating` tool — or one whose `needs_approval`
                     # says so for these arguments — needs an explicit yes before the registry
@@ -297,15 +337,25 @@ def build_stream_response(
                     # while a person decides and proxies time out on idle connections
                     # (Traefik's default is 180s).
                     approved = False
-                    approval = None  # display only: "approved" / "denied" / "rule"
-                    tool = registry.lookup(call["name"], privileged=privileged)
-                    needs_yes = tool is not None and (ask_every_tool or tool.requires_approval(args))
+                    approval = None  # display only: "approved" / "denied" / "rule" / "plan"
+                    # In plan mode a call the registry will refuse gets no card: a "yes" would not run it.
+                    refused_in_plan = planning_turn and tool is not None and not tool.allowed_in_plan(args)
+                    needs_yes = (tool is not None and not refused_in_plan
+                                 and (ask_every_tool or tool.requires_approval(args)))
                     # "Always allow" (#113): a rule of the owner's may answer for a host tool —
                     # never under 🛡, which asks for everything whatever the rules say.
                     rules_apply = (needs_yes and user_id is not None and not ask_every_tool
                                    and tool.source == host.SOURCE)
-                    rule = approval_rules.find(user_id, call["name"], args) if rules_apply else None
-                    if rule is not None:
+                    # The approved plan (#114) answers for the calls it names, the same way.
+                    in_plan = bool(rules_apply and matcher and matcher.in_plan(call["name"], args))
+                    rule = approval_rules.find(user_id, call["name"], args) if rules_apply and not in_plan else None
+                    if in_plan:
+                        approved = True
+                        approval = "plan"
+                        yield json.dumps({
+                            "type": "approval_result", "name": call["name"], "approved": True, "plan": True,
+                        }) + "\n"
+                    elif rule is not None:
                         approved = True
                         approval = "rule"
                         yield json.dumps({
@@ -345,8 +395,8 @@ def build_stream_response(
                     if tool is not None and tool.source == host.SOURCE:
                         audit_id = audit.record_call(
                             chat_id=chat_id, user_id=user_id, server=server_name, model=model,
-                            tool=call["name"], args=args, rule=rule,
-                            approval="rule" if rule else "auto" if not needs_yes
+                            tool=call["name"], args=args, rule=rule, off_plan=off_plan,
+                            approval=approval if approval in ("rule", "plan") else "auto" if not needs_yes
                             else ("owner" if approved else "denied"),
                         )
                         if not approved and needs_yes:
@@ -355,7 +405,7 @@ def build_stream_response(
                     try:
                         result = await registry.execute(
                             call["name"], args, approved=approved, privileged=privileged,
-                            strict=ask_every_tool,
+                            strict=ask_every_tool, plan=planning_turn,
                         )
                         ok = not result.startswith(ERROR_PREFIX)
                     except Exception:
@@ -392,6 +442,7 @@ def build_stream_response(
                             "role": "tool", "name": call["name"], "tool_call_id": call["id"],
                             "content": _clip(result), "ok": ok, "approval": approval,
                             **({"rule": rule} if rule else {}),
+                            **({"off_plan": True} if off_plan else {}),
                         })
                     yield json.dumps(event) + "\n"
                     if ok and not agent:
@@ -405,6 +456,8 @@ def build_stream_response(
                             tool_chips.append(_chip_for(call["name"], args, result))
                 if step_images:
                     messages.append({"role": "user", "content": TOOL_IMAGES_NOTICE, "images": step_images})
+                if proposed_plan is not None:
+                    break  # the owner decides next; the model does not get another word in
         except Exception as e:
             # Only genuine upstream errors (httpx etc. → Exception). Stop cancels the turn's task
             # (CancelledError, a BaseException), which does not land here, so a stopped reply is
@@ -425,7 +478,7 @@ def build_stream_response(
             # (CancelledError is a BaseException, so it never reaches the except) or a model
             # that simply returned no text still persisted an empty row, which renders as a
             # blank assistant bubble indistinguishable from a real reply.
-            if content_to_save.strip() or steps:  # a stopped agent turn keeps the steps it ran
+            if content_to_save.strip() or steps or proposed_plan:  # a stopped agent turn keeps the steps it ran
                 save_db = SessionLocal()
                 try:
                     # The chat may have been deleted while this turn ran (the delete cancels it,
@@ -441,6 +494,7 @@ def build_stream_response(
                                 server_used=server_name,
                                 tokens_per_sec=tokens_per_sec,
                                 steps=steps or None,
+                                plan=proposed_plan,
                             )
                         )
                         save_db.query(models.Chat).filter(models.Chat.id == chat_id).update({"updated_at": models.utcnow()})
@@ -501,8 +555,13 @@ def _context_of(db: Session, chat_id: int) -> tuple[list[dict], str | None]:
             history.extend(_replay_steps(m.steps, full=m.id in full_ids))
             if not (m.content or "").strip():
                 continue  # a stopped turn: its steps are the whole reply
+        content = m.content
+        if m.plan and not (agent and m.steps):
+            # Chat mode keeps no steps, so the plan would vanish from the model's view and a
+            # "change it" reply would have nothing to change. Agent mode replays propose_plan.
+            content = f"{content}\n\n{planning.as_text(m.plan)}".strip()
         history.append(
-            {"role": m.role, "content": m.content, "images": m.images or [], "attachments": m.attachments or []}
+            {"role": m.role, "content": content, "images": m.images or [], "attachments": m.attachments or []}
         )
     return history, compaction.active_summary(chat)
 
@@ -618,6 +677,7 @@ async def send_message(
     _ensure_idle(chat.id)  # before the user message is saved, not after
 
     target, model = resolve_target(db, payload.server_id, payload.model)
+    run_plan = _approve_plan(db, chat, user, payload.run_plan) if payload.run_plan is not None else None
 
     atts = [a.model_dump() for a in payload.attachments]
     history, summary = _context_of(db, chat.id)
@@ -635,7 +695,50 @@ async def send_message(
     return build_stream_response(
         chat.id, target, model, history, use_tools=payload.use_tools, user_id=user.id, summary=summary,
         ask_every_tool=payload.ask_every_tool, agent=chat.mode == "agent",
+        # Running the plan leaves plan mode for that turn, whatever the toggle says.
+        plan_mode=payload.plan_mode and run_plan is None, run_plan=run_plan,
     )
+
+
+def _pending_plan(db: Session, chat: models.Chat, user: models.User, message_id: int) -> models.Message:
+    """The reply whose plan is being decided: in this chat, the owner's, still `proposed`, and
+    the chat's last message — a plan the conversation has moved past is not approvable."""
+    if not (config.HOST_TOOLS_ENABLED and user.id == SUPER_ADMIN_ID):
+        raise HTTPException(404, "Plan not found")
+    msg = db.get(models.Message, message_id)
+    if not msg or msg.chat_id != chat.id or not msg.plan:
+        raise HTTPException(404, "Plan not found")
+    if msg.plan.get("status") != "proposed":
+        raise HTTPException(409, "This plan was already decided")
+    last = db.query(models.Message.id).filter(models.Message.chat_id == chat.id).order_by(
+        models.Message.id.desc()).first()
+    if last is None or last[0] != msg.id:
+        raise HTTPException(409, "The conversation has moved past this plan")
+    return msg
+
+
+def _approve_plan(db: Session, chat: models.Chat, user: models.User, message_id: int) -> dict:
+    msg = _pending_plan(db, chat, user, message_id)
+    msg.plan = {**msg.plan, "status": "approved"}  # a new dict: JSON columns are not mutation-tracked
+    db.commit()
+    audit.record_plan("plan_approved", user.id, chat.id, msg.id, planning.public(msg.plan))
+    return msg.plan
+
+
+@router.post("/{chat_id}/messages/{message_id}/plan/cancel", status_code=204)
+def cancel_plan(
+    chat_id: int,
+    message_id: int,
+    user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db),
+):
+    """The plan card's Cancel (#114): nothing runs, and the decision is on record."""
+    chat = _owned_chat(db, chat_id, user)
+    _ensure_idle(chat_id)
+    msg = _pending_plan(db, chat, user, message_id)
+    msg.plan = {**msg.plan, "status": "cancelled"}
+    db.commit()
+    audit.record_plan("plan_cancelled", user.id, chat.id, msg.id, planning.public(msg.plan))
 
 
 @router.delete("/{chat_id}/messages/{message_id}", status_code=204)
@@ -686,7 +789,7 @@ async def edit_message(
     history, summary = _context_of(db, chat_id)
     return build_stream_response(
         chat_id, target, model, history, use_tools=payload.use_tools, user_id=user.id, summary=summary,
-        ask_every_tool=payload.ask_every_tool, agent=chat.mode == "agent",
+        ask_every_tool=payload.ask_every_tool, agent=chat.mode == "agent", plan_mode=payload.plan_mode,
     )
 
 
@@ -745,7 +848,7 @@ async def fork_chat(
     return build_stream_response(
         new_chat.id, target, model, history,
         use_tools=payload.use_tools, user_id=user.id, summary=summary,
-        ask_every_tool=payload.ask_every_tool, agent=new_chat.mode == "agent",
+        ask_every_tool=payload.ask_every_tool, agent=new_chat.mode == "agent", plan_mode=payload.plan_mode,
         extra_headers={"X-Calivi-Chat-Id": str(new_chat.id)},
     )
 
