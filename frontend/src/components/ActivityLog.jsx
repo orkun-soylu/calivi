@@ -141,7 +141,9 @@ function ActivityRow({ e, chatLabel }) {
         ? t("activity.auto")
         : e.approval === "rule" && e.rule
           ? t("rules.approvedBy", { rule: `${t(`rules.kind.${e.rule.kind}`)} ${e.rule.pattern}` })
-          : null;
+          : e.approval === "plan"
+            ? t("plan.approvedByPlan")
+            : null;
   const when = e.ts ? new Date(e.ts).toLocaleString() : "";
 
   return (
@@ -153,6 +155,7 @@ function ActivityRow({ e, chatLabel }) {
           <span className="text-neutral-400">{t("activity.exit", { code: r.exit })}</span>
         )}
         {approval && <span className="text-neutral-500 min-w-0 truncate">{approval}</span>}
+        {e.off_plan && <span className="text-amber-300">{t("plan.offPlan")}</span>}
         <span className="text-neutral-500 ml-auto">{when}</span>
       </div>
       <div className="text-neutral-500 truncate">

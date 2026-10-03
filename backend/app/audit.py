@@ -83,12 +83,14 @@ def _append(entry: dict) -> None:
 
 
 def record_call(*, chat_id: int, user_id: int | None, server: str, model: str, tool: str,
-                args: dict, approval: str, rule: dict | None = None) -> str | None:
+                args: dict, approval: str, rule: dict | None = None,
+                off_plan: bool = False) -> str | None:
     """Writes the `call` line and returns its id (None when the log is off).
 
     `approval`: `auto` (no card was needed), `owner` (the owner said yes), `rule` (an "always
-    allow" rule said yes in the owner's place — `rule` says which, #113) or `denied` (said no,
-    or let it time out — the tool does not run, and no `result` line follows).
+    allow" rule said yes in the owner's place — `rule` says which, #113), `plan` (it is in the
+    plan the owner approved, #114) or `denied` (said no, or let it time out — the tool does not
+    run, and no `result` line follows). `off_plan`: made during a plan's run, but not in it.
     """
     if not enabled():
         return None
@@ -99,8 +101,18 @@ def record_call(*, chat_id: int, user_id: int | None, server: str, model: str, t
     }
     if rule is not None:
         entry["rule"] = rule
+    if off_plan:
+        entry["off_plan"] = True
     _append(entry)
     return call_id
+
+
+def record_plan(event: str, user_id: int, chat_id: int, message_id: int, plan: dict) -> None:
+    """`plan_approved` / `plan_cancelled` (#114): the owner's decision, with the plan itself —
+    its commands are what the owner said yes to."""
+    if enabled():
+        _append({"event": event, "id": uuid.uuid4().hex, "user": user_id, "chat": chat_id,
+                 "message": message_id, "plan": plan})
 
 
 def record_rule(event: str, user_id: int, rule: dict) -> None:

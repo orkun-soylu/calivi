@@ -4,12 +4,15 @@
 //
 // An item is either
 //   { kind: "text", text }                        — the model's own words between steps
-//   { kind: "call", id, name, args, status, output, approval, rule }
+//   { kind: "call", id, name, args, status, output, approval, rule, offPlan }
 // approval: null (none needed) | "approved" | "denied" | "rule" (an "always allow" rule, #113)
+//   | "plan" (in the plan the owner approved, #114). offPlan: made while running a plan, not in it.
 // with status "running" | "ok" | "failed" | "denied" | "interrupted".
 //
 // SECURITY: `output` is what a tool returned and `args` is model-generated. Both are untrusted and
 // are only ever rendered as plain text (StepTimeline), never markdown or HTML.
+
+const PLAN_TOOL = "propose_plan";
 
 /** Persisted steps → timeline items. Results are matched to their call by `tool_call_id`. */
 export function toTimeline(steps) {
@@ -18,11 +21,14 @@ export function toTimeline(steps) {
   for (const s of steps || []) {
     if (s.role === "tool") {
       const item = byId.get(s.tool_call_id);
-      if (item) Object.assign(item, finished(s.ok, s.approval, s.content), s.rule ? { rule: s.rule } : {});
+      if (item) Object.assign(item, finished(s.ok, s.approval, s.content), s.rule ? { rule: s.rule } : {},
+        s.off_plan ? { offPlan: true } : {});
       continue;
     }
     if ((s.content || "").trim()) items.push({ kind: "text", text: s.content });
     for (const c of s.tool_calls || []) {
+      // The plan itself is shown as its card (PlanCard), not as a row.
+      if (c.name === PLAN_TOOL) continue;
       // No result recorded: the turn was stopped while this call was running or waiting.
       const item = { kind: "call", id: c.id, name: c.name, args: c.arguments || {}, status: "interrupted", output: "", approval: null };
       items.push(item);
@@ -46,7 +52,10 @@ export function applyPiece(items, piece) {
   };
   switch (piece.type) {
     case "tool_call":
-      return [...items, { kind: "call", id: null, name: piece.name, args: piece.args || {}, status: "running", output: "", approval: null }];
+      return [...items, {
+        kind: "call", id: null, name: piece.name, args: piece.args || {}, status: "running", output: "",
+        approval: null, ...(piece.off_plan ? { offPlan: true } : {}),
+      }];
     case "approval_request": {
       const i = lastCall();
       return i < 0 ? items : replace(items, i, { awaiting: true });
@@ -55,6 +64,7 @@ export function applyPiece(items, piece) {
       const i = lastCall();
       if (i < 0) return items;
       if (piece.rule) return replace(items, i, { awaiting: false, approval: "rule", rule: piece.rule });
+      if (piece.plan) return replace(items, i, { awaiting: false, approval: "plan" });
       return replace(items, i, { awaiting: false, approval: piece.approved ? "approved" : "denied" });
     }
     case "tool_result": {

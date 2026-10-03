@@ -21,6 +21,8 @@ export default function Composer({
   hostTools = false,
   askEveryTool = false,
   onToggleAskEveryTool,
+  planMode = false,
+  onTogglePlanMode,
 }) {
   const t = useT();
   const fileInputRef = useRef(null);
@@ -91,7 +93,9 @@ export default function Composer({
           ))}
         </div>
       )}
-      <div className="flex gap-2 items-end">
+      {/* With the host toggles (🛡 📋) four buttons leave a phone's text box too narrow to type
+          in, so there it takes a row of its own above them. */}
+      <div className={`flex gap-2 items-end ${hostTools ? "flex-wrap md:flex-nowrap" : ""}`}>
         <button
           onClick={openPicker}
           title={t("chat.attachDoc")}
@@ -130,6 +134,24 @@ export default function Composer({
             </svg>
           </button>
         )}
+        {/* Plan mode (#114): the model inspects and proposes; nothing changes until the owner
+            approves the plan on its card. */}
+        {hostTools && (
+          <button
+            onClick={onTogglePlanMode}
+            aria-pressed={planMode}
+            title={planMode ? t("chat.planModeOn") : t("chat.planModeOff")}
+            className={`h-10 px-3 md:px-4 rounded-xl shrink-0 flex items-center justify-center ${
+              planMode ? "bg-accent text-white hover:bg-accent-hover" : "bg-neutral-800 text-neutral-300 hover:bg-neutral-700"
+            }`}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="6" y="4" width="12" height="17" rx="2" />
+              <path d="M9 4V3h6v1" />
+              <path d="M9 10h6M9 14h6M9 18h3" />
+            </svg>
+          </button>
+        )}
         <textarea
           ref={inputRef}
           value={input}
@@ -138,13 +160,15 @@ export default function Composer({
           onPaste={onPaste}
           onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && (e.preventDefault(), onSend())}
           placeholder={t("chat.placeholder")}
-          className="themed-scroll flex-1 min-w-0 resize-none max-h-60 bg-neutral-800 rounded-xl px-4 py-2 outline-none border border-neutral-700 focus:border-neutral-500"
+          className={`themed-scroll flex-1 min-w-0 resize-none max-h-60 bg-neutral-800 rounded-xl px-4 py-2 outline-none border border-neutral-700 focus:border-neutral-500 ${
+            hostTools ? "order-first basis-full md:order-none md:basis-auto" : ""
+          }`}
         />
         {sending ? (
           <button
             onClick={onStop}
             title={t("chat.stop")}
-            className="h-10 px-4 rounded-xl bg-red-600 hover:bg-red-500 flex items-center justify-center"
+            className={`h-10 px-4 rounded-xl bg-red-600 hover:bg-red-500 flex items-center justify-center ${hostTools ? "ml-auto md:ml-0" : ""}`}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
               <rect x="6" y="6" width="12" height="12" rx="1.5" />
@@ -154,7 +178,9 @@ export default function Composer({
           <button
             onClick={onSend}
             disabled={!canSend}
-            className="h-10 px-4 rounded-xl bg-accent hover:bg-accent-hover disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center"
+            className={`h-10 px-4 rounded-xl bg-accent hover:bg-accent-hover disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center ${
+              hostTools ? "ml-auto md:ml-0" : ""
+            }`}
           >
             →
           </button>

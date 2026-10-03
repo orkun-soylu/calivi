@@ -202,6 +202,7 @@ class MessageOut(BaseModel):
     server_used: str | None
     tokens_per_sec: float | None = None
     steps: list[dict] | None = None  # agent mode: the reply's tool steps (outputs are untrusted text)
+    plan: dict | None = None  # plan mode (#114): the proposed plan and its status
     timestamp: datetime.datetime
 
 
@@ -232,6 +233,8 @@ class SendMessageIn(BaseModel):
     model: str | None = None  # None → chosen by the caller (on server_id if given)
     use_tools: bool = False  # when on, the tool layer is offered to the model (it decides what to call)
     ask_every_tool: bool = False  # when on, every tool call waits for the user's approval
+    plan_mode: bool = False  # 📋 (#114): the model may only inspect, then proposes a plan
+    run_plan: int | None = None  # the id of the reply whose plan the owner approves with this turn
 
 
 class EditMessageIn(BaseModel):
@@ -241,6 +244,7 @@ class EditMessageIn(BaseModel):
     model: str | None = None
     use_tools: bool = False
     ask_every_tool: bool = False
+    plan_mode: bool = False
 
 
 class ForkIn(BaseModel):
@@ -252,3 +256,4 @@ class ForkIn(BaseModel):
     model: str | None = None
     use_tools: bool = False
     ask_every_tool: bool = False
+    plan_mode: bool = False

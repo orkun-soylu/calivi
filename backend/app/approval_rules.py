@@ -29,16 +29,15 @@ widen what the account can do. Every call a rule approves is in the audit log (#
 rule that approved it, and so is every rule added or deleted.
 """
 import os
-import shlex
 
 from sqlalchemy.orm import Session
 
 from app import models
 from app.database import SessionLocal
 from app.tools import host
+from app.tools.shellwords import simple_words
 
 KINDS = {"bash": ("exact", "prefix"), "write_file": ("dir",), "edit_file": ("dir",)}
-_SHELL_SYNTAX = set(";&|`$<>(){}\\\n\r")
 MAX_PATTERN = 500
 
 
@@ -46,19 +45,9 @@ class RuleError(ValueError):
     """The rule cannot be saved; the message says why (shown to the owner)."""
 
 
-def _tokens(cmd: str) -> list[str] | None:
-    if not isinstance(cmd, str) or any(c in _SHELL_SYNTAX for c in cmd):
-        return None
-    try:
-        tokens = shlex.split(cmd)
-    except ValueError:
-        return None
-    return tokens or None
-
-
 def _bash_coverable(cmd: str) -> list[str] | None:
     """The command's tokens if a rule may ever cover it, else None."""
-    tokens = _tokens(cmd)
+    tokens = simple_words(cmd)
     if tokens is None or host._denied(cmd) or host.NOTES_PATTERN.search(cmd):
         return None
     return tokens

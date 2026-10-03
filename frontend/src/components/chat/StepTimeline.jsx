@@ -49,8 +49,14 @@ function CallRow({ item, approval, onDecide }) {
         <span className={`shrink-0 ${status.cls} ${item.status === "running" ? "animate-pulse" : ""}`}>{status.icon}</span>
         <span className="shrink-0 text-neutral-400">{item.name}</span>
         <code className="min-w-0 flex-1 truncate font-mono text-neutral-200">{summary}</code>
+        {item.offPlan && (
+          <span className="shrink-0 rounded px-1.5 py-0.5 bg-amber-500/15 text-amber-300">{t("plan.offPlan")}</span>
+        )}
         <span className="shrink-0 text-neutral-500">{open ? "▾" : "▸"}</span>
       </button>
+      {item.approval === "plan" && (
+        <div className="px-2.5 pb-1.5 -mt-0.5 text-neutral-500 truncate">{t("plan.approvedByPlan")}</div>
+      )}
       {item.approval === "rule" && item.rule && (
         <div className="px-2.5 pb-1.5 -mt-0.5 text-neutral-500 truncate">
           {t("rules.approvedBy", { rule: `${t(`rules.kind.${item.rule.kind}`)} ${item.rule.pattern}` })}

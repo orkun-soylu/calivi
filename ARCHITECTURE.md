@@ -1047,6 +1047,53 @@ owner's place for one narrow pattern.
   exclusion (bash and dir), the breadth check, the strict-mode override, the "covers this call"
   check, the refusal on a "no", strict path containment or the per-user filter, a test fails.
 
+### Plan mode (`plan_mode.py`, `tools/readonly.py`, #114)
+
+For larger changes ("move the models to the new disk") the owner wants the whole plan first
+rather than a card per step. 📋 next to 🛡 travels with each request, like 🛡, and is honoured
+only where the host tools are offered (the owner on calivi-vm). Anywhere else it is ignored, so
+it can never strip anyone's tools.
+
+- **Planning turn.** The model gets only tools that change nothing (`Tool.plan_safe`):
+  `read_file`, `view_image`, non-host tools that are not `mutating`, and `bash` behind the
+  read-only list. It also gets `propose_plan` (summary, steps with exact commands and files,
+  risks, rollback). The registry enforces this (`execute(plan=True)`), as it does every gate.
+  A call plan mode refuses gets **no card**, since a "yes" would not run it.
+- **Read-only bash is an allow-list** (decided in #114), the inverse of the approval patterns.
+  The command must be simple (`shellwords.simple_words`: no `;` `|` `$` redirections…). Its
+  program must be listed by bare name, with an optional `sudo`/`sudo -n`, and its arguments must
+  pass that program's check: `systemctl status` passes, `systemctl stop` does not;
+  `journalctl` passes, `--vacuum-*` does not; `date +%F` passes, `date -s` does not; `ip addr`
+  passes, `ip link set` does not. Interpreters, `curl`/`wget`, `sed`/`awk`/`sort`/`tee` (each
+  can write) and `env` with a command are left out on purpose. A seatbelt, like the rest:
+  the list is only as good as each program's flags.
+- **The plan ends the turn.** A valid `propose_plan` emits `{"type":"plan"}`. The loop stops,
+  without another model call, and the plan is saved on the reply (`Message.plan`, status
+  `proposed`). Calls after it in the same message are answered "not run", so a replayed step
+  stays well-formed. An invalid plan goes back to the model as an error to fix.
+- **Decision.** The card (`PlanCard.jsx`) offers *Run it* / *Cancel* only on the chat's last
+  message. A reply is "change it": plan mode stays on and the model proposes again; chat mode
+  keeps no steps, so `_context_of` appends the plan as text. *Run it* is the next turn with
+  `run_plan`. The backend checks that the plan is the owner's, still `proposed`, and the chat's
+  last message (409 otherwise), marks it `approved`, and runs that turn **outside** plan mode.
+  *Cancel* marks it `cancelled`. Both decisions go to the audit log with the plan itself.
+- **Run turn.** The approved plan goes into the system layer. A host call whose command
+  (whitespace-normalised) or file path is in the plan runs without a card: approval `plan`,
+  where a card would have been. Any other call that changes something is flagged **off-plan**
+  (`off_plan` on the event, the step and the audit line) and goes through the normal approval
+  rules. Inspection (file reads, read-only commands) is never flagged. The model may adapt,
+  as decided in #114, and is told to say so first; the flag shows every deviation whether it
+  does or not. A plan never covers the deny list or `~/.calivi`, and 🛡 still asks for every
+  call.
+- **Phone layout:** with the host toggles the composer has four buttons, which left the text
+  box about 90px wide at 390px. For the owner, the text box takes its own row on a phone.
+- Mutation-checked: the registry gate, the host default and the spec filter; the read-only
+  checks for `date`, `ip`, `docker`, `find` and `journalctl`; inspection limited to read-only
+  bash; the turn ending on the plan; plan mode for non-owners; 🛡 over the plan; a stale,
+  decided or ungated plan decision; a run left in plan mode; the plan covering the notes or
+  the deny list; the plan missing from chat-mode history; and a card for a refused call. With
+  any one of these broken, a test fails.
+
 ### Audit log of host-tool calls (`audit.py`, #115)
 
 The timeline lives with the chat; a deleted chat, a fork or compaction loses it. On a machine
@@ -1055,7 +1102,7 @@ it" without the chats, so every **host-tool** call is appended to `CALIVI_AUDIT_
 (`/var/log/calivi/host-tools.jsonl` on calivi-vm; unset — off — in the Docker deployment).
 
 - **Two lines per call, joined by `id`.** `call` (time, chat, user, server, model, tool,
-  arguments, approval `auto` / `owner` / `rule` / `denied`) is written **before** the tool runs, `result`
+  arguments, approval `auto` / `owner` / `rule` / `plan` / `denied`, and `off_plan` during a plan's run) is written **before** the tool runs, `result`
   (ok, exit code, output sha256 + size, duration) after. The call that most needs a record is
   the one that never returns — `systemctl restart calivi`, a reboot, a crash — and that is a
   `call` with no `result`. A denied call has no `result` because nothing ran; Stop while it ran

@@ -11,6 +11,15 @@ Read this file before upgrading.
 
 ### Added
 
+- calivi-vm: **plan mode** (📋 next to 🛡, #114). The model only inspects (file reads and
+  read-only commands such as `systemctl status`, `journalctl`, `df`, `docker ps`) and then
+  proposes a plan: steps with exact commands and files, risks, rollback. The plan appears as a
+  card with **Run it** / **Cancel**; replying changes it. On Run, the plan's own commands run
+  without asking. Anything else is flagged "not in plan" on the timeline and in the audit log,
+  and asks as usual. Decisions are recorded in the audit log with the plan.
+- On a phone, the owner's composer puts the text box on its own row, now that there are four
+  buttons.
+
 - calivi-vm: **Always allow…** on the approval card (#113). It saves a narrow rule (an exact
   command, a command prefix, or a directory for the file tools), and matching calls stop asking.
   The rule starts as the narrowest one and can be edited. Commands with shell syntax (`;`, `|`,
