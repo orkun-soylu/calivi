@@ -45,7 +45,7 @@ fi
 echo "== layout"
 A="$REPO/appliance"
 install -d "$ROOT/opt/calivi/backend" "$ROOT/usr/sbin" "$ROOT/usr/lib/calivi" "$ROOT/usr/lib/systemd/system" \
-    "$ROOT/usr/share/calivi" "$ROOT/etc/calivi" "$ROOT/etc/sudoers.d" "$ROOT/etc/cloud/cloud.cfg.d" "$ROOT/etc/needrestart/conf.d" \
+    "$ROOT/usr/share/calivi" "$ROOT/etc/calivi" "$ROOT/etc/sudoers.d" "$ROOT/etc/cloud/cloud.cfg.d" "$ROOT/etc/needrestart/conf.d" "$ROOT/etc/logrotate.d" \
     "$ROOT/etc/apt/sources.list.d" "$ROOT/usr/share/keyrings" "$ROOT/DEBIAN"
 cp -r "$REPO/backend/app" "$REPO/backend/requirements.txt" "$ROOT/opt/calivi/backend/"
 find "$ROOT/opt/calivi/backend" -name __pycache__ -prune -exec rm -rf {} +
@@ -60,6 +60,7 @@ install -m 0644 "$A/files/calivi.env" "$ROOT/etc/calivi/calivi.env"
 install -m 0440 "$A/files/sudoers-calivi" "$ROOT/etc/sudoers.d/70-calivi-bootstrap"
 install -m 0644 "$A/files/cloud-calivi.cfg" "$ROOT/etc/cloud/cloud.cfg.d/90-calivi.cfg"
 install -m 0644 "$A/files/needrestart-calivi.conf" "$ROOT/etc/needrestart/conf.d/calivi.conf"
+install -m 0644 "$A/files/logrotate-calivi" "$ROOT/etc/logrotate.d/calivi"
 # The package brings its own APT source, so one `apt install ./calivi_….deb` is enough and
 # `apt upgrade` does the rest. Byte for byte what https://apt.calivi.ai tells people to write
 # (packaging/apt/index.html.in): a machine set up by hand then takes the package's copy without

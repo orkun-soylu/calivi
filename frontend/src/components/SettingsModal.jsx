@@ -3,6 +3,7 @@ import StatusLight from "./StatusLight.jsx";
 import ConfigEditor from "./ConfigEditor.jsx";
 import UserManagement from "./UserManagement.jsx";
 import McpServers from "./McpServers.jsx";
+import ActivityLog from "./ActivityLog.jsx";
 import { api } from "../api.js";
 import { useT, useLang, setLang, LANGUAGES } from "../i18n.js";
 import { useTheme, setTheme } from "../theme.js";
@@ -29,6 +30,9 @@ export default function SettingsModal({ servers, me, onClose, onAdd, onUpdate, o
     { id: "prompts", key: "settings.tab.prompts" },
     { id: "tools", key: "settings.tab.tools" },
     { id: "users", key: "settings.tab.users" },
+    // calivi-vm: the audit log of what the model ran on this machine — for the owner alone,
+    // the one person the host tools exist for.
+    ...(me?.host_tools ? [{ id: "activity", key: "settings.tab.activity" }] : []),
     { id: "about", key: "settings.tab.about" },
   ];
 
@@ -280,6 +284,8 @@ export default function SettingsModal({ servers, me, onClose, onAdd, onUpdate, o
           )}
 
           {tab === "mcp" && isAdmin && <McpServers />}
+
+          {tab === "activity" && me?.host_tools && <ActivityLog />}
 
           {tab === "servers" && (
             <div className="h-full overflow-y-auto themed-scroll space-y-4">

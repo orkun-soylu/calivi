@@ -225,7 +225,8 @@ async def _bash(args: dict) -> str:
         return (f"{ERROR_PREFIX} the command did not finish within {config.HOST_COMMAND_TIMEOUT}s "
                 f"and was killed. Run long jobs detached (see the tool description).\n\n"
                 f"{_clip(output)}")
-    return f"exit code: {code}\n\n{_clip(output)}" if output else f"exit code: {code}"
+    text = f"exit code: {code}\n\n{_clip(output)}" if output else f"exit code: {code}"
+    return ToolResult(text, exit_code=code)
 
 
 async def _read(path: str) -> tuple[str | None, str]:

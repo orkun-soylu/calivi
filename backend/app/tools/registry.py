@@ -26,7 +26,7 @@ ERROR_PREFIX = "ERROR:"
 
 
 class ToolResult(str):
-    """A text result that also carries images (data URIs) for the model to look at.
+    """A text result that also carries images (data URIs) for the model to look at, or an exit code.
 
     A `str`, so everything that handles results — the error-prefix test, clipping, the saved
     steps — keeps working on the text. Only the agentic loop reads `images`: tool messages
@@ -34,10 +34,12 @@ class ToolResult(str):
     """
 
     images: list[str]
+    exit_code: int | None  # a command's exit status, for the audit log (audit.py); None if none
 
-    def __new__(cls, text: str, images: list[str] | None = None):
+    def __new__(cls, text: str, images: list[str] | None = None, exit_code: int | None = None):
         obj = super().__new__(cls, text)
         obj.images = list(images or [])
+        obj.exit_code = exit_code
         return obj
 
 

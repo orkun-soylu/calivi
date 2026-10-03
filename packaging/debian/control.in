@@ -4,7 +4,7 @@ Architecture: amd64
 Maintainer: Orkun Soylu <orkun-soylu@users.noreply.github.com>
 Installed-Size: @SIZE@
 Depends: python3 (>= @PY@), python3 (<< @PYNEXT@), nginx, sudo, ca-certificates
-Recommends: qemu-guest-agent
+Recommends: qemu-guest-agent, logrotate
 Section: web
 Priority: optional
 Homepage: https://calivi.ai

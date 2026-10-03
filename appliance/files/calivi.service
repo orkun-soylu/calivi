@@ -18,6 +18,12 @@ ExecStart=/opt/calivi/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000
 # (apt's --force-confold) would silently drop the setting.
 RuntimeDirectory=calivi
 Environment=CALIVI_BUSY_FILE=/run/calivi/busy
+# The audit log of host-tool calls (#115). The directory belongs to this service account and is
+# closed to the owner's account, which the model's commands run as; logrotate rotates it
+# (/etc/logrotate.d/calivi). Here for the same conffile reason as the busy file.
+LogsDirectory=calivi
+LogsDirectoryMode=0750
+Environment=CALIVI_AUDIT_LOG=/var/log/calivi/host-tools.jsonl
 Restart=on-failure
 RestartSec=2
 # Everything the host tools run is a child of this unit, so it inherits the unit's sandbox.

@@ -9,6 +9,15 @@ Read this file before upgrading.
 
 ## [Unreleased]
 
+### Added
+
+- calivi-vm: an audit log of every host-tool call (#115), independent of the chats — a deleted
+  or compacted chat no longer takes the record of what ran with it. One JSON line before each
+  call (tool, arguments, who approved it) and one after (exit code, output hash and size,
+  duration) in `/var/log/calivi/host-tools.jsonl`, rotated monthly. Output and file content are
+  stored as hashes, never verbatim. The owner reads it in Settings → Activity, filtered by tool
+  or chat.
+
 ## [0.6.6] — 2026-10-03
 
 Dependency updates for published advisories; no other change.
