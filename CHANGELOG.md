@@ -11,6 +11,13 @@ Read this file before upgrading.
 
 ### Added
 
+- calivi-vm: **Always allow…** on the approval card (#113). It saves a narrow rule (an exact
+  command, a command prefix, or a directory for the file tools), and matching calls stop asking.
+  The rule starts as the narrowest one and can be edited. Commands with shell syntax (`;`, `|`,
+  `$`, redirections…), the deny list and `~/.calivi` are never covered, and 🛡 still asks for
+  everything. Rules are listed and deleted in Settings → Activity. Each call a rule approved
+  says so on the timeline and in the audit log.
+
 - calivi-vm: an audit log of every host-tool call (#115), independent of the chats — a deleted
   or compacted chat no longer takes the record of what ran with it. One JSON line before each
   call (tool, arguments, who approved it) and one after (exit code, output hash and size,

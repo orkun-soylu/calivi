@@ -51,6 +51,11 @@ function CallRow({ item, approval, onDecide }) {
         <code className="min-w-0 flex-1 truncate font-mono text-neutral-200">{summary}</code>
         <span className="shrink-0 text-neutral-500">{open ? "▾" : "▸"}</span>
       </button>
+      {item.approval === "rule" && item.rule && (
+        <div className="px-2.5 pb-1.5 -mt-0.5 text-neutral-500 truncate">
+          {t("rules.approvedBy", { rule: `${t(`rules.kind.${item.rule.kind}`)} ${item.rule.pattern}` })}
+        </div>
+      )}
       {approval && (
         <div className="px-2.5 pb-2">
           <ApprovalCard approval={approval} onDecide={onDecide} />

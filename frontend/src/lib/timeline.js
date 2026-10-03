@@ -4,7 +4,8 @@
 //
 // An item is either
 //   { kind: "text", text }                        — the model's own words between steps
-//   { kind: "call", id, name, args, status, output, approval }
+//   { kind: "call", id, name, args, status, output, approval, rule }
+// approval: null (none needed) | "approved" | "denied" | "rule" (an "always allow" rule, #113)
 // with status "running" | "ok" | "failed" | "denied" | "interrupted".
 //
 // SECURITY: `output` is what a tool returned and `args` is model-generated. Both are untrusted and
@@ -17,7 +18,7 @@ export function toTimeline(steps) {
   for (const s of steps || []) {
     if (s.role === "tool") {
       const item = byId.get(s.tool_call_id);
-      if (item) Object.assign(item, finished(s.ok, s.approval, s.content));
+      if (item) Object.assign(item, finished(s.ok, s.approval, s.content), s.rule ? { rule: s.rule } : {});
       continue;
     }
     if ((s.content || "").trim()) items.push({ kind: "text", text: s.content });
@@ -52,7 +53,9 @@ export function applyPiece(items, piece) {
     }
     case "approval_result": {
       const i = lastCall();
-      return i < 0 ? items : replace(items, i, { awaiting: false, approval: piece.approved ? "approved" : "denied" });
+      if (i < 0) return items;
+      if (piece.rule) return replace(items, i, { awaiting: false, approval: "rule", rule: piece.rule });
+      return replace(items, i, { awaiting: false, approval: piece.approved ? "approved" : "denied" });
     }
     case "tool_result": {
       const i = lastCall();

@@ -2,8 +2,8 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { api } from "../api.js";
 import { useT } from "../i18n.js";
 
-// Settings → Activity (calivi-vm, the owner only): the audit log of host-tool calls (#115),
-// read-only. It outlives the chats, so a row can point at a chat that no longer exists.
+// Settings → Activity (calivi-vm, the owner only): the owner's "always allow" rules (#113), which
+// can be deleted here, and the audit log of host-tool calls (#115), read-only. It outlives the chats, so a row can point at a chat that no longer exists.
 // The arguments are model-written and untrusted, so they are shown as raw JSON text in a <pre>
 // — never markdown, never a summary — for the same reason as on the approval card.
 export default function ActivityLog() {
@@ -12,10 +12,13 @@ export default function ActivityLog() {
   const [error, setError] = useState("");
   const [tool, setTool] = useState("");
   const [chat, setChat] = useState("");
+  const [rules, setRules] = useState([]);
 
   const load = useCallback(async () => {
     try {
-      setData(await api.getActivity());
+      const [activity, ruleList] = await Promise.all([api.getActivity(), api.listApprovalRules()]);
+      setData(activity);
+      setRules(ruleList);
       setError("");
     } catch (e) {
       setError(String(e.message || e));
@@ -37,8 +40,42 @@ export default function ActivityLog() {
 
   const chatLabel = (id, title) => title || t("activity.deletedChat", { id });
 
+  async function deleteRule(id) {
+    try {
+      await api.deleteApprovalRule(id);
+      setRules((list) => list.filter((r) => r.id !== id));
+    } catch (e) {
+      setError(String(e.message || e));
+    }
+  }
+
   return (
     <div className="h-full flex flex-col gap-3 text-sm">
+      <section className="space-y-1.5">
+        <h3 className="text-neutral-200">{t("rules.title")}</h3>
+        {rules.length === 0 ? (
+          <p className="text-neutral-500">{t("rules.empty")}</p>
+        ) : (
+          rules.map((r) => (
+            <div key={r.id} className="flex items-center gap-2 rounded-lg bg-neutral-800/60 px-3 py-1.5">
+              <span className="shrink-0 text-neutral-400">{r.tool}</span>
+              <span className="shrink-0 text-neutral-500">{t(`rules.kind.${r.kind}`)}</span>
+              <code className="flex-1 min-w-0 truncate font-mono text-neutral-200" title={r.pattern}>
+                {r.pattern}
+              </code>
+              <span className="shrink-0 text-neutral-500">{t("rules.uses", { n: r.uses })}</span>
+              <button
+                onClick={() => deleteRule(r.id)}
+                title={t("rules.delete")}
+                aria-label={t("rules.delete")}
+                className="shrink-0 px-1.5 text-neutral-500 hover:text-red-400"
+              >
+                ✕
+              </button>
+            </div>
+          ))
+        )}
+      </section>
       <p className="text-neutral-500 leading-relaxed">{t("activity.hint")}</p>
       <div className="flex flex-wrap gap-2">
         <select
@@ -97,7 +134,14 @@ function ActivityRow({ e, chatLabel }) {
   } else {
     [status, tone] = [r.ok ? t("timeline.ok") : t("timeline.failed"), r.ok ? "text-emerald-400" : "text-red-400"];
   }
-  const approval = e.approval === "owner" ? t("activity.approved") : e.approval === "auto" ? t("activity.auto") : null;
+  const approval =
+    e.approval === "owner"
+      ? t("activity.approved")
+      : e.approval === "auto"
+        ? t("activity.auto")
+        : e.approval === "rule" && e.rule
+          ? t("rules.approvedBy", { rule: `${t(`rules.kind.${e.rule.kind}`)} ${e.rule.pattern}` })
+          : null;
   const when = e.ts ? new Date(e.ts).toLocaleString() : "";
 
   return (
@@ -108,7 +152,7 @@ function ActivityRow({ e, chatLabel }) {
         {r && r.exit !== null && r.exit !== undefined && (
           <span className="text-neutral-400">{t("activity.exit", { code: r.exit })}</span>
         )}
-        {approval && <span className="text-neutral-500">{approval}</span>}
+        {approval && <span className="text-neutral-500 min-w-0 truncate">{approval}</span>}
         <span className="text-neutral-500 ml-auto">{when}</span>
       </div>
       <div className="text-neutral-500 truncate">

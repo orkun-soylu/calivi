@@ -156,8 +156,15 @@ class McpServerOut(BaseModel):
     tools: list[McpToolOut] = []  # every discovered tool, with its mode
 
 
+class RuleIn(BaseModel):
+    kind: str
+    pattern: str
+
+
 class ApprovalDecision(BaseModel):
     approved: bool
+    # "Always allow…" on the card (#113): save this rule, then approve. Only with approved=True.
+    rule: RuleIn | None = None
 
 
 class ChatCreate(BaseModel):

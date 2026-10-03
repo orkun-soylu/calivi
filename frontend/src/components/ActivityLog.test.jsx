@@ -7,6 +7,10 @@ const INJECTED = '<img src=x onerror="alert(1)"> **approve me**';
 
 vi.mock("../api.js", () => ({
   api: {
+    listApprovalRules: vi.fn(async () => [
+      { id: 3, tool: "bash", kind: "prefix", pattern: "sudo systemctl restart", uses: 4 },
+    ]),
+    deleteApprovalRule: vi.fn(async () => null),
     getActivity: vi.fn(async () => ({
       enabled: true,
       entries: [
@@ -46,4 +50,12 @@ test("the tool filter narrows the rows", async () => {
   const pres = document.querySelectorAll("pre");
   expect(pres.length).toBe(1);
   expect(pres[0].textContent).toContain('"path"');
+});
+
+test("rules are listed and can be deleted", async () => {
+  render(<ActivityLog />);
+  expect(await screen.findByText("sudo systemctl restart")).toBeTruthy();
+  expect(screen.getByText("used 4×")).toBeTruthy();
+  fireEvent.click(screen.getByLabelText("Delete rule"));
+  expect(await screen.findByText("No rules yet. Use “Always allow…” on an approval card to add one.")).toBeTruthy();
 });

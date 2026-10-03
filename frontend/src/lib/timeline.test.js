@@ -55,3 +55,20 @@ test("callSummary: the command, the path, or the arguments", () => {
   expect(callSummary("mcp__x__y", { q: 1 })).toBe('{"q":1}');
   expect(callSummary("t", {})).toBe("");
 });
+
+describe("always-allow rules (#113)", () => {
+  const rule = { id: 3, tool: "bash", kind: "exact", pattern: "sudo systemctl restart ollama" };
+
+  test("a rule's yes is marked as the rule's, live and reloaded", () => {
+    let items = applyPiece([], { type: "tool_call", name: "bash", args: { command: rule.pattern } });
+    items = applyPiece(items, { type: "approval_result", name: "bash", approved: true, rule });
+    items = applyPiece(items, { type: "tool_result", name: "bash", ok: true, output: "exit code: 0" });
+    expect(items[0]).toMatchObject({ status: "ok", approval: "rule", rule });
+
+    const saved = toTimeline([
+      { role: "assistant", content: "", tool_calls: [{ id: "c1", name: "bash", arguments: { command: rule.pattern } }] },
+      { role: "tool", tool_call_id: "c1", name: "bash", content: "exit code: 0", ok: true, approval: "rule", rule },
+    ]);
+    expect(saved[0]).toMatchObject({ status: "ok", approval: "rule", rule });
+  });
+});

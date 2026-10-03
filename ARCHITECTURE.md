@@ -1005,6 +1005,48 @@ five are `privileged` (super admin only, see above).
 > dangerous strings only ever go to the pure classifier. "Safe while the guard holds" is not
 > enough — mutation testing exists precisely to run the suite with the guard gone.
 
+### "Always allow" rules (`approval_rules.py`, #113)
+
+On calivi-vm a routine the owner trusts (`systemctl restart ollama`, a file under `/etc/nginx/`)
+otherwise asks every time, and approval decays into clicking. A rule answers "yes" in the
+owner's place for one narrow pattern.
+
+- **The language is small on purpose.** `bash`: `exact` (token for token) or `prefix` (these
+  tokens first, anything after). Tokens come from `shlex.split`, so quoting and spacing do not
+  matter. `write_file` / `edit_file`: `dir` (the normalised path is strictly inside the
+  directory). A rule belongs to one tool. No globs, no regex: the owner has to be able to read a
+  rule on the card and know what it allows.
+- **Nothing composed is ever covered.** A command containing `;` `&` `|` `` ` `` `$` `<` `>`
+  `(` `)` `{` `}` `\` or a newline matches no rule. Otherwise `systemctl restart ollama; rm -rf ~`
+  rides on the rule for `systemctl restart ollama`. `$` is in the list because a variable
+  expands to anything, and braces because `{a,/etc}` does.
+- **Never covered: the deny list and `~/.calivi`** (#110). This is checked when a rule is
+  matched, not only when it is saved, so a rule saved under an older policy cannot outlive a
+  tightened one.
+- **Too broad is refused.** A `prefix` needs two words that are neither options nor `sudo`
+  (`rm -rf` and `sudo` alone would be blanket grants). A `dir` may not be `/`, nor contain or
+  sit inside `~/.calivi`.
+- **🛡 overrides the rules.** Under "ask before every tool" the loop does not consult them, and
+  the card offers no rule.
+- **The card offers the narrowest rule**: the exact command, or the file's own directory. The
+  backend computes it (`rule_suggestion` on `approval_request`), and only for calls a rule may
+  cover. The owner can edit it: switch to a prefix, shorten it.
+- **Saved and approved in one request.** `POST …/approvals/{id}` with `rule` saves it only if it
+  passes validation **and covers the very call on the card**; otherwise it returns 400, and the
+  card keeps waiting. A rule the owner believes approved this call must not quietly be about
+  something else. A rule cannot ride on a "no" either.
+- **The registry gate is unchanged.** The loop passes `approved=True` for a rule's yes, exactly
+  as for the owner's. The decision is the loop's, as a human one is; the registry still refuses
+  an unapproved risky call.
+- **Recorded.** On the timeline the row says which rule approved it (`approval: "rule"` plus the
+  rule, saved with the step). In the audit log the call is `approval: "rule"` with the rule.
+  Adding and deleting a rule are `rule_added` / `rule_deleted` lines. Rules never expire (owner's
+  decision). They are listed with a use count and deleted under Settings → Activity
+  (`/api/approval-rules`, owner-only like the log).
+- Mutation-checked: without the shell-syntax check (or only without `;`), the deny or notes
+  exclusion (bash and dir), the breadth check, the strict-mode override, the "covers this call"
+  check, the refusal on a "no", strict path containment or the per-user filter, a test fails.
+
 ### Audit log of host-tool calls (`audit.py`, #115)
 
 The timeline lives with the chat; a deleted chat, a fork or compaction loses it. On a machine
@@ -1013,7 +1055,7 @@ it" without the chats, so every **host-tool** call is appended to `CALIVI_AUDIT_
 (`/var/log/calivi/host-tools.jsonl` on calivi-vm; unset — off — in the Docker deployment).
 
 - **Two lines per call, joined by `id`.** `call` (time, chat, user, server, model, tool,
-  arguments, approval `auto` / `owner` / `denied`) is written **before** the tool runs, `result`
+  arguments, approval `auto` / `owner` / `rule` / `denied`) is written **before** the tool runs, `result`
   (ok, exit code, output sha256 + size, duration) after. The call that most needs a record is
   the one that never returns — `systemctl restart calivi`, a reboot, a crash — and that is a
   `call` with no `result`. A denied call has no `result` because nothing ran; Stop while it ran

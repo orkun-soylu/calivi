@@ -83,20 +83,30 @@ def _append(entry: dict) -> None:
 
 
 def record_call(*, chat_id: int, user_id: int | None, server: str, model: str, tool: str,
-                args: dict, approval: str) -> str | None:
+                args: dict, approval: str, rule: dict | None = None) -> str | None:
     """Writes the `call` line and returns its id (None when the log is off).
 
-    `approval`: `auto` (no card was needed), `owner` (the owner said yes) or `denied` (said no,
+    `approval`: `auto` (no card was needed), `owner` (the owner said yes), `rule` (an "always
+    allow" rule said yes in the owner's place — `rule` says which, #113) or `denied` (said no,
     or let it time out — the tool does not run, and no `result` line follows).
     """
     if not enabled():
         return None
     call_id = uuid.uuid4().hex
-    _append({
+    entry = {
         "event": "call", "id": call_id, "chat": chat_id, "user": user_id, "server": server,
         "model": model, "tool": tool, "args": _recorded_args(tool, args), "approval": approval,
-    })
+    }
+    if rule is not None:
+        entry["rule"] = rule
+    _append(entry)
     return call_id
+
+
+def record_rule(event: str, user_id: int, rule: dict) -> None:
+    """`rule_added` / `rule_deleted` (#113): who changed what may run without asking."""
+    if enabled():
+        _append({"event": event, "id": uuid.uuid4().hex, "user": user_id, "rule": rule})
 
 
 def record_result(call_id: str | None, result: str, ok: bool, started: float,

@@ -83,11 +83,14 @@ export const api = {
   // MCP servers (admin only). `refresh=1` forces a live probe instead of the TTL cache —
   // an MCP probe opens a real session, so it is not something to do on every render.
   // Decide on a pending tool call; unblocks the stream that is still open.
-  respondToApproval: (chatId, approvalId, approved) =>
+  // `rule` ("Always allow…", calivi-vm): saved first, then the call is approved (#113).
+  respondToApproval: (chatId, approvalId, approved, rule) =>
     request(`/chats/${chatId}/approvals/${approvalId}`, {
       method: "POST",
-      body: JSON.stringify({ approved }),
+      body: JSON.stringify(rule ? { approved, rule } : { approved }),
     }),
+  listApprovalRules: () => request("/approval-rules"),
+  deleteApprovalRule: (id) => request(`/approval-rules/${id}`, { method: "DELETE" }),
 
   listMcpServers: (refresh) => request(`/mcp${refresh ? "?refresh=1" : ""}`),
   addMcpServer: (data) => request("/mcp", { method: "POST", body: JSON.stringify(data) }),

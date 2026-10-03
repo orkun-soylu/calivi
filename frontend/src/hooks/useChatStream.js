@@ -83,7 +83,7 @@ export function useChatStream() {
       setSearchInfo({ status: piece.ok ? "tool_done" : "tool_failed", name: piece.name });
     // A state-changing tool is waiting on a human. The stream stays open while the card is up.
     else if (piece.type === "approval_request")
-      setApproval({ id: piece.id, name: piece.name, args: piece.args });
+      setApproval({ id: piece.id, name: piece.name, args: piece.args, rule_suggestion: piece.rule_suggestion });
     else if (piece.type === "approval_result") setApproval(null);
     // Keep-alive emitted while waiting for a decision — no bytes would flow otherwise and
     // proxies drop idle connections. Nothing to display.
