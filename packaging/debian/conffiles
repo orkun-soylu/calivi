@@ -1,3 +1,4 @@
 /etc/calivi/calivi.env
 /etc/cloud/cloud.cfg.d/90-calivi.cfg
 /etc/apt/sources.list.d/calivi.sources
+/etc/logrotate.d/calivi

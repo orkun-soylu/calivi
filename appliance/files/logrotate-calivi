@@ -1,0 +1,13 @@
+# The audit log of host-tool calls (#115). Monthly, a year kept. The previous month stays
+# uncompressed (delaycompress) because Settings -> Activity reads it too. The backend opens the
+# file per write, so no signal and no copytruncate are needed.
+/var/log/calivi/host-tools.jsonl {
+    monthly
+    rotate 12
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 0640 calivi calivi
+    su calivi calivi
+}

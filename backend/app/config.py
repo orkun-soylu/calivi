@@ -75,6 +75,9 @@ HOST_TOOLS_ENABLED = os.environ.get("CALIVI_HOST_TOOLS") == "1"
 HOST_USER = os.environ.get("CALIVI_HOST_USER", "")
 HOST_USER_FILE = os.environ.get("CALIVI_HOST_USER_FILE", "/etc/calivi/host-user")
 HOST_COMMAND_TIMEOUT = int(os.environ.get("CALIVI_HOST_TIMEOUT", "120"))
+# Append-only record of every host-tool call (audit.py, #115). Empty → off; the appliance's unit sets
+# it, next to the LogsDirectory it lives in.
+AUDIT_LOG_FILE = os.environ.get("CALIVI_AUDIT_LOG", "")
 # Present while any reply is running (turns.py). An upgrade's postinst waits for it to go
 # before restarting the service, so an update does not cut a running agent turn (#95).
 # Empty → not written (the Docker deployment has no such updater).

@@ -1,4 +1,5 @@
 import json
+import time
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
@@ -9,7 +10,7 @@ from sqlalchemy.orm import Session
 from app import auth, compaction, config, models, schemas, llm, tools_config
 from app.database import get_db, SessionLocal
 from app.system_prompts import get_system_prompt
-from app import approvals, turns
+from app import approvals, audit, turns
 from app.config import APPROVAL_HEARTBEAT, APPROVAL_TIMEOUT
 from app.tools import ERROR_PREFIX, host, mcp_client, registry
 from app.routers.users import SUPER_ADMIN_ID
@@ -322,6 +323,18 @@ def build_stream_response(
                             "type": "approval_result", "name": call["name"], "approved": approved,
                         }) + "\n"
 
+                    # calivi-vm: every host-tool call goes to the audit log (#115) — the `call`
+                    # line before it runs, so a command that never returns is still recorded.
+                    audit_id = None
+                    if tool is not None and tool.source == host.SOURCE:
+                        audit_id = audit.record_call(
+                            chat_id=chat_id, user_id=user_id, server=server_name, model=model,
+                            tool=call["name"], args=args,
+                            approval="auto" if not needs_yes else ("owner" if approved else "denied"),
+                        )
+                        if not approved and needs_yes:
+                            audit_id = None  # not run: the `call` line says so, no `result` follows
+                    started = time.monotonic()
                     try:
                         result = await registry.execute(
                             call["name"], args, approved=approved, privileged=privileged,
@@ -333,6 +346,12 @@ def build_stream_response(
                         # and can recover.
                         result = f"{ERROR_PREFIX} unexpected failure while running tool '{call['name']}'."
                         ok = False
+                    except BaseException:
+                        # Stop (CancelledError) while the command ran: recorded as such, so the
+                        # log tells a stopped call from one that never came back.
+                        audit.record_result(audit_id, "", False, started, cancelled=True)
+                        raise
+                    audit.record_result(audit_id, result, ok, started)
                     images = getattr(result, "images", None)
                     if images:
                         if can_see is None:

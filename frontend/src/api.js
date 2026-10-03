@@ -94,6 +94,9 @@ export const api = {
   updateMcpServer: (id, data) => request(`/mcp/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   deleteMcpServer: (id) => request(`/mcp/${id}`, { method: "DELETE" }),
 
+  // calivi-vm owner only: the host-tool audit log (#115), newest first.
+  getActivity: () => request("/activity?limit=1000"),
+
   getConfig: (name) => request(`/config/${name}`),
   getConfigDefault: (name) => request(`/config/${name}/default`),
   saveConfig: (name, content) => request(`/config/${name}`, { method: "PUT", body: JSON.stringify({ content }) }),

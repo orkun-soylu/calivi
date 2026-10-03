@@ -1005,6 +1005,44 @@ five are `privileged` (super admin only, see above).
 > dangerous strings only ever go to the pure classifier. "Safe while the guard holds" is not
 > enough — mutation testing exists precisely to run the suite with the guard gone.
 
+### Audit log of host-tool calls (`audit.py`, #115)
+
+The timeline lives with the chat; a deleted chat, a fork or compaction loses it. On a machine
+where a model has sudo the owner must be able to answer "what ran here, when, and who approved
+it" without the chats, so every **host-tool** call is appended to `CALIVI_AUDIT_LOG`
+(`/var/log/calivi/host-tools.jsonl` on calivi-vm; unset — off — in the Docker deployment).
+
+- **Two lines per call, joined by `id`.** `call` (time, chat, user, server, model, tool,
+  arguments, approval `auto` / `owner` / `denied`) is written **before** the tool runs, `result`
+  (ok, exit code, output sha256 + size, duration) after. The call that most needs a record is
+  the one that never returns — `systemctl restart calivi`, a reboot, a crash — and that is a
+  `call` with no `result`. A denied call has no `result` because nothing ran; Stop while it ran
+  writes `result` with `cancelled`.
+- **Hashes, not content.** The output, and the file content `write_file`/`edit_file` carry, are
+  recorded as sha256 + size: both routinely contain secrets, and the log would be a second copy
+  that outlives the chat. The command and the paths are verbatim — they are the record.
+- **Exit code** travels on `ToolResult.exit_code` (set by `bash`), not parsed from the text.
+- **Written by the backend, per event**: `open(O_APPEND)`, one `write()`, close. Concurrent
+  turns cannot interleave inside a line, and logrotate needs no signal or `copytruncate`.
+- **A failed write does not stop the tool**; it goes to the journal as a warning. Refusing every
+  host call because `/var/log` is full would leave the owner unable to repair it from the chat.
+- **Seatbelt, not tamper-proof.** `LogsDirectory=calivi` with mode `0750` makes the directory
+  the service account's, closed to the owner's account the model runs as — but that account
+  has sudo by design. The log survives the chat, not a model set on erasing it.
+- **Rotation**: `/etc/logrotate.d/calivi`, monthly, twelve kept, `delaycompress` so the previous
+  month stays readable. logrotate is a **Recommends**, not a Depends — a new Depends makes a
+  plain `apt-get upgrade` hold Calivi back, which is worse than a log that does not rotate.
+  Without it the file only grows (about half a kilobyte per call), and the reader is bounded.
+- **Settings → Activity** (`GET /api/activity`, `ActivityLog.jsx`): for the super admin on an
+  instance with host tools, 404 for everyone and everywhere else, like a privileged tool. It
+  reads the last 8 MB of the live file and of `.1`, merges `call` with `result`, newest first in
+  file order (timestamps tie at the millisecond), and adds the titles of the owner's chats
+  that still exist. Arguments render as raw JSON in a `<pre>`, as on the approval card.
+- `postrm purge` keeps `/var/log/calivi`, like the chats: it is the record of what ran.
+- Mutation-checked: logging every tool, keeping the output or the file content, an ungated
+  endpoint, another user's chat titles, a `result` for a denied call, and a Stop left
+  unrecorded each fail a test.
+
 ### First registration on the appliance — claiming the machine
 
 On calivi-vm the first registration does more than create the super admin: it creates the

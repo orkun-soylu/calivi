@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import CORS_ORIGINS
 from app.database import init_db
-from app.routers import servers, chats, config, extract, auth, users, mcp
+from app.routers import servers, chats, config, extract, auth, users, mcp, activity
 from app.tools import mcp_client
 
 
@@ -36,6 +36,7 @@ app.include_router(chats.router)
 app.include_router(config.router)
 app.include_router(extract.router)
 app.include_router(mcp.router)
+app.include_router(activity.router)
 
 
 @app.get("/api/health")
