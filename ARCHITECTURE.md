@@ -1439,7 +1439,7 @@ as an unhandled `IntegrityError` (a 500).
 
 ## Tests
 
-### Frontend — `npm test` (vitest + jsdom, 106 tests)
+### Frontend — `npm test` (vitest + jsdom, 117 tests)
 
 ```bash
 cd frontend && npm install && npm test     # or: npm run test:watch
@@ -1462,7 +1462,7 @@ button, back gesture; `matchMedia` is mocked since jsdom has none),
 Fake timers (`vi.useFakeTimers`) deadlock with RTL's async `act` wrapper; the two tests that verify
 delay behaviour deliberately use **real** timers (~3s).
 
-### Backend — pytest (388 tests)
+### Backend — pytest (592 tests)
 
 `backend/tests/` — pytest + `httpx.ASGITransport` (a real HTTP layer, no live server needed). They
 do not ship in the prod image: the `Dockerfile` installs only `requirements.txt`, and the test

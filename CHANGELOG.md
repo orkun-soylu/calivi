@@ -9,6 +9,18 @@ Read this file before upgrading.
 
 ## [Unreleased]
 
+## [0.7.0] — 2026-10-04
+
+calivi-vm: the owner can see, narrow and plan what the model does on the machine. An audit log
+of every host-tool call, "always allow" rules on the approval card, and plan mode.
+
+> **Upgrading:** `apt upgrade` on a machine with apt.calivi.ai, or install
+> `calivi_0.7.0-1+<distro>_amd64.deb` from this release. The package now recommends
+> `logrotate`, for the new audit log; if `command -v logrotate` finds nothing afterwards,
+> `sudo apt install logrotate` — without it the log only grows, slowly. **Schema:** a new `approval_rules` table and
+> a `messages.plan` column, both created automatically on start. Docker installs: rebuild as
+> usual; none of this is active there (the host tools are calivi-vm only).
+
 ### Added
 
 - calivi-vm: **plan mode** (📋 next to 🛡, #114). The model only inspects (file reads and
@@ -19,14 +31,12 @@ Read this file before upgrading.
   and asks as usual. Decisions are recorded in the audit log with the plan.
 - On a phone, the owner's composer puts the text box on its own row, now that there are four
   buttons.
-
 - calivi-vm: **Always allow…** on the approval card (#113). It saves a narrow rule (an exact
   command, a command prefix, or a directory for the file tools), and matching calls stop asking.
   The rule starts as the narrowest one and can be edited. Commands with shell syntax (`;`, `|`,
   `$`, redirections…), the deny list and `~/.calivi` are never covered, and 🛡 still asks for
   everything. Rules are listed and deleted in Settings → Activity. Each call a rule approved
   says so on the timeline and in the audit log.
-
 - calivi-vm: an audit log of every host-tool call (#115), independent of the chats — a deleted
   or compacted chat no longer takes the record of what ran with it. One JSON line before each
   call (tool, arguments, who approved it) and one after (exit code, output hash and size,
@@ -428,7 +438,8 @@ someone can install and stay on, instead of tracking `main`.
 - **About 700 MB on disk for the whole stack**, web search included — backend 230 MB, frontend
   95.8 MB, SearXNG 372 MB (measured on arm64).
 
-[Unreleased]: https://github.com/orkun-soylu/calivi/compare/v0.6.6...HEAD
+[Unreleased]: https://github.com/orkun-soylu/calivi/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/orkun-soylu/calivi/compare/v0.6.6...v0.7.0
 [0.6.6]: https://github.com/orkun-soylu/calivi/compare/v0.6.5...v0.6.6
 [0.6.5]: https://github.com/orkun-soylu/calivi/compare/v0.6.4...v0.6.5
 [0.6.4]: https://github.com/orkun-soylu/calivi/compare/v0.6.3...v0.6.4
