@@ -26,4 +26,4 @@ bcrypt==4.2.1
 PyJWT==2.15.1
 # MCP client (Streamable HTTP + the older HTTP+SSE transport). Pulls pyjwt[crypto], so
 # `cryptography` is now available without adding a dependency of its own.
-mcp==1.28.1
+mcp==1.30.0
