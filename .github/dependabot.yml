@@ -1,0 +1,14 @@
+version: 2
+updates:
+  # Security updates only: the limit of 0 keeps version-update PRs off,
+  # while security PRs still honour the ignore rules below.
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0
+    ignore:
+      # Tailwind 4 moves the PostCSS plugin to @tailwindcss/postcss and changes
+      # the config format; that migration is done by hand, not by a bump (#131).
+      - dependency-name: tailwindcss
+        update-types: ["version-update:semver-major"]
