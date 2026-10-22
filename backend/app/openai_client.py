@@ -1,9 +1,10 @@
+import base64
 import json
 import time
 
 import httpx
 
-from app.config import OPENAI_PROBE_TIMEOUT, OLLAMA_CHAT_TIMEOUT
+from app.config import IMAGE_GEN_TIMEOUT, OPENAI_PROBE_TIMEOUT, OLLAMA_CHAT_TIMEOUT
 
 
 def _headers(api_key: str | None) -> dict:
@@ -139,3 +140,61 @@ async def stream_chat(base_url: str, api_key: str | None, model: str, messages: 
                 args = {}
             calls.append({"id": slot["id"] or f"call_{i}", "name": slot["name"], "arguments": args})
         yield {"type": "tool_calls", "calls": calls}
+
+
+async def generate_image(base_url: str, api_key: str | None, model: str, prompt: str) -> dict:
+    """One picture from the OpenAI-compatible `/images/generations`.
+
+    Returns {"images": [data URI, ...], "revised_prompt": str | None}. `response_format` is not
+    sent: gpt-image models reject the parameter, and a server that answers with a `url` instead
+    of `b64_json` (dall-e's default) is followed and the picture fetched, so the chat keeps the
+    image itself rather than a link that expires. Size, steps and seed are the server's defaults.
+    """
+    url = base_url.rstrip("/") + "/images/generations"
+    payload = {"model": model, "prompt": prompt, "n": 1}
+    images, revised = [], None
+    async with httpx.AsyncClient(timeout=httpx.Timeout(IMAGE_GEN_TIMEOUT, connect=10)) as client:
+        resp = await client.post(url, json=payload, headers=_headers(api_key))
+        resp.raise_for_status()
+        for item in resp.json().get("data") or []:
+            revised = revised or item.get("revised_prompt")
+            if item.get("b64_json"):
+                raw = base64.b64decode(item["b64_json"])
+            elif item.get("url"):
+                got = await client.get(item["url"])
+                got.raise_for_status()
+                raw = got.content
+            else:
+                continue
+            images.append(f"data:{_image_mime(raw)};base64,{base64.b64encode(raw).decode()}")
+    return {"images": images, "revised_prompt": revised}
+
+
+def _image_mime(raw: bytes) -> str:
+    if raw.startswith(b"\xff\xd8"):
+        return "image/jpeg"
+    if raw[:4] == b"RIFF" and raw[8:12] == b"WEBP":
+        return "image/webp"
+    return "image/png"
+
+
+def image_size(data_uri: str) -> tuple[int, int] | None:
+    """(width, height) of a PNG/JPEG/WebP data URI, read from its header; None if unknown."""
+    try:
+        raw = base64.b64decode(data_uri.split(",", 1)[1][:4096] + "==")
+    except (IndexError, ValueError):
+        return None
+    if raw[:8] == b"\x89PNG\r\n\x1a\n" and len(raw) >= 24:
+        return int.from_bytes(raw[16:20], "big"), int.from_bytes(raw[20:24], "big")
+    if raw[:4] == b"RIFF" and raw[12:16] == b"VP8 " and len(raw) >= 30:
+        return int.from_bytes(raw[26:28], "little") & 0x3FFF, int.from_bytes(raw[28:30], "little") & 0x3FFF
+    if raw[:2] == b"\xff\xd8":
+        i = 2
+        while i + 9 < len(raw):
+            if raw[i] != 0xFF:
+                return None
+            marker, length = raw[i + 1], int.from_bytes(raw[i + 2:i + 4], "big")
+            if 0xC0 <= marker <= 0xCF and marker not in (0xC4, 0xC8, 0xCC):
+                return int.from_bytes(raw[i + 7:i + 9], "big"), int.from_bytes(raw[i + 5:i + 7], "big")
+            i += 2 + length
+    return None

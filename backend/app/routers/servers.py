@@ -30,6 +30,7 @@ class _Entry:
     status: str
     models: list[str]
     vision: list[str]
+    image: list[str] = field(default_factory=list)
     at: float = field(default_factory=time.monotonic)
 
 
@@ -65,7 +66,8 @@ async def _probe(s: models.Server) -> _Entry:
         # permanent → if a model returns (or the failure was transient) it comes back on
         # the next refresh.
         live, vision = await llm.model_capabilities(spec, model_names) if status == "up" else ([], [])
-        entry = _Entry(spec=spec, status=status, models=live, vision=vision)
+        entry = _Entry(spec=spec, status=status, models=live, vision=vision,
+                       image=llm.image_models(spec, live))
         _cache[s.id] = entry
         return entry
 
@@ -85,6 +87,7 @@ async def _build_out(s: models.Server, refresh: bool = False) -> schemas.ServerO
         status=entry.status,
         models=entry.models,
         vision_models=entry.vision,
+        image_models=entry.image,
     )
 
 

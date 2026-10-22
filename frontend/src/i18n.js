@@ -86,6 +86,7 @@ export const translations = {
     "search.done": "🔍 Arandı: {query} · {count} sonuç",
     "search.empty": "🔍 Sonuç bulunamadı: {query}",
     "search.skip": "🔍 Arama gerekmedi",
+    "image.generating": "🎨 Görsel üretiliyor…",
 
     "tools.running": "🔧 {name} çalışıyor…",
     "tools.done": "🔧 {name} ✓",
@@ -327,6 +328,7 @@ export const translations = {
     "search.done": "🔍 Searched: {query} · {count} results",
     "search.empty": "🔍 No results: {query}",
     "search.skip": "🔍 No search needed",
+    "image.generating": "🎨 Generating image…",
 
     "tools.running": "🔧 {name} running…",
     "tools.done": "🔧 {name} ✓",
@@ -568,6 +570,7 @@ export const translations = {
     "search.done": "🔍 Gesucht: {query} · {count} Ergebnisse",
     "search.empty": "🔍 Keine Ergebnisse: {query}",
     "search.skip": "🔍 Keine Suche nötig",
+    "image.generating": "🎨 Bild wird erzeugt…",
 
     "tools.running": "🔧 {name} läuft…",
     "tools.done": "🔧 {name} ✓",
@@ -806,6 +809,7 @@ export const translations = {
     "search.done": "🔍 Buscado: {query} · {count} resultados",
     "search.empty": "🔍 Sin resultados: {query}",
     "search.skip": "🔍 No se necesita búsqueda",
+    "image.generating": "🎨 Generando imagen…",
 
     "tools.running": "🔧 {name} en curso…",
     "tools.done": "🔧 {name} ✓",
@@ -1044,6 +1048,7 @@ export const translations = {
     "search.done": "🔍 Cercato: {query} · {count} risultati",
     "search.empty": "🔍 Nessun risultato: {query}",
     "search.skip": "🔍 Nessuna ricerca necessaria",
+    "image.generating": "🎨 Generazione dell'immagine…",
 
     "tools.running": "🔧 {name} in corso…",
     "tools.done": "🔧 {name} ✓",
@@ -1282,6 +1287,7 @@ export const translations = {
     "search.done": "🔍 Buscado: {query} · {count} resultados",
     "search.empty": "🔍 Nenhum resultado: {query}",
     "search.skip": "🔍 Busca não necessária",
+    "image.generating": "🎨 Gerando imagem…",
 
     "tools.running": "🔧 {name} em execução…",
     "tools.done": "🔧 {name} ✓",
@@ -1520,6 +1526,7 @@ export const translations = {
     "search.done": "🔍 Найдено: {query} · {count} результатов",
     "search.empty": "🔍 Ничего не найдено: {query}",
     "search.skip": "🔍 Поиск не требуется",
+    "image.generating": "🎨 Создаётся изображение…",
 
     "tools.running": "🔧 {name} выполняется…",
     "tools.done": "🔧 {name} ✓",
@@ -1758,6 +1765,7 @@ export const translations = {
     "search.done": "🔍 検索しました: {query} · {count} 件",
     "search.empty": "🔍 結果なし: {query}",
     "search.skip": "🔍 検索は不要です",
+    "image.generating": "🎨 画像を生成中…",
 
     "tools.running": "🔧 {name} 実行中…",
     "tools.done": "🔧 {name} ✓",
@@ -1996,6 +2004,7 @@ export const translations = {
     "search.done": "🔍 已搜索：{query} · {count} 条结果",
     "search.empty": "🔍 无结果：{query}",
     "search.skip": "🔍 无需搜索",
+    "image.generating": "🎨 正在生成图片…",
 
     "tools.running": "🔧 {name} 运行中…",
     "tools.done": "🔧 {name} ✓",

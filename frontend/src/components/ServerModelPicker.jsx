@@ -32,7 +32,7 @@ export default function ServerModelPicker({ servers, value, onChange }) {
         >
           {selectedServer.models.map((m) => (
             <option key={m} value={m}>
-              {m}
+              {selectedServer.image_models?.includes(m) ? `🎨 ${m}` : m}
             </option>
           ))}
         </select>

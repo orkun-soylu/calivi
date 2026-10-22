@@ -1,4 +1,4 @@
-# Calivi — vision (image) capability overrides
+# Calivi — image capability overrides (vision, image generation)
 #
 # Vision detection is automatic:
 #   - Ollama: when "vision" appears in /api/show capabilities.
@@ -9,3 +9,10 @@
 
 force_vision: []   # models containing these substrings COUNT as vision (when the heuristic misses)
 force_text: []     # models containing these substrings are NOT vision (kills a false positive)
+
+# Image generation (text → image). On OpenAI-compatible servers a model whose name carries an
+# image-generation hint (qwen-image, flux, sdxl, stable-diffusion, sd3, dall-e, gpt-image, hidream)
+# is sent to /images/generations instead of /chat/completions: your message is the prompt and
+# the reply is the picture. Same substring rules as above.
+force_image: []    # models containing these substrings GENERATE IMAGES (when the name gives no hint)
+force_chat: []     # models containing these substrings are chat models (kills a false positive)
