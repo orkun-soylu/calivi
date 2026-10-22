@@ -8,6 +8,7 @@ import { CompactIcon, SettingsIcon } from "./icons.jsx";
 import { useChatStream } from "../hooks/useChatStream.js";
 import { useServerModel } from "../hooks/useServerModel.js";
 import { fileToScaledDataUrl } from "../lib/images.js";
+import { imageOptionsPayload, loadImageOptions, saveImageOptions } from "../lib/imageOptions.js";
 import {
   ASK_EVERY_TOOL_KEY, PLAN_MODE_KEY, USE_TOOLS_KEY, loadAskEveryTool, loadPlanMode, loadUseTools,
 } from "../lib/modelPrefs.js";
@@ -43,6 +44,14 @@ export default function ChatView({ chat, servers, hostTools, onMessageSent, onFo
   const [editTarget, setEditTarget] = useState({ serverId: null, model: "" });
 
   const supportsVision = !!selectedServer?.vision_models?.includes(model);
+  const imageModel = !!selectedServer?.image_models?.includes(model);
+  const [imageOptions, setImageOptions] = useState(loadImageOptions);
+  // Sent with every turn; the backend only uses it when the target is an image model.
+  const imageOpts = imageOptionsPayload(imageOptions);
+
+  useEffect(() => {
+    saveImageOptions(imageOptions);
+  }, [imageOptions.size, imageOptions.steps]);
   const canSend = (!!input.trim() || !!images.length || !!attachments.length) && !!serverId && !!model;
 
   useEffect(() => {
@@ -145,7 +154,7 @@ export default function ChatView({ chat, servers, hostTools, onMessageSent, onFo
       ({ signal, onPiece }) =>
         api.sendMessage(
           chat.id,
-          { content, images: imgs, attachments: atts, serverId, model, useTools, askEveryTool, planMode, signal },
+          { content, images: imgs, attachments: atts, serverId, model, useTools, askEveryTool, planMode, imageOptions: imageOpts, signal },
           onPiece
         ),
       {
@@ -222,7 +231,7 @@ export default function ChatView({ chat, servers, hostTools, onMessageSent, onFo
     cancelEdit();
     await stream.run(
       ({ signal, onPiece }) =>
-        api.editMessage(chat.id, mid, { content, ...editTarget, useTools, askEveryTool, planMode, signal }, onPiece),
+        api.editMessage(chat.id, mid, { content, ...editTarget, useTools, askEveryTool, planMode, imageOptions: imageOpts, signal }, onPiece),
       { chatId: chat.id, agent: chat.mode === "agent", afterClear: () => onMessageSent() }
     );
   }
@@ -236,7 +245,7 @@ export default function ChatView({ chat, servers, hostTools, onMessageSent, onFo
       ({ signal, onPiece }) =>
         api.forkChat(
           chat.id,
-          { messageId: mid, content, ...editTarget, useTools, askEveryTool, planMode, signal },
+          { messageId: mid, content, ...editTarget, useTools, askEveryTool, planMode, imageOptions: imageOpts, signal },
           (newId) => {
             // Follow the new chat *before* switching to it, so the switch does not detach.
             stream.setChatId(newId);
@@ -393,6 +402,9 @@ export default function ChatView({ chat, servers, hostTools, onMessageSent, onFo
         onToggleAskEveryTool={() => setAskEveryTool((v) => !v)}
         planMode={planMode}
         onTogglePlanMode={() => setPlanMode((v) => !v)}
+        imageModel={imageModel}
+        imageOptions={imageOptions}
+        onImageOptionsChange={setImageOptions}
       />
 
       <ToolOutputModal tool={inspecting} onClose={() => setInspecting(null)} />

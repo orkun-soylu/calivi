@@ -484,15 +484,26 @@ the package and the appliance needed no new file. The picker marks these models 
   refused before any request ("describe the picture you want").
 - `openai_client.generate_image` sends `{model, prompt, n: 1}` and **no `response_format`**
   (gpt-image rejects the parameter). A `b64_json` answer is used as is; a `url` answer is
-  fetched, so the chat keeps the picture rather than a link that expires. Size, steps and seed are
-  the server's defaults.
+  fetched, so the chat keeps the picture rather than a link that expires.
+- **The 🎨 picker (`chat/ImageOptions.jsx`, `lib/imageOptions.js`):** above the text box while an
+  image model is selected, in place of the 🔧 button (tools mean nothing to a one-prompt turn).
+  Size (square 1024², landscape 1536×1024, portrait 1024×1536 — gpt-image's three — plus
+  Qwen-Image's 16:9 1664×928 and 9:16 928×1664), steps (10–50) and seed. Each one left at
+  "Default" (or the seed empty) is **not sent at all**: `steps` and `seed` are not in OpenAI's API
+  and OpenAI rejects parameters it does not know, so only what the user set goes out
+  (`image_options` on send / edit / fork → `schemas.ImageOptions`, validated: size `WxH`, steps
+  1–150, seed ≥ 0). Size and steps are remembered in localStorage; the seed is not, so a
+  forgotten seed cannot keep repeating the same picture.
 - Nothing streams while the picture is made (30–90 s on a local diffusion model), so the turn
   emits `{"type":"search","status":"image_generating"}` (the activity line, shown in agent mode
   too) and a `ping` every 10 s. Timeout `IMAGE_GEN_TIMEOUT` (600 s).
 - The reply is saved with the picture in `messages.images` (data URI, the column user images
   already use — `MessageItem` renders it, the lightbox opens it) and a caption as its text:
-  `1024×1024 · 34 s`, plus the server's `revised_prompt` when it sends one. The size comes from
-  the image header (`openai_client.image_size`), not from the request.
+  `1664×928 · 20 steps · seed 1234 · 53 s`, plus the server's `revised_prompt` when it sends one.
+  The size comes from the image header (`openai_client.image_size`), not from the request; steps
+  and seed appear when the server reports them per picture (`data[].seed` / `data[].steps`, an
+  extension a diffusers server can send — OpenAI does not), so the caption is what it takes to
+  make the same picture again.
 - An upstream error shows the server's own `error.message` after the usual HTTP line — "HTTP 400"
   alone does not tell the user that the size was too large.
 - Stop cancels the request; the server may still finish its picture, which is then discarded.
@@ -503,8 +514,7 @@ a later turn is built. Chat APIs take images on user messages only — OpenAI re
 was made, which the caption says. To discuss a generated picture with a vision model, attach it
 again.
 
-Not yet: size / seed / steps controls in the composer, image editing (`/images/edits`), and a
-`generate_image` tool for chat models.
+Not yet: image editing (`/images/edits`) and a `generate_image` tool for chat models.
 
 ## Document (PDF/doc/txt) support
 
@@ -1486,7 +1496,7 @@ as an unhandled `IntegrityError` (a 500).
 
 ## Tests
 
-### Frontend — `npm test` (vitest + jsdom, 120 tests)
+### Frontend — `npm test` (vitest + jsdom, 132 tests)
 
 ```bash
 cd frontend && npm install && npm test     # or: npm run test:watch
@@ -1509,7 +1519,7 @@ button, back gesture; `matchMedia` is mocked since jsdom has none),
 Fake timers (`vi.useFakeTimers`) deadlock with RTL's async `act` wrapper; the two tests that verify
 delay behaviour deliberately use **real** timers (~3s).
 
-### Backend — pytest (616 tests)
+### Backend — pytest (624 tests)
 
 `backend/tests/` — pytest + `httpx.ASGITransport` (a real HTTP layer, no live server needed). They
 do not ship in the prod image: the `Dockerfile` installs only `requirements.txt`, and the test

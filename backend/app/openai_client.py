@@ -142,22 +142,33 @@ async def stream_chat(base_url: str, api_key: str | None, model: str, messages: 
         yield {"type": "tool_calls", "calls": calls}
 
 
-async def generate_image(base_url: str, api_key: str | None, model: str, prompt: str) -> dict:
+async def generate_image(base_url: str, api_key: str | None, model: str, prompt: str,
+                         options: dict | None = None) -> dict:
     """One picture from the OpenAI-compatible `/images/generations`.
 
-    Returns {"images": [data URI, ...], "revised_prompt": str | None}. `response_format` is not
-    sent: gpt-image models reject the parameter, and a server that answers with a `url` instead
-    of `b64_json` (dall-e's default) is followed and the picture fetched, so the chat keeps the
-    image itself rather than a link that expires. Size, steps and seed are the server's defaults.
+    Returns {"images": [data URI, ...], "revised_prompt", "seed", "steps"} — the last three None
+    unless the server reports them (a diffusers server does; OpenAI does not). `response_format`
+    is not sent: gpt-image models reject the parameter, and a server that answers with a `url`
+    instead of `b64_json` (dall-e's default) is followed and the picture fetched, so the chat
+    keeps the image itself rather than a link that expires.
+
+    `options` ({size, steps, seed}): only the keys that are set go out. `steps` and `seed` are not
+    in OpenAI's API and OpenAI rejects unknown parameters, so leaving them unset keeps such a
+    server working; size, steps and seed left out are the server's defaults.
     """
     url = base_url.rstrip("/") + "/images/generations"
     payload = {"model": model, "prompt": prompt, "n": 1}
-    images, revised = [], None
+    payload.update({k: v for k, v in (options or {}).items() if k in ("size", "steps", "seed") and v is not None})
+    images, revised, seed, steps = [], None, None, None
     async with httpx.AsyncClient(timeout=httpx.Timeout(IMAGE_GEN_TIMEOUT, connect=10)) as client:
         resp = await client.post(url, json=payload, headers=_headers(api_key))
         resp.raise_for_status()
         for item in resp.json().get("data") or []:
             revised = revised or item.get("revised_prompt")
+            if seed is None and isinstance(item.get("seed"), int):
+                seed = item["seed"]
+            if steps is None and isinstance(item.get("steps"), int):
+                steps = item["steps"]
             if item.get("b64_json"):
                 raw = base64.b64decode(item["b64_json"])
             elif item.get("url"):
@@ -167,7 +178,7 @@ async def generate_image(base_url: str, api_key: str | None, model: str, prompt:
             else:
                 continue
             images.append(f"data:{_image_mime(raw)};base64,{base64.b64encode(raw).decode()}")
-    return {"images": images, "revised_prompt": revised}
+    return {"images": images, "revised_prompt": revised, "seed": seed, "steps": steps}
 
 
 def _image_mime(raw: bytes) -> str:

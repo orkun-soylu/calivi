@@ -51,9 +51,11 @@ def is_image_model(server: dict, model: str) -> bool:
     return bool(image_models(server, [model]))
 
 
-async def generate_image(server: dict, model: str, prompt: str) -> dict:
-    """{"images": [data URI], "revised_prompt": str | None} — see openai_client.generate_image."""
-    return await openai_client.generate_image(server.get("base_url") or "", server.get("api_key"), model, prompt)
+async def generate_image(server: dict, model: str, prompt: str, options: dict | None = None) -> dict:
+    """{"images": [data URI], "revised_prompt", "seed", "steps"} — see openai_client.generate_image."""
+    return await openai_client.generate_image(
+        server.get("base_url") or "", server.get("api_key"), model, prompt, options
+    )
 
 
 async def vision_models(server: dict, model_names: list[str]) -> list[str]:

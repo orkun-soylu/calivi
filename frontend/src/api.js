@@ -56,6 +56,11 @@ function normalizeTarget(serverId, model) {
   };
 }
 
+// `image_options` only when something is set: an older backend, or a chat model, gets nothing extra.
+function imageOptionsField(imageOptions) {
+  return imageOptions && Object.keys(imageOptions).length ? { image_options: imageOptions } : {};
+}
+
 export const api = {
   // Auth
   getAuthConfig: () => request("/auth/config"),
@@ -124,7 +129,8 @@ export const api = {
   },
 
   // planMode: 📋 (#114). runPlan: the id of the reply whose plan this turn carries out.
-  async sendMessage(chatId, { content, images, attachments, serverId, model, useTools, askEveryTool, planMode, runPlan, signal }, onPiece) {
+  // imageOptions: the 🎨 picker's {size?, steps?, seed?} — only what is set (image models only).
+  async sendMessage(chatId, { content, images, attachments, serverId, model, useTools, askEveryTool, planMode, runPlan, imageOptions, signal }, onPiece) {
     const resp = await fetch(`${BASE}/chats/${chatId}/messages`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -137,6 +143,7 @@ export const api = {
         ask_every_tool: !!askEveryTool,
         plan_mode: !!planMode,
         ...(runPlan ? { run_plan: runPlan } : {}),
+        ...imageOptionsField(imageOptions),
         ...normalizeTarget(serverId, model),
       }),
       signal,
@@ -145,14 +152,14 @@ export const api = {
   },
 
   // Edit a user message / reroute it to a different model → truncate + regen (same chat).
-  async editMessage(chatId, messageId, { content, serverId, model, useTools, askEveryTool, planMode, signal }, onPiece) {
+  async editMessage(chatId, messageId, { content, serverId, model, useTools, askEveryTool, planMode, imageOptions, signal }, onPiece) {
     const resp = await fetch(`${BASE}/chats/${chatId}/messages/${messageId}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
       body: JSON.stringify({
         content, use_tools: !!useTools, ask_every_tool: !!askEveryTool, plan_mode: !!planMode,
-        ...normalizeTarget(serverId, model),
+        ...imageOptionsField(imageOptions), ...normalizeTarget(serverId, model),
       }),
       signal,
     });
@@ -192,14 +199,14 @@ export const api = {
   },
 
   // Fork a new chat from history. onChatId(newId) comes from the header, then the stream flows.
-  async forkChat(chatId, { messageId, content, serverId, model, useTools, askEveryTool, planMode, signal }, onChatId, onPiece) {
+  async forkChat(chatId, { messageId, content, serverId, model, useTools, askEveryTool, planMode, imageOptions, signal }, onChatId, onPiece) {
     const resp = await fetch(`${BASE}/chats/${chatId}/fork`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
       body: JSON.stringify({
         message_id: messageId, content, use_tools: !!useTools, ask_every_tool: !!askEveryTool,
-        plan_mode: !!planMode, ...normalizeTarget(serverId, model),
+        plan_mode: !!planMode, ...imageOptionsField(imageOptions), ...normalizeTarget(serverId, model),
       }),
       signal,
     });

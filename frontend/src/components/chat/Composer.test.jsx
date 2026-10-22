@@ -52,3 +52,30 @@ describe("Composer — ask before every tool", () => {
     expect(toggle().title).toMatch(/Every tool call waits/);
   });
 });
+
+describe("Composer — image models (🎨)", () => {
+  const opts = { size: "", steps: "", seed: "" };
+
+  test("a chat model gets the tools button and no image settings", () => {
+    composer({ imageModel: false, imageOptions: opts });
+    expect(screen.queryByText("Size")).toBeNull();
+    expect(screen.getByTitle(/Tools/)).toBeTruthy();
+  });
+
+  test("an image model gets size / steps / seed instead of the tools button", () => {
+    composer({ imageModel: true, imageOptions: opts, onImageOptionsChange: () => {} });
+    expect(screen.getByText("Size")).toBeTruthy();
+    expect(screen.getByText("Steps")).toBeTruthy();
+    expect(screen.getByPlaceholderText("random")).toBeTruthy();
+    expect(screen.queryByTitle(/Tools/)).toBeNull();
+  });
+
+  test("changes report the whole settings object; the seed keeps digits only", () => {
+    const onChange = vi.fn();
+    composer({ imageModel: true, imageOptions: opts, onImageOptionsChange: onChange });
+    fireEvent.change(screen.getAllByRole("combobox")[0], { target: { value: "1024x1536" } });
+    expect(onChange).toHaveBeenLastCalledWith({ size: "1024x1536", steps: "", seed: "" });
+    fireEvent.change(screen.getByPlaceholderText("random"), { target: { value: "12a3" } });
+    expect(onChange).toHaveBeenLastCalledWith({ size: "", steps: "", seed: "123" });
+  });
+});

@@ -14,8 +14,12 @@ Read this file before upgrading.
 - **Image generation.** Image models on OpenAI-compatible servers (Qwen-Image, FLUX, SDXL,
   dall-e, gpt-image…) can be picked like a chat model, marked 🎨 in the picker. Your message is
   the prompt; the reply is the picture, with its size and how long it took. Detection is by name;
-  `force_image` / `force_chat` in `config/vision_models.yml` correct it. Size and seed are the
-  server's defaults for now. Generated pictures are not sent back to later turns.
+  `force_image` / `force_chat` in `config/vision_models.yml` correct it. Generated pictures are
+  not sent back to later turns.
+- **🎨 settings for image models:** size (square, landscape, portrait, 16:9, 9:16), steps and seed,
+  above the text box while an image model is selected. Anything left at "Default" is not sent,
+  so servers that do not know steps or seed keep working. The reply's caption shows the steps
+  and seed when the server reports them, so the same picture can be made again.
 
 ## [0.7.0] — 2026-10-04
 
