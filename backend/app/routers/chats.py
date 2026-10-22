@@ -192,7 +192,7 @@ def build_stream_response(
     chat_id: int, target: dict, model: str, history: list[dict],
     use_tools: bool = False, extra_headers: dict | None = None, user_id: int | None = None,
     summary: str | None = None, ask_every_tool: bool = False, agent: bool = False,
-    plan_mode: bool = False, run_plan: dict | None = None,
+    plan_mode: bool = False, run_plan: dict | None = None, image_options: dict | None = None,
 ) -> StreamingResponse:
     """Injects the system prompt (and optional tools), returns the NDJSON stream and saves the
     assistant message at the end.
@@ -510,7 +510,7 @@ def build_stream_response(
     # The loop runs as a background task (turns.py): this response only follows it, so a
     # closed tab or a dropped connection no longer stops the reply (#85).
     if llm.is_image_model(target, model):
-        gen = _image_turn(chat_id, target, model, history)
+        gen = _image_turn(chat_id, target, model, history, image_options)
     else:
         gen = generate()
     try:
@@ -540,10 +540,12 @@ def _upstream_detail(e: Exception) -> str:
     return str(msg)[:300] if msg else ""
 
 
-async def _image_turn(chat_id: int, target: dict, model: str, history: list[dict]):
+async def _image_turn(chat_id: int, target: dict, model: str, history: list[dict], options: dict | None = None):
     """A turn on an image-generation model: the last user message is the prompt, the reply is the
     picture. No system prompt, no tools, no earlier turns — an image endpoint takes one prompt.
-    The reply is saved with the picture in `images` and a one-line caption as its text."""
+    `options` is the 🎨 picker's {size, steps, seed}. The reply is saved with the picture in
+    `images` and a one-line caption as its text: size · steps · seed · time, the parts the server
+    reported — enough to make the same picture again."""
     prompt = next((m.get("content") or "" for m in reversed(history) if m.get("role") == "user"), "").strip()
     caption, images, error_msg = "", [], None
     task = None
@@ -554,7 +556,7 @@ async def _image_turn(chat_id: int, target: dict, model: str, history: list[dict
             return
         yield json.dumps({"type": "search", "status": "image_generating"}) + "\n"
         started = time.perf_counter()
-        task = asyncio.create_task(llm.generate_image(target, model, prompt))
+        task = asyncio.create_task(llm.generate_image(target, model, prompt, options))
         while not (await asyncio.wait({task}, timeout=IMAGE_HEARTBEAT))[0]:
             yield json.dumps({"type": "ping"}) + "\n"
         result = task.result()
@@ -566,6 +568,8 @@ async def _image_turn(chat_id: int, target: dict, model: str, history: list[dict
         size = openai_client.image_size(images[0])
         caption = " · ".join(filter(None, [
             f"{size[0]}×{size[1]}" if size else "",
+            f"{result['steps']} steps" if result.get("steps") else "",
+            f"seed {result['seed']}" if result.get("seed") is not None else "",
             f"{time.perf_counter() - started:.0f} s",
         ]))
         if result.get("revised_prompt"):
@@ -747,6 +751,10 @@ def delete_chat(
     turns.cancel(chat_id)
 
 
+def _options(payload) -> dict | None:
+    return payload.image_options.model_dump(exclude_none=True) if payload.image_options else None
+
+
 @router.post("/{chat_id}/messages")
 async def send_message(
     chat_id: int,
@@ -778,6 +786,7 @@ async def send_message(
         ask_every_tool=payload.ask_every_tool, agent=chat.mode == "agent",
         # Running the plan leaves plan mode for that turn, whatever the toggle says.
         plan_mode=payload.plan_mode and run_plan is None, run_plan=run_plan,
+        image_options=_options(payload),
     )
 
 
@@ -871,6 +880,7 @@ async def edit_message(
     return build_stream_response(
         chat_id, target, model, history, use_tools=payload.use_tools, user_id=user.id, summary=summary,
         ask_every_tool=payload.ask_every_tool, agent=chat.mode == "agent", plan_mode=payload.plan_mode,
+        image_options=_options(payload),
     )
 
 
@@ -930,7 +940,7 @@ async def fork_chat(
         new_chat.id, target, model, history,
         use_tools=payload.use_tools, user_id=user.id, summary=summary,
         ask_every_tool=payload.ask_every_tool, agent=new_chat.mode == "agent", plan_mode=payload.plan_mode,
-        extra_headers={"X-Calivi-Chat-Id": str(new_chat.id)},
+        extra_headers={"X-Calivi-Chat-Id": str(new_chat.id)}, image_options=_options(payload),
     )
 
 

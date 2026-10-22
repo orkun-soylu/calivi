@@ -1,7 +1,7 @@
 import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class RegisterIn(BaseModel):
@@ -226,6 +226,14 @@ class CompactIn(BaseModel):
     model: str | None = None
 
 
+class ImageOptions(BaseModel):
+    """Settings for a turn on an image-generation model (the 🎨 picker). Unset → the server's default.
+    `steps` and `seed` are not in OpenAI's API; they are sent only when set."""
+    size: str | None = Field(None, pattern=r"^[1-9][0-9]{1,4}x[1-9][0-9]{1,4}$")
+    steps: int | None = Field(None, ge=1, le=150)
+    seed: int | None = Field(None, ge=0, le=2**63 - 1)
+
+
 class SendMessageIn(BaseModel):
     content: str
     images: list[str] = []  # base64 data-URI listesi (vision)
@@ -236,6 +244,7 @@ class SendMessageIn(BaseModel):
     ask_every_tool: bool = False  # when on, every tool call waits for the user's approval
     plan_mode: bool = False  # 📋 (#114): the model may only inspect, then proposes a plan
     run_plan: int | None = None  # the id of the reply whose plan the owner approves with this turn
+    image_options: ImageOptions | None = None  # image models only
 
 
 class EditMessageIn(BaseModel):
@@ -246,6 +255,7 @@ class EditMessageIn(BaseModel):
     use_tools: bool = False
     ask_every_tool: bool = False
     plan_mode: bool = False
+    image_options: ImageOptions | None = None  # image models only
 
 
 class ForkIn(BaseModel):
@@ -258,3 +268,4 @@ class ForkIn(BaseModel):
     use_tools: bool = False
     ask_every_tool: bool = False
     plan_mode: bool = False
+    image_options: ImageOptions | None = None  # image models only

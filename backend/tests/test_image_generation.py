@@ -127,7 +127,7 @@ async def test_a_url_answer_is_fetched_so_the_chat_keeps_the_picture(upstream):
 
     upstream["handler"] = handler
     out = await openai_client.generate_image("http://img.test/v1", None, "dall-e-3", "fox")
-    assert out == {"images": [_uri(jpeg, "image/jpeg")], "revised_prompt": "A red fox"}
+    assert out == {"images": [_uri(jpeg, "image/jpeg")], "revised_prompt": "A red fox", "seed": None, "steps": None}
 
 
 def test_image_size_reads_png_and_jpeg_headers():
@@ -173,7 +173,7 @@ def _replies(chat_id):
 async def test_the_last_user_message_is_the_prompt_and_the_picture_is_saved(chat_id, monkeypatch):
     seen = {}
 
-    async def gen(server, model, prompt):
+    async def gen(server, model, prompt, options=None):
         seen.update(model=model, prompt=prompt)
         return {"images": [_uri(_png(1024, 1024))], "revised_prompt": None}
 
@@ -198,7 +198,7 @@ async def test_the_last_user_message_is_the_prompt_and_the_picture_is_saved(chat
 async def test_a_slow_picture_keeps_the_stream_alive(chat_id, monkeypatch):
     import asyncio
 
-    async def slow(server, model, prompt):
+    async def slow(server, model, prompt, options=None):
         await asyncio.sleep(0.05)
         return {"images": [_uri(_png(64, 64))], "revised_prompt": None}
 
@@ -259,3 +259,76 @@ def test_a_generated_picture_is_not_sent_back_as_history(chat_id):
     finally:
         db.close()
     assert [m["images"] for m in history] == [["data:image/png;base64,U"], []]
+
+
+# ── v2: size / steps / seed ──────────────────────────────────────────────────
+
+async def test_only_the_options_that_are_set_go_out(upstream):
+    raw = _png(1536, 1024)
+    upstream["handler"] = lambda r: httpx.Response(200, json={"data": [
+        {"b64_json": base64.b64encode(raw).decode(), "seed": 42, "steps": 20}]})
+    out = await openai_client.generate_image("http://img.test/v1", None, "qwen-image-2.1", "fox",
+                                             {"size": "1536x1024", "steps": 20, "seed": None, "junk": 1})
+    body = json.loads(upstream["requests"][0].content)
+    assert body == {"model": "qwen-image-2.1", "prompt": "fox", "n": 1, "size": "1536x1024", "steps": 20}
+    assert (out["seed"], out["steps"]) == (42, 20)
+
+
+async def test_the_caption_says_how_to_make_the_same_picture_again(chat_id, monkeypatch):
+    got = {}
+
+    async def gen(server, model, prompt, options=None):
+        got["options"] = options
+        return {"images": [_uri(_png(1024, 1536))], "revised_prompt": None, "seed": 7, "steps": 20}
+
+    monkeypatch.setattr(llm, "generate_image", gen)
+    resp = build_stream_response(chat_id, OPENAI, "qwen-image-2.1", [{"role": "user", "content": "x"}],
+                                 image_options={"size": "1024x1536", "steps": 20})
+    async for _ in resp.body_iterator:
+        pass
+    assert got["options"] == {"size": "1024x1536", "steps": 20}
+    [reply] = _replies(chat_id)
+    assert reply.content.startswith("1024×1536 · 20 steps · seed 7 · ")
+
+
+async def test_send_edit_and_fork_pass_the_options_through(client, admin, monkeypatch):
+    calls = []
+
+    async def gen(server, model, prompt, options=None):
+        calls.append(options)
+        return {"images": [_uri(_png(64, 64))], "revised_prompt": None, "seed": None, "steps": None}
+
+    monkeypatch.setattr(llm, "generate_image", gen)
+    db = SessionLocal()
+    srv = models.Server(name="gpu-box", type="openai", host="", port=0, base_url="http://img.test/v1")
+    db.add(srv)
+    db.commit()
+    sid = srv.id
+    db.close()
+    chat = (await client.post("/api/chats", json={})).json()
+    body = {"content": "fox", "server_id": sid, "model": "qwen-image-2.1",
+            "image_options": {"size": "1024x1024", "seed": 5}}
+    r = await client.post(f"/api/chats/{chat['id']}/messages", json=body)
+    assert r.status_code == 200
+    await r.aread()
+    msgs = (await client.get(f"/api/chats/{chat['id']}")).json()["messages"]
+    user_id = msgs[0]["id"]
+    r = await client.put(f"/api/chats/{chat['id']}/messages/{user_id}",
+                         json={**body, "image_options": {"steps": 30}})
+    await r.aread()
+    r = await client.post(f"/api/chats/{chat['id']}/fork", json={**body, "message_id": user_id})
+    await r.aread()
+    for _ in range(50):  # the turns run as background tasks
+        if len(calls) == 3:
+            break
+        import asyncio
+        await asyncio.sleep(0.02)
+    assert calls == [{"size": "1024x1024", "seed": 5}, {"steps": 30}, {"size": "1024x1024", "seed": 5}]
+
+
+@pytest.mark.parametrize("bad", [{"size": "big"}, {"size": "1024x"}, {"steps": 0}, {"steps": 500}, {"seed": -1}])
+async def test_nonsense_options_are_refused(client, admin, bad):
+    chat = (await client.post("/api/chats", json={})).json()
+    r = await client.post(f"/api/chats/{chat['id']}/messages",
+                          json={"content": "x", "server_id": 1, "model": "m", "image_options": bad})
+    assert r.status_code == 422

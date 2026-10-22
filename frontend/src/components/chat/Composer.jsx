@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { AttachmentChip } from "./MessageActions.jsx";
+import ImageOptions from "./ImageOptions.jsx";
 import { useT } from "../../i18n.js";
 
 /** Bottom bar: attach/search buttons, auto-grow textarea, send/stop + attachment previews. */
@@ -23,6 +24,9 @@ export default function Composer({
   onToggleAskEveryTool,
   planMode = false,
   onTogglePlanMode,
+  imageModel = false,
+  imageOptions,
+  onImageOptionsChange,
 }) {
   const t = useT();
   const fileInputRef = useRef(null);
@@ -93,6 +97,7 @@ export default function Composer({
           ))}
         </div>
       )}
+      {imageModel && <ImageOptions value={imageOptions} onChange={onImageOptionsChange} />}
       {/* With the host toggles (🛡 📋) four buttons leave a phone's text box too narrow to type
           in, so there it takes a row of its own above them. */}
       <div className={`flex gap-2 items-end ${hostTools ? "flex-wrap md:flex-nowrap" : ""}`}>
@@ -105,6 +110,8 @@ export default function Composer({
             <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
           </svg>
         </button>
+        {/* Tools mean nothing to an image model: its turn is one prompt → one picture. */}
+        {!imageModel && (
         <button
           onClick={onToggleUseTools}
           title={useTools ? t("chat.toolsOn") : t("chat.toolsOff")}
@@ -117,6 +124,7 @@ export default function Composer({
             <path d="M14.7 6.3l3-3a4 4 0 0 1 3 6l-1.7 1.7" />
           </svg>
         </button>
+        )}
         {/* Only where the model can operate the host: elsewhere the default policy already
             asks for every tool that changes anything. */}
         {hostTools && (
