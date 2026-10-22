@@ -22,6 +22,8 @@ export function searchLabel(t, info) {
       return t("search.empty", { query: info.query });
     case "skip":
       return t("search.skip");
+    case "image_generating":
+      return t("image.generating");
     case "tool_running":
       return t("tools.running", { name: info.name });
     case "tool_done":

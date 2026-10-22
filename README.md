@@ -267,7 +267,7 @@ request — **no restart needed**. Most are also editable from the Settings UI.
 | `config/system_prompts.yml` | Per-model system prompts (the `default` key is the fallback) — **not in git**, see below |
 | `config/tools.yml` | Tool (function-calling) layer: on/off, loop cap, `web_search` options |
 | `config/search.yml` | Web search: query-generation prompt, result count |
-| `config/vision_models.yml` | Manual overrides for vision detection (`force_vision` / `force_text`) |
+| `config/vision_models.yml` | Manual overrides for vision and image-generation detection (`force_vision` / `force_text`, `force_image` / `force_chat`) |
 | `searxng/settings.yml` | Bundled SearXNG. No port is exposed; change `secret_key` if you expose it publicly |
 
 `config/system_prompts.yml` is **git-ignored**: system prompts tend to name your own

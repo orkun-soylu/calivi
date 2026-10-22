@@ -102,6 +102,7 @@ class ServerOut(BaseModel):
     status: str = "unknown"  # "up" | "down"
     models: list[str] = []
     vision_models: list[str] = []  # subset of models: those supporting images (vision)
+    image_models: list[str] = []  # subset of models: those that generate images (/images/generations)
 
 
 class McpServerCreate(BaseModel):

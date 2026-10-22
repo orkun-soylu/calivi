@@ -146,7 +146,7 @@ export default function MessageList({
 
         {sending && approval && !agent && <ApprovalCard approval={approval} onDecide={onDecide} />}
 
-        {sending && searchInfo && !agent && (
+        {sending && searchInfo && (!agent || searchInfo.status === "image_generating") && (
           <div className="flex justify-start">
             <div className="max-w-[88%] md:max-w-[70%] rounded-xl px-3 py-1.5 bg-neutral-900 text-neutral-400 text-xs">
               {searchLabel(t, searchInfo)}

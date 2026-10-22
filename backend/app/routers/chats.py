@@ -1,3 +1,4 @@
+import asyncio
 import json
 import time
 
@@ -7,7 +8,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app import auth, compaction, config, models, schemas, llm, tools_config
+from app import auth, compaction, config, models, schemas, llm, openai_client, tools_config
 from app.database import get_db, SessionLocal
 from app.system_prompts import get_system_prompt
 from app import approval_rules, approvals, audit, turns
@@ -508,14 +509,90 @@ def build_stream_response(
 
     # The loop runs as a background task (turns.py): this response only follows it, so a
     # closed tab or a dropped connection no longer stops the reply (#85).
+    if llm.is_image_model(target, model):
+        gen = _image_turn(chat_id, target, model, history)
+    else:
+        gen = generate()
     try:
-        turn = turns.start(chat_id, user_id, generate())
+        turn = turns.start(chat_id, user_id, gen)
     except turns.Busy:
         raise HTTPException(409, BUSY_MESSAGE)
     return StreamingResponse(turns.follow(turn), media_type="application/x-ndjson", headers=extra_headers)
 
 
 BUSY_MESSAGE = "This chat is still answering. Stop it or wait for it to finish."
+
+# Nothing flows while a picture is being made (30-90 s on a local diffusion model); a ping keeps
+# proxies from dropping the idle stream.
+IMAGE_HEARTBEAT = 10.0
+NO_PROMPT_MESSAGE = "An image model needs a text prompt: describe the picture you want."
+
+
+def _upstream_detail(e: Exception) -> str:
+    """The error text an OpenAI-compatible server put in its body (`error.message`), if any."""
+    if not isinstance(e, httpx.HTTPStatusError):
+        return ""
+    try:
+        err = e.response.json().get("error")
+    except ValueError:
+        return ""
+    msg = err.get("message") if isinstance(err, dict) else err
+    return str(msg)[:300] if msg else ""
+
+
+async def _image_turn(chat_id: int, target: dict, model: str, history: list[dict]):
+    """A turn on an image-generation model: the last user message is the prompt, the reply is the
+    picture. No system prompt, no tools, no earlier turns — an image endpoint takes one prompt.
+    The reply is saved with the picture in `images` and a one-line caption as its text."""
+    prompt = next((m.get("content") or "" for m in reversed(history) if m.get("role") == "user"), "").strip()
+    caption, images, error_msg = "", [], None
+    task = None
+    try:
+        if not prompt:
+            error_msg = NO_PROMPT_MESSAGE
+            yield json.dumps({"type": "error", "message": error_msg}) + "\n"
+            return
+        yield json.dumps({"type": "search", "status": "image_generating"}) + "\n"
+        started = time.perf_counter()
+        task = asyncio.create_task(llm.generate_image(target, model, prompt))
+        while not (await asyncio.wait({task}, timeout=IMAGE_HEARTBEAT))[0]:
+            yield json.dumps({"type": "ping"}) + "\n"
+        result = task.result()
+        images = result["images"]
+        if not images:
+            error_msg = "The image server returned no image."
+            yield json.dumps({"type": "error", "message": error_msg}) + "\n"
+            return
+        size = openai_client.image_size(images[0])
+        caption = " · ".join(filter(None, [
+            f"{size[0]}×{size[1]}" if size else "",
+            f"{time.perf_counter() - started:.0f} s",
+        ]))
+        if result.get("revised_prompt"):
+            caption += f"\n\n{result['revised_prompt']}"
+        yield json.dumps({"type": "content", "text": caption}) + "\n"
+    except Exception as e:
+        detail = _upstream_detail(e)
+        error_msg = _humanize_error(e) + (f" {detail}" if detail else "")
+        yield json.dumps({"type": "error", "message": error_msg}) + "\n"
+    finally:
+        if task is not None and not task.done():
+            task.cancel()  # Stop: the request is dropped; the server may still finish its picture
+        content = f"⚠️ {error_msg}" if error_msg else caption
+        if content.strip() or images:
+            save_db = SessionLocal()
+            try:
+                if save_db.get(models.Chat, chat_id) is not None:
+                    save_db.add(models.Message(
+                        chat_id=chat_id, role="assistant", content=content, images=images or None,
+                        model_used=model, server_used=target["name"],
+                    ))
+                    save_db.query(models.Chat).filter(models.Chat.id == chat_id).update({"updated_at": models.utcnow()})
+                    save_db.commit()
+            except IntegrityError:
+                save_db.rollback()
+            finally:
+                save_db.close()
 
 
 def _ensure_idle(chat_id: int) -> None:
@@ -560,8 +637,12 @@ def _context_of(db: Session, chat_id: int) -> tuple[list[dict], str | None]:
             # Chat mode keeps no steps, so the plan would vanish from the model's view and a
             # "change it" reply would have nothing to change. Agent mode replays propose_plan.
             content = f"{content}\n\n{planning.as_text(m.plan)}".strip()
+        # A generated picture (an image model's reply) stays out of the history: chat APIs take
+        # images on user messages only, and OpenAI rejects them on an assistant turn outright.
+        # The reply's text still says a picture was made.
+        images = (m.images or []) if m.role == "user" else []
         history.append(
-            {"role": m.role, "content": content, "images": m.images or [], "attachments": m.attachments or []}
+            {"role": m.role, "content": content, "images": images, "attachments": m.attachments or []}
         )
     return history, compaction.active_summary(chat)
 

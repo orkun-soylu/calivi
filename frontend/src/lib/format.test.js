@@ -39,6 +39,10 @@ describe("searchLabel", () => {
     expect(searchLabel(t, { status: "done", query: "x", count: 3 })).toContain("search.done");
   });
 
+  test("an image model at work has its own line", () => {
+    expect(searchLabel(t, { status: "image_generating" })).toBe("image.generating");
+  });
+
   test("an unknown status does not crash, it falls back to the icon", () => {
     expect(searchLabel(t, { status: "something-new" })).toBe("🔍");
   });

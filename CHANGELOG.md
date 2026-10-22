@@ -9,6 +9,14 @@ Read this file before upgrading.
 
 ## [Unreleased]
 
+### Added
+
+- **Image generation.** Image models on OpenAI-compatible servers (Qwen-Image, FLUX, SDXL,
+  dall-e, gpt-image…) can be picked like a chat model, marked 🎨 in the picker. Your message is
+  the prompt; the reply is the picture, with its size and how long it took. Detection is by name;
+  `force_image` / `force_chat` in `config/vision_models.yml` correct it. Size and seed are the
+  server's defaults for now. Generated pictures are not sent back to later turns.
+
 ## [0.7.0] — 2026-10-04
 
 calivi-vm: the owner can see, narrow and plan what the model does on the machine. An audit log

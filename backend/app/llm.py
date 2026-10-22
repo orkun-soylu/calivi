@@ -39,6 +39,23 @@ async def model_capabilities(server: dict, model_names: list[str]) -> tuple[list
     return live, [m for m in live if vision.apply_overrides(m, base.get(m, False))]
 
 
+def image_models(server: dict, model_names: list[str]) -> list[str]:
+    """The image-generation models among model_names. Only OpenAI-compatible servers have the
+    `/images/generations` endpoint they are sent to."""
+    if not _is_openai(server):
+        return []
+    return [m for m in model_names if vision.is_image_generator(m)]
+
+
+def is_image_model(server: dict, model: str) -> bool:
+    return bool(image_models(server, [model]))
+
+
+async def generate_image(server: dict, model: str, prompt: str) -> dict:
+    """{"images": [data URI], "revised_prompt": str | None} — see openai_client.generate_image."""
+    return await openai_client.generate_image(server.get("base_url") or "", server.get("api_key"), model, prompt)
+
+
 async def vision_models(server: dict, model_names: list[str]) -> list[str]:
     """Returns the vision-capable subset of model_names."""
     _, vis = await model_capabilities(server, model_names)

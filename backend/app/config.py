@@ -63,6 +63,9 @@ OLLAMA_PROBE_TIMEOUT = 2.0
 # is dropped before the model has said anything, and the user sees a bare timeout with no clue
 # that the prompt was simply too long. Configurable so large-context setups can raise it.
 OLLAMA_CHAT_TIMEOUT = float(os.environ.get("OLLAMA_CHAT_TIMEOUT", "300"))
+# One `/images/generations` request: nothing streams back until the picture is done, and a local
+# diffusion model takes 30-90 s at 1024px (minutes for larger sizes or more steps).
+IMAGE_GEN_TIMEOUT = float(os.environ.get("IMAGE_GEN_TIMEOUT", "600"))
 # Conversation compaction (compaction.py). Compaction is always user-triggered; the threshold
 # only decides when the UI suggests it. A turn = a user message plus the replies after it.
 COMPACT_SUGGEST_TOKENS = int(os.environ.get("COMPACT_SUGGEST_TOKENS", "16000"))

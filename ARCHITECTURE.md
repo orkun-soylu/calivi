@@ -459,6 +459,53 @@ pasting is not broken).
 > **Diagnostic note:** when someone reports "pasting doesn't work", check **whether the selected
 > model is vision-capable** first; the `onPaste` prop chain was fine.
 
+## Image generation (text → image)
+
+An image-generation model (Qwen-Image, FLUX, SDXL, dall-e, gpt-image…) is picked like any chat
+model; its turn is a picture, not text.
+
+**Detection (`vision.is_image_generator` + `llm.image_models`):** `ServerOut.image_models` is a
+subset of models. Only **OpenAI-compatible** servers are asked — the turn goes to their
+`/images/generations`, which Ollama does not have. OpenAI's `/models` says nothing about what a
+model does, so it is the name: a deliberately **narrow** hint list (`qwen-image`, `flux`, `sdxl`,
+`stable-diffusion`, `sd3`, `dall-e`, `gpt-image`, `hidream`). Narrow because the two mistakes are
+not equal: a chat model taken for an image model never gets a chat turn again, while a missed
+image model only fails the way it always did. `config/vision_models.yml` carries the overrides,
+`force_chat` > `force_image` > the name — same file as the vision overrides, so the config editor,
+the package and the appliance needed no new file. The picker marks these models with 🎨.
+
+> Some providers (OpenRouter) serve image models through `/chat/completions` with output
+> modalities, not `/images/generations`. A name such as `…/flux…` there is routed to an endpoint
+> the provider lacks and fails with a 404 → `force_chat` it.
+
+**The turn (`chats._image_turn`):** chosen in `build_stream_response` before the agentic loop.
+- The prompt is the **last user message's text**, as typed. No system prompt, no tools, no earlier
+  turns: an image endpoint takes one prompt. A message with no text (only a pasted image) is
+  refused before any request ("describe the picture you want").
+- `openai_client.generate_image` sends `{model, prompt, n: 1}` and **no `response_format`**
+  (gpt-image rejects the parameter). A `b64_json` answer is used as is; a `url` answer is
+  fetched, so the chat keeps the picture rather than a link that expires. Size, steps and seed are
+  the server's defaults.
+- Nothing streams while the picture is made (30–90 s on a local diffusion model), so the turn
+  emits `{"type":"search","status":"image_generating"}` (the activity line, shown in agent mode
+  too) and a `ping` every 10 s. Timeout `IMAGE_GEN_TIMEOUT` (600 s).
+- The reply is saved with the picture in `messages.images` (data URI, the column user images
+  already use — `MessageItem` renders it, the lightbox opens it) and a caption as its text:
+  `1024×1024 · 34 s`, plus the server's `revised_prompt` when it sends one. The size comes from
+  the image header (`openai_client.image_size`), not from the request.
+- An upstream error shows the server's own `error.message` after the usual HTTP line — "HTTP 400"
+  alone does not tell the user that the size was too large.
+- Stop cancels the request; the server may still finish its picture, which is then discarded.
+
+**Generated pictures stay out of the history (`_context_of`):** assistant images are dropped when
+a later turn is built. Chat APIs take images on user messages only — OpenAI rejects an
+`image_url` part on an assistant message — and a later text model only needs to know a picture
+was made, which the caption says. To discuss a generated picture with a vision model, attach it
+again.
+
+Not yet: size / seed / steps controls in the composer, image editing (`/images/edits`), and a
+`generate_image` tool for chat models.
+
 ## Document (PDF/doc/txt) support
 
 Feeds text-based documents (PDF/docx/txt/code/csv/json...) to the model as **lossless text**
@@ -1439,7 +1486,7 @@ as an unhandled `IntegrityError` (a 500).
 
 ## Tests
 
-### Frontend — `npm test` (vitest + jsdom, 117 tests)
+### Frontend — `npm test` (vitest + jsdom, 120 tests)
 
 ```bash
 cd frontend && npm install && npm test     # or: npm run test:watch
@@ -1462,7 +1509,7 @@ button, back gesture; `matchMedia` is mocked since jsdom has none),
 Fake timers (`vi.useFakeTimers`) deadlock with RTL's async `act` wrapper; the two tests that verify
 delay behaviour deliberately use **real** timers (~3s).
 
-### Backend — pytest (592 tests)
+### Backend — pytest (616 tests)
 
 `backend/tests/` — pytest + `httpx.ASGITransport` (a real HTTP layer, no live server needed). They
 do not ship in the prod image: the `Dockerfile` installs only `requirements.txt`, and the test
