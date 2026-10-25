@@ -21,6 +21,11 @@ Read this file before upgrading.
   so servers that do not know steps or seed keep working. The reply's caption shows the steps
   and seed when the server reports them, so the same picture can be made again.
 
+### Security
+
+- Dependency update for a published advisory: pypdf 6.19.0 → 6.21.1 (unvalidated JPEG image
+  data in crafted PDFs, reachable through the document upload).
+
 ## [0.7.0] — 2026-10-04
 
 calivi-vm: the owner can see, narrow and plan what the model does on the machine. An audit log
