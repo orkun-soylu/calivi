@@ -23,8 +23,9 @@ Read this file before upgrading.
 
 ### Security
 
-- Dependency update for a published advisory: pypdf 6.19.0 → 6.21.1 (unvalidated JPEG image
-  data in crafted PDFs, reachable through the document upload).
+- Dependency updates for published advisories: pypdf 6.19.0 → 6.21.2 (unvalidated JPEG image
+  data and long runtimes on malformed cross-references in crafted PDFs, reachable through the
+  document upload) and, development only, vite 6.4.3 → 6.4.5 and undici 7.30.0 → 7.30.1.
 
 ## [0.7.0] — 2026-10-04
 
