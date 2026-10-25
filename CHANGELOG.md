@@ -9,6 +9,14 @@ Read this file before upgrading.
 
 ## [Unreleased]
 
+## [0.7.1] — 2026-10-25
+
+Image-generation models as a chat target, and security updates for the document upload.
+
+> **Upgrading:** `apt upgrade` on a machine with apt.calivi.ai, or install
+> `calivi_0.7.1-1+<distro>_amd64.deb` from this release. Docker installs: rebuild as usual.
+> No schema change.
+
 ### Added
 
 - **Image generation.** Image models on OpenAI-compatible servers (Qwen-Image, FLUX, SDXL,
@@ -456,7 +464,8 @@ someone can install and stay on, instead of tracking `main`.
 - **About 700 MB on disk for the whole stack**, web search included — backend 230 MB, frontend
   95.8 MB, SearXNG 372 MB (measured on arm64).
 
-[Unreleased]: https://github.com/orkun-soylu/calivi/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/orkun-soylu/calivi/compare/v0.7.1...HEAD
+[0.7.1]: https://github.com/orkun-soylu/calivi/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/orkun-soylu/calivi/compare/v0.6.6...v0.7.0
 [0.6.6]: https://github.com/orkun-soylu/calivi/compare/v0.6.5...v0.6.6
 [0.6.5]: https://github.com/orkun-soylu/calivi/compare/v0.6.4...v0.6.5
