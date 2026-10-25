@@ -21,6 +21,12 @@ Read this file before upgrading.
   so servers that do not know steps or seed keep working. The reply's caption shows the steps
   and seed when the server reports them, so the same picture can be made again.
 
+### Security
+
+- Dependency updates for published advisories: pypdf 6.19.0 → 6.20.1 (crafted-PDF infinite
+  loops and memory exhaustion, reachable through the document upload) and, development only,
+  vitest 5.0.0 → 5.0.5 (`@vitest/mocker` code injection and redirect-allowlist bypass).
+
 ## [0.7.0] — 2026-10-04
 
 calivi-vm: the owner can see, narrow and plan what the model does on the machine. An audit log
