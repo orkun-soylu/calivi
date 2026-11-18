@@ -15,8 +15,8 @@ Calivi is a chat app again, and only that: **calivi-vm is removed** (#143).
 
 > **Upgrading:** Docker installs rebuild as usual; no schema change, and an existing database
 > opens as it is. **calivi-vm installs (the `.deb`, the Proxmox image) get no further releases** —
-> `0.7.1` is the last. apt.calivi.ai is being retired; remove `/etc/apt/sources.list.d/calivi.sources`
-> on such a machine. Its code stays in the git history, tagged `calivi-vm-final`.
+> `0.7.1` is the last. apt.calivi.ai is gone; remove `/etc/apt/sources.list.d/calivi.sources`
+> on such a machine, or `apt update` will keep failing on it. Its code stays in the git history, tagged `calivi-vm-final`.
 
 ### Removed
 
