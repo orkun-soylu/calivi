@@ -9,6 +9,8 @@ Read this file before upgrading.
 
 ## [Unreleased]
 
+## [0.8.0] — 2026-11-19
+
 Calivi is a chat app again, and only that: **calivi-vm is removed** (#143).
 
 > **Upgrading:** Docker installs rebuild as usual; no schema change, and an existing database
@@ -480,7 +482,8 @@ someone can install and stay on, instead of tracking `main`.
 - **About 700 MB on disk for the whole stack**, web search included — backend 230 MB, frontend
   95.8 MB, SearXNG 372 MB (measured on arm64).
 
-[Unreleased]: https://github.com/orkun-soylu/calivi/compare/v0.7.1...HEAD
+[Unreleased]: https://github.com/orkun-soylu/calivi/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/orkun-soylu/calivi/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/orkun-soylu/calivi/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/orkun-soylu/calivi/compare/v0.6.6...v0.7.0
 [0.6.6]: https://github.com/orkun-soylu/calivi/compare/v0.6.5...v0.6.6
