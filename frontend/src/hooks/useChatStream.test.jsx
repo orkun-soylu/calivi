@@ -316,30 +316,14 @@ describe("stop vs detach — the reply runs on the server (#85)", () => {
   });
 });
 
-describe("agent mode — the live timeline (#91)", () => {
-  test("a tool call closes the text before it into its own item, as the backend stores it", async () => {
-    const { result } = renderHook(() => useChatStream());
-    const s = await startStream(result, { agent: true });
-    await s.emit({ type: "content", text: "Checking. " });
-    await s.emit({ type: "tool_call", name: "bash", args: { command: "ls" } });
-    expect(result.current.streaming).toBe("");
-    expect(result.current.timeline.map((i) => i.kind)).toEqual(["text", "call"]);
-    expect(result.current.timeline[0].text).toBe("Checking. ");
-    await s.emit({ type: "tool_result", name: "bash", ok: true, output: "a b" });
-    await s.emit({ type: "content", text: "Done." });
-    expect(result.current.timeline[1]).toMatchObject({ status: "ok", output: "a b" });
-    expect(result.current.streaming).toBe("Done.");
-    await s.finish();
-    expect(result.current.timeline).toEqual([]);
-  });
-
-  test("chat mode keeps its single bubble and no timeline", async () => {
+describe("tool calls stay in one bubble", () => {
+  test("text before a tool call stays in the streaming bubble", async () => {
     const { result } = renderHook(() => useChatStream());
     const s = await startStream(result, {});
     await s.emit({ type: "content", text: "Checking. " });
-    await s.emit({ type: "tool_call", name: "bash", args: { command: "ls" } });
+    await s.emit({ type: "tool_call", name: "web_search", args: { query: "x" } });
     expect(result.current.streaming).toBe("Checking. ");
-    expect(result.current.timeline).toEqual([]);
+    expect(result.current.searchInfo).toEqual({ status: "tool_running", name: "web_search" });
     await s.finish();
   });
 });
@@ -368,7 +352,7 @@ describe("one stream at a time — a second run replaces the first", () => {
     expect(first.signal().aborted).toBe(true);
     await first.emit({ type: "content", text: "stale " });
     await second.emit({ type: "content", text: "live" });
-    expect(result.current.streaming).toBe("live"); // not "stale live": no double timeline/text
+    expect(result.current.streaming).toBe("live"); // not "stale live": no doubled text
     await first.finish();
     expect(result.current.sending).toBe(true); // the first run's cleanup did not end the second
     expect(result.current.streaming).toBe("live");

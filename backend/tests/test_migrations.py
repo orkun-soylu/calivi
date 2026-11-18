@@ -131,3 +131,35 @@ def test_servers_without_disabled_tools_are_left_alone():
         assert db.query(models.McpServer).one().tool_modes is None  # defaults apply
     finally:
         db.close()
+
+
+# --- A database from the calivi-vm era (≤ 0.7.x) --------------------------------------------
+# Agent mode, plan mode and "always allow" rules left columns and a table behind. They are no
+# longer in the models and nothing migrates them away: an existing database must open, take new
+# chats and replies, and fork them, with those leftovers still there.
+
+
+def test_a_database_with_the_removed_agent_columns_still_works():
+    with engine.connect() as conn:
+        conn.exec_driver_sql("ALTER TABLE chats ADD COLUMN mode VARCHAR(10) NOT NULL DEFAULT 'chat'")
+        conn.exec_driver_sql("ALTER TABLE messages ADD COLUMN steps JSON")
+        conn.exec_driver_sql("ALTER TABLE messages ADD COLUMN plan JSON")
+        conn.exec_driver_sql(
+            "CREATE TABLE approval_rules (id INTEGER PRIMARY KEY, user_id INTEGER, tool VARCHAR(50))"
+        )
+        conn.commit()
+    _migrate()
+
+    db = SessionLocal()
+    try:
+        user = models.User(email="a@b.co", username="a", password_hash="x", role="admin")
+        db.add(user)
+        db.commit()
+        chat = models.Chat(title="t", user_id=user.id)  # `mode` is left to its column default
+        db.add(chat)
+        db.commit()
+        db.add(models.Message(chat_id=chat.id, role="assistant", content="hi"))
+        db.commit()
+        assert [m.content for m in db.get(models.Chat, chat.id).messages] == ["hi"]
+    finally:
+        db.close()

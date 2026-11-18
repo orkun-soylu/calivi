@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app import auth, config, host_bootstrap, models, schemas
+from app import auth, models, schemas
 from app.config import (
     LOGIN_MAX_ATTEMPTS,
     LOGIN_WINDOW_SECONDS,
@@ -13,7 +13,6 @@ from app.config import (
 )
 from app.database import get_db
 from app.rate_limit import SlidingWindowLimiter, login_key
-from app.routers.users import SUPER_ADMIN_ID
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -40,20 +39,10 @@ def _get_settings(db: Session) -> models.Setting:
 @router.get("/config", response_model=schemas.AuthConfigOut)
 def auth_config(db: Session = Depends(get_db)):
     """Unauthenticated: lets the login screen show or hide the signup tab."""
-    return schemas.AuthConfigOut(
-        registration_enabled=_get_settings(db).registration_enabled,
-        host_setup=host_bootstrap.required(db.query(models.User).count()),
-    )
+    return schemas.AuthConfigOut(registration_enabled=_get_settings(db).registration_enabled)
 
 
-def _me(user: models.User) -> schemas.MeOut:
-    out = schemas.MeOut.model_validate(user)
-    # Mirrors the loop's rule: host tools are privileged, and privileged means id 1.
-    out.host_tools = config.HOST_TOOLS_ENABLED and user.id == SUPER_ADMIN_ID
-    return out
-
-
-@router.post("/register", response_model=schemas.MeOut)
+@router.post("/register", response_model=schemas.UserOut)
 def register(payload: schemas.RegisterIn, response: Response, db: Session = Depends(get_db)):
     email = payload.email.strip().lower()
     username = payload.username.strip()
@@ -82,24 +71,6 @@ def register(payload: schemas.RegisterIn, response: Response, db: Session = Depe
     if db.query(models.User).filter(models.User.username == username).first():
         raise HTTPException(409, "That username is already taken")
 
-    # Appliance: the first registration claims the machine. Code first — nobody learns anything
-    # about the other fields without it — then the root helper; the Calivi user is written
-    # only if that succeeded.
-    claims_host = host_bootstrap.required(user_count)
-    if claims_host:
-        try:
-            host_bootstrap.check_setup_code(payload.setup_code)
-            host_bootstrap.validate(username, (payload.hostname or "").strip() or None)
-            host_bootstrap.run_helper({
-                "username": username,
-                "password": payload.password,
-                "hostname": (payload.hostname or "").strip() or None,
-                "timezone": (payload.timezone or "").strip() or None,
-                "ssh_key": (payload.ssh_key or "").strip() or None,
-            })
-        except host_bootstrap.BootstrapError as e:
-            raise HTTPException(e.status, e.message)
-
     user = models.User(
         email=email,
         username=username,
@@ -115,17 +86,12 @@ def register(payload: schemas.RegisterIn, response: Response, db: Session = Depe
         db.rollback()
         raise HTTPException(409, "That email or username is already registered")
     db.refresh(user)
-    if claims_host:
-        # Registration was open only so the owner could arrive. On a machine where the super
-        # admin holds a root shell, more accounts are the owner's decision to make.
-        _get_settings(db).registration_enabled = False
-        db.commit()
     register_limiter.record("global")
     auth.set_session_cookie(response, user.id)
-    return _me(user)
+    return user
 
 
-@router.post("/login", response_model=schemas.MeOut)
+@router.post("/login", response_model=schemas.UserOut)
 def login(payload: schemas.LoginIn, response: Response, db: Session = Depends(get_db)):
     ident = payload.identifier.strip()
     user = (
@@ -161,7 +127,7 @@ def login(payload: schemas.LoginIn, response: Response, db: Session = Depends(ge
 
     login_limiter.reset(key)
     auth.set_session_cookie(response, user.id)
-    return _me(user)
+    return user
 
 
 @router.post("/logout")
@@ -170,6 +136,6 @@ def logout(response: Response):
     return {"ok": True}
 
 
-@router.get("/me", response_model=schemas.MeOut)
+@router.get("/me", response_model=schemas.UserOut)
 def me(user: models.User = Depends(auth.get_current_user)):
-    return _me(user)
+    return user

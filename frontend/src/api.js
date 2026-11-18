@@ -88,24 +88,16 @@ export const api = {
   // MCP servers (admin only). `refresh=1` forces a live probe instead of the TTL cache —
   // an MCP probe opens a real session, so it is not something to do on every render.
   // Decide on a pending tool call; unblocks the stream that is still open.
-  // `rule` ("Always allow…", calivi-vm): saved first, then the call is approved (#113).
-  respondToApproval: (chatId, approvalId, approved, rule) =>
+  respondToApproval: (chatId, approvalId, approved) =>
     request(`/chats/${chatId}/approvals/${approvalId}`, {
       method: "POST",
-      body: JSON.stringify(rule ? { approved, rule } : { approved }),
+      body: JSON.stringify({ approved }),
     }),
-  listApprovalRules: () => request("/approval-rules"),
-  // The plan card's Cancel (#114). Run goes through sendMessage with runPlan.
-  cancelPlan: (chatId, messageId) => request(`/chats/${chatId}/messages/${messageId}/plan/cancel`, { method: "POST" }),
-  deleteApprovalRule: (id) => request(`/approval-rules/${id}`, { method: "DELETE" }),
 
   listMcpServers: (refresh) => request(`/mcp${refresh ? "?refresh=1" : ""}`),
   addMcpServer: (data) => request("/mcp", { method: "POST", body: JSON.stringify(data) }),
   updateMcpServer: (id, data) => request(`/mcp/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   deleteMcpServer: (id) => request(`/mcp/${id}`, { method: "DELETE" }),
-
-  // calivi-vm owner only: the host-tool audit log (#115), newest first.
-  getActivity: () => request("/activity?limit=1000"),
 
   getConfig: (name) => request(`/config/${name}`),
   getConfigDefault: (name) => request(`/config/${name}/default`),
@@ -128,9 +120,8 @@ export const api = {
     return resp.json();
   },
 
-  // planMode: 📋 (#114). runPlan: the id of the reply whose plan this turn carries out.
   // imageOptions: the 🎨 picker's {size?, steps?, seed?} — only what is set (image models only).
-  async sendMessage(chatId, { content, images, attachments, serverId, model, useTools, askEveryTool, planMode, runPlan, imageOptions, signal }, onPiece) {
+  async sendMessage(chatId, { content, images, attachments, serverId, model, useTools, imageOptions, signal }, onPiece) {
     const resp = await fetch(`${BASE}/chats/${chatId}/messages`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -140,9 +131,6 @@ export const api = {
         images: images || [],
         attachments: attachments || [],
         use_tools: !!useTools,
-        ask_every_tool: !!askEveryTool,
-        plan_mode: !!planMode,
-        ...(runPlan ? { run_plan: runPlan } : {}),
         ...imageOptionsField(imageOptions),
         ...normalizeTarget(serverId, model),
       }),
@@ -152,14 +140,13 @@ export const api = {
   },
 
   // Edit a user message / reroute it to a different model → truncate + regen (same chat).
-  async editMessage(chatId, messageId, { content, serverId, model, useTools, askEveryTool, planMode, imageOptions, signal }, onPiece) {
+  async editMessage(chatId, messageId, { content, serverId, model, useTools, imageOptions, signal }, onPiece) {
     const resp = await fetch(`${BASE}/chats/${chatId}/messages/${messageId}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
       body: JSON.stringify({
-        content, use_tools: !!useTools, ask_every_tool: !!askEveryTool, plan_mode: !!planMode,
-        ...imageOptionsField(imageOptions), ...normalizeTarget(serverId, model),
+        content, use_tools: !!useTools, ...imageOptionsField(imageOptions), ...normalizeTarget(serverId, model),
       }),
       signal,
     });
@@ -199,14 +186,13 @@ export const api = {
   },
 
   // Fork a new chat from history. onChatId(newId) comes from the header, then the stream flows.
-  async forkChat(chatId, { messageId, content, serverId, model, useTools, askEveryTool, planMode, imageOptions, signal }, onChatId, onPiece) {
+  async forkChat(chatId, { messageId, content, serverId, model, useTools, imageOptions, signal }, onChatId, onPiece) {
     const resp = await fetch(`${BASE}/chats/${chatId}/fork`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
       body: JSON.stringify({
-        message_id: messageId, content, use_tools: !!useTools, ask_every_tool: !!askEveryTool,
-        plan_mode: !!planMode, ...imageOptionsField(imageOptions), ...normalizeTarget(serverId, model),
+        message_id: messageId, content, use_tools: !!useTools, ...imageOptionsField(imageOptions), ...normalizeTarget(serverId, model),
       }),
       signal,
     });

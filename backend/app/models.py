@@ -106,9 +106,6 @@ class Chat(Base):
     summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     summary_upto_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     context_mode: Mapped[str] = mapped_column(String(10), default="compact")  # "compact" | "full"
-    # "agent": tool steps are persisted with each reply and replayed on later turns (#91).
-    # "chat": today's behaviour, where only the reply's text reaches the history.
-    mode: Mapped[str] = mapped_column(String(10), default="chat")
 
     messages: Mapped[list["Message"]] = relationship(
         back_populates="chat", cascade="all, delete-orphan", order_by="Message.id"
@@ -127,27 +124,6 @@ class Message(Base):
     model_used: Mapped[str | None] = mapped_column(String(100), nullable=True)
     server_used: Mapped[str | None] = mapped_column(String(100), nullable=True)
     tokens_per_sec: Mapped[float | None] = mapped_column(Float, nullable=True)
-    # Agent mode: the turn's tool traffic in provider shape, in order — assistant tool-call
-    # turns and tool results (+ display fields `ok`, `approval`). `content` is the final answer.
-    steps: Mapped[list | None] = mapped_column(JSON, nullable=True)
-    # Plan mode (#114): the plan this reply proposed — summary, steps, risks, rollback and its
-    # status: proposed | approved | cancelled. Replace the dict to change it (JSON is not mutable-tracked).
-    plan: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     timestamp: Mapped[datetime.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     chat: Mapped["Chat"] = relationship(back_populates="messages")
-
-
-class ApprovalRule(Base):
-    """An "always allow" rule for a host tool (approval_rules.py, #113). The owner's alone."""
-
-    __tablename__ = "approval_rules"
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
-    tool: Mapped[str] = mapped_column(String(50))  # bash | write_file | edit_file
-    kind: Mapped[str] = mapped_column(String(10))  # exact | prefix (bash) — dir (file tools)
-    pattern: Mapped[str] = mapped_column(String(500))
-    uses: Mapped[int] = mapped_column(Integer, default=0)
-    created_at: Mapped[datetime.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
-    last_used_at: Mapped[datetime.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

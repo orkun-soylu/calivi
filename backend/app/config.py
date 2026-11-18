@@ -70,25 +70,6 @@ IMAGE_GEN_TIMEOUT = float(os.environ.get("IMAGE_GEN_TIMEOUT", "600"))
 # only decides when the UI suggests it. A turn = a user message plus the replies after it.
 COMPACT_SUGGEST_TOKENS = int(os.environ.get("COMPACT_SUGGEST_TOKENS", "16000"))
 COMPACT_KEEP_TURNS = int(os.environ.get("COMPACT_KEEP_TURNS", "4"))
-# Host tools (tools/host.py): the chat model operates the machine Calivi runs on — the
-# calivi-vm appliance. Off unless explicitly enabled; the Docker deployment never sets this.
-HOST_TOOLS_ENABLED = os.environ.get("CALIVI_HOST_TOOLS") == "1"
-# The Linux account commands run as. The appliance's bootstrap writes the owner's account name
-# to HOST_USER_FILE at first registration; CALIVI_HOST_USER overrides it (development, tests).
-HOST_USER = os.environ.get("CALIVI_HOST_USER", "")
-HOST_USER_FILE = os.environ.get("CALIVI_HOST_USER_FILE", "/etc/calivi/host-user")
-HOST_COMMAND_TIMEOUT = int(os.environ.get("CALIVI_HOST_TIMEOUT", "120"))
-# Append-only record of every host-tool call (audit.py, #115). Empty → off; the appliance's unit sets
-# it, next to the LogsDirectory it lives in.
-AUDIT_LOG_FILE = os.environ.get("CALIVI_AUDIT_LOG", "")
-# Present while any reply is running (turns.py). An upgrade's postinst waits for it to go
-# before restarting the service, so an update does not cut a running agent turn (#95).
-# Empty → not written (the Docker deployment has no such updater).
-BUSY_FILE = os.environ.get("CALIVI_BUSY_FILE", "")
-# First registration on the appliance (host_bootstrap.py). The setup code is generated at first
-# boot and shown on the VM console; without it nobody can claim the machine.
-HOST_SETUP_CODE_FILE = os.environ.get("CALIVI_SETUP_CODE_FILE", "/etc/calivi/setup-code")
-HOST_BOOTSTRAP_CMD = ["sudo", "-n", "/usr/sbin/calivi-bootstrap-user"]
 OPENAI_PROBE_TIMEOUT = 5.0  # a little longer, since these APIs are remote
 SEARCH_TIMEOUT = 15.0  # SearXNG JSON search
 

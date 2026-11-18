@@ -22,6 +22,8 @@ shaped them, and the traps that are easy to fall into again. The code says what;
   chat list. See "Authentication & User Management" below.
 - **Note**: a rule-based auto router (`router.py` + `routing.yml`) existed for a while and was
   removed in favour of manual selection. The code is still in the git history.
+- **Note**: calivi-vm — a second product in the same repository, where the chat model operated
+  the machine Calivi ran on — was removed after `v0.7.1`. See *calivi-vm — REMOVED* below.
 
 ## Authentication & User Management
 
@@ -471,8 +473,8 @@ model does, so it is the name: a deliberately **narrow** hint list (`qwen-image`
 `stable-diffusion`, `sd3`, `dall-e`, `gpt-image`, `hidream`). Narrow because the two mistakes are
 not equal: a chat model taken for an image model never gets a chat turn again, while a missed
 image model only fails the way it always did. `config/vision_models.yml` carries the overrides,
-`force_chat` > `force_image` > the name — same file as the vision overrides, so the config editor,
-the package and the appliance needed no new file. The picker marks these models with 🎨.
+`force_chat` > `force_image` > the name — same file as the vision overrides, so the config editor
+needed no new file. The picker marks these models with 🎨.
 
 > Some providers (OpenRouter) serve image models through `/chat/completions` with output
 > modalities, not `/images/generations`. A name such as `…/flux…` there is routed to an endpoint
@@ -495,8 +497,7 @@ the package and the appliance needed no new file. The picker marks these models 
   1–150, seed ≥ 0). Size and steps are remembered in localStorage; the seed is not, so a
   forgotten seed cannot keep repeating the same picture.
 - Nothing streams while the picture is made (30–90 s on a local diffusion model), so the turn
-  emits `{"type":"search","status":"image_generating"}` (the activity line, shown in agent mode
-  too) and a `ping` every 10 s. Timeout `IMAGE_GEN_TIMEOUT` (600 s).
+  emits `{"type":"search","status":"image_generating"}` (the activity line) and a `ping` every 10 s. Timeout `IMAGE_GEN_TIMEOUT` (600 s).
 - The reply is saved with the picture in `messages.images` (data URI, the column user images
   already use — `MessageItem` renders it, the lightbox opens it) and a caption as its text:
   `1664×928 · 20 steps · seed 1234 · 53 s`, plus the server's `revised_prompt` when it sends one.
@@ -630,6 +631,28 @@ unused. If WOL is ever wanted as a product feature: MAC-based wake (derive a sub
 broadcast from the host IP, pure-Python magic packet) + optional SSH poweroff — there is a
 discussion in the git history.
 
+## calivi-vm — REMOVED
+
+From `v0.3.0` to `v0.7.1` the repository carried a second product: **calivi-vm**, a native install
+(Debian/Ubuntu `.deb`, a Proxmox image, the signed APT repository `apt.calivi.ai`) where the chat
+model operated the machine Calivi ran on — bash and file tools as the owner's sudo-capable account,
+with per-command approval, "always allow" rules, plan mode, an audit log and agent mode (tool steps
+saved with the reply and replayed). It was removed so Calivi is one thing: the chat app.
+
+Removed: `appliance/`, `packaging/`, the `packages`/`apt` workflows, `tools/host.py`,
+`tools/readonly.py`, `tools/shellwords.py`, `host_bootstrap.py`, `approval_rules.py`,
+`plan_mode.py`, `audit.py`, the activity endpoint, the busy marker, and in the registry the
+`privileged` / `needs_approval` / `plan_safe` fields and strict mode — each existed only for the host
+shell. On the frontend: the agent timeline, the plan card, 🛡 / 📋, the setup-code sign-up and the
+activity tab. The approval card is back to Approve / Deny for `mutating` tools.
+
+**Kept on purpose:** background turns (a reply survives a closed tab), which was built for long
+agent turns but is just as right for chat. **Left in the database:** `chats.mode`,
+`messages.steps`, `messages.plan` and the `approval_rules` table are no longer in the models and
+nothing reads them; nothing drops them either, so a database from any earlier release opens as it
+is (`test_migrations.py` covers it). The full code and its design notes are in the git history up
+to the `calivi-vm-final` tag.
+
 ## Tool (function-calling) layer — Phase 1
 
 A **native tool-calling** agentic loop. Models are called with the `tools` parameter; if the model
@@ -695,8 +718,8 @@ tool is still called `web_search` — that is a tool name, and it is accurate.
    second call that narrowed a lookup — often the one the answer relied on — was silently dropped
    (#49). MCP chip labels now end in a clipped argument summary (`🔧 server: tool · version=2.17.1`)
    so distinct calls are distinguishable; exact repeats still collapse.
-   In **chat** mode tool turns are **not persisted** as messages (the final answer carries the context); **agent** mode (#91, *Agent mode* below) does persist them
-   (in chat mode history reconstruction is exactly as it was).
+   Tool turns are **not persisted** as messages: the final answer carries the context, and
+   history reconstruction is exactly as it was before tools existed.
    - `web_search` → `🔍 <query>` **with its result text**, which is how a search stays in context
      on later turns (`_inject_attachments` re-injects attachment text on *every* subsequent turn).
    - Any other tool → `🔧 <label>`, and for MCP `mcp_client.display_label` renders
@@ -943,482 +966,6 @@ chat. Both failures return 404: an approval id is a capability and must not be p
 > a summary. Summarising here *is* the vulnerability: the operator has to see exactly what will
 > run. This is the one place in the UI where the "render it nicely" instinct must be resisted.
 
-### Per-call approval and privileged tools
-
-Two extensions to the gate, made for a shell tool (#78) and inert until a tool uses them.
-
-- **`needs_approval(args)`.** `mutating` is fixed per tool, but a shell's risk depends on the
-  command: marking it mutating would put a card on every `ls` — the decay that sank Playwright
-  below — and not marking it would run `rm -rf` unasked. The classifier decides per call; the
-  **registry** still enforces the answer (rule 1), `mutating=True` still means "always", and a
-  classifier that raises counts as "ask". The loop evaluates the same arguments it later passes
-  to `execute`, so the card shows exactly what the registry will judge.
-- **`privileged`.** A tool that acts on the host belongs to the **super admin (id 1)** alone —
-  not to every admin, since a second admin of the same instance would otherwise inherit the
-  owner's shell. The loop derives `privileged` from `user_id`; an unidentified caller is not
-  privileged. For everyone else the tool does not exist: absent from `specs()`, refused by
-  `execute()` with the unknown-tool message, left out of the name hint, and `lookup()` returns
-  `None` so no approval card is ever shown for a call that would be refused anyway.
-- **Strict mode — "ask before every tool".** The default only asks for risky calls; an operator
-  who wants to watch every step flips the 🛡 toggle next to 🔧. It travels with each request
-  (`ask_every_tool`, like `use_tools`, remembered per browser), the loop shows a card for every
-  call, and `execute(strict=True)` refuses any call without `approved` — so the registry enforces
-  it too. It can only **add** a question: it never unhides a privileged tool. The toggle is
-  rendered only when `/api/auth/me` reports `host_tools` (the switch is on and the caller is
-  id 1), and a preference left in the browser is ignored elsewhere, so nobody gets cards from a
-  switch they cannot see. Not a chat column: the mode belongs to the operator watching, not to
-  the conversation.
-
-### Host tools — the appliance's shell (`tools/host.py`)
-
-`bash`, `read_file`, `write_file`, `edit_file` and `view_image`, for the calivi-vm appliance (#78),
-where the model operates the machine Calivi runs on. **Registered only when `CALIVI_HOST_TOOLS=1`**;
-the Docker deployment never sets it, so nothing here changes that deployment's security model. All
-five are `privileged` (super admin only, see above).
-
-- **Who runs it.** The backend is an unprivileged service account. Every command — the file
-  tools included — runs as the owner's Linux account via `sudo -n -u <user> -H`, the only sudo
-  the service account has. The account name is read **per call** from `CALIVI_HOST_USER_FILE`
-  (written by the appliance's bootstrap at first registration, while the backend is already up);
-  `CALIVI_HOST_USER` overrides it. When it is the backend's own user the sudo hop is skipped —
-  that is how the tests run.
-- **Output goes to a temp file, not a pipe.** With a pipe, a process the command leaves behind
-  (`nohup server &`) holds the write end open, the read never sees EOF, and the call hangs until
-  the timeout — which then kills that background process too. With a file the call returns when
-  the command itself exits.
-- **Timeout.** GNU `timeout` wraps the command and signals its whole process group
-  (`CALIVI_HOST_TIMEOUT`, default 120s); the backend has its own backstop a little later. Exit
-  124/137 counts as "killed" only if the time was really up, or a command that exits 124 by itself
-  would be misreported. Long jobs are the model's to detach (`nohup … >log 2>&1 &`,
-  `systemd-run`), and the tool description tells it so — background turns are a separate problem.
-- **The policy is a seatbelt, not a boundary.** `bash` asks first for commands that destroy data,
-  cut access or stop things (`rm`, `mv`, `dd`, `mkfs`, `systemctl stop|disable`, `reboot`,
-  `apt purge`, firewall and `ip … set|del`, `| sh`, writes into system paths by `>` or `tee`, …)
-  and **refuses** a very short list outright (`rm -rf /`, `--no-preserve-root`, the fork bomb) —
-  no card for those, since saying yes would not make them run. Harmless look-alikes are tested
-  not to ask (`docker run --rm`, `git add`, `systemctl status`), because a policy that asks for
-  everything decays into clicking. None of it survives a model that *wants* around it — `r''m`
-  matches nothing, and the account has sudo by design. It exists to catch mistakes; **the
-  boundary is the VM**.
-- **File tools** run without sudo, expand `~` themselves (the path reaches bash quoted, where the
-  shell would not), resolve relative paths against home, and ask before writing outside it. That
-  check is lexical — a symlink in home can point out — which is acceptable because the write still
-  carries only the account's own permissions.
-- **Machine notes (#110).** `~/.calivi/AGENTS.md` in the owner's home is what a later chat needs
-  to know about this machine: what runs where, the owner's decisions and rules, pitfalls and
-  their fixes. It is the counterpart of a coding agent's `AGENTS.md`/`CLAUDE.md`.
-  - **Read at the start of every turn that offers the host tools** (so only the owner's, only on
-    calivi-vm), through `_run`, i.e. as the owner via sudo, since the home is `0700`. The notes
-    go into the system layer as a labelled block with instructions on what belongs there (and
-    never secrets), capped at 12,000 characters with a "condense it" note. A missing file gets
-    a block inviting the model to start one. A read that fails (no owner yet, sudo refused, not a
-    file) drops the block; it never fails the turn.
-  - **Every change asks the owner**, although the file is inside home: notes an injection got
-    written would be read back into every later chat. `write_file`/`edit_file` under `~/.calivi`
-    always get the card, which shows the change, and `bash` asks for any command that names
-    `.calivi`, reads included, since the notes are in context already. The same seatbelt caveat
-    applies: a command can name the path without spelling it. So the block tells the model the
-    notes are what the owner has accepted, to follow the owner's rules in them, and that they
-    are not the user's words for this turn.
-  - **Seeded at claim:** the bootstrap helper writes a skeleton (hostname, owner, date, empty
-    *Services* / *Owner's rules* / *Learned*), `0600` in a `0700` directory, before the claim
-    marker. Machines claimed earlier get theirs from the model, with approval, the first time
-    there is something to keep.
-  - Mutation-checked: without the `.calivi` bash pattern, without the path rule, without the
-    injection, with the error case shown, or with "missing" undetected, a test fails.
-- **`view_image` — the model looks at an image file.** A screenshot it took, a chart it drew. Read
-  as the owner without sudo, like the other file tools, and without approval (it is a read). The
-  file goes over as base64 after a size check (8 MB), and its type is sniffed from the bytes
-  (PNG, JPEG, GIF, WebP), never the name, because the data URI's type is what the model server
-  trusts.
-  - **Tool messages carry text only** on both wire formats, so a handler returns a
-    `ToolResult`: a `str` (the error-prefix test, clipping and saved steps all keep working on
-    the text) with an `images` list only the loop reads. The loop puts a step's images in **one
-    user message after all of that step's tool results** — OpenAI requires the tool results to
-    follow the tool-call turn directly — with `TOOL_IMAGES_NOTICE` saying they are tool output
-    and text inside them is data, not instructions: a screenshot is as untrusted as a page.
-  - **Only when the model can see.** The loop asks `llm.vision_models` once per turn, the first
-    time a tool returns an image; a model that cannot (or an answer that failed) gets
-    `NO_VISION_NOTE` in the tool result instead of an image its server would reject with a 400.
-  - **For this turn only.** Images are not saved with agent-mode steps; a replayed step keeps
-    the text, which says so. A screenshot per step would otherwise grow every later request.
-  - Measured on rocm-prod-01 (`qwen3.8:27b-q8_0-mtp`) with a 1400×900 homepage screenshot in
-    exactly this message shape: the model read the cards and named three of the four marked
-    DOWN. Seeing works; accuracy is the model's.
-  - **Not a reversal of the Playwright MCP decision below.** That rejected a browser inside the
-    Docker deployment's trust boundary. On calivi-vm the model already has a shell with sudo on
-    the LAN and the VM is the boundary; a browser the owner installs there is one more program,
-    and `view_image` is not a browser — it shows any image file.
-  - Mutation-checked: without the image message, without the vision check, without the type
-    sniff or without the size limit, a test fails.
-- **`max_iterations` ceiling raised from 20 to 200.** Twenty was ample for search and
-  documentation lookups; installing and configuring one service is easily 20–40 calls. The value
-  itself stays in `tools.yml`; the ceiling only stops a typo from meaning "unbounded".
-
-> **⚠️ A guard test must fail harmlessly when the guard is broken.** The first version of the
-> deny-list test proved a refusal by running the real command after `touch marker`. The mutation
-> run that removed the deny check therefore executed a fork bomb on the machine running the
-> suite, and took it down. The test now replaces `_run` and asserts it was never reached;
-> dangerous strings only ever go to the pure classifier. "Safe while the guard holds" is not
-> enough — mutation testing exists precisely to run the suite with the guard gone.
-
-### "Always allow" rules (`approval_rules.py`, #113)
-
-On calivi-vm a routine the owner trusts (`systemctl restart ollama`, a file under `/etc/nginx/`)
-otherwise asks every time, and approval decays into clicking. A rule answers "yes" in the
-owner's place for one narrow pattern.
-
-- **The language is small on purpose.** `bash`: `exact` (token for token) or `prefix` (these
-  tokens first, anything after). Tokens come from `shlex.split`, so quoting and spacing do not
-  matter. `write_file` / `edit_file`: `dir` (the normalised path is strictly inside the
-  directory). A rule belongs to one tool. No globs, no regex: the owner has to be able to read a
-  rule on the card and know what it allows.
-- **Nothing composed is ever covered.** A command containing `;` `&` `|` `` ` `` `$` `<` `>`
-  `(` `)` `{` `}` `\` or a newline matches no rule. Otherwise `systemctl restart ollama; rm -rf ~`
-  rides on the rule for `systemctl restart ollama`. `$` is in the list because a variable
-  expands to anything, and braces because `{a,/etc}` does.
-- **Never covered: the deny list and `~/.calivi`** (#110). This is checked when a rule is
-  matched, not only when it is saved, so a rule saved under an older policy cannot outlive a
-  tightened one.
-- **Too broad is refused.** A `prefix` needs two words that are neither options nor `sudo`
-  (`rm -rf` and `sudo` alone would be blanket grants). A `dir` may not be `/`, nor contain or
-  sit inside `~/.calivi`.
-- **🛡 overrides the rules.** Under "ask before every tool" the loop does not consult them, and
-  the card offers no rule.
-- **The card offers the narrowest rule**: the exact command, or the file's own directory. The
-  backend computes it (`rule_suggestion` on `approval_request`), and only for calls a rule may
-  cover. The owner can edit it: switch to a prefix, shorten it.
-- **Saved and approved in one request.** `POST …/approvals/{id}` with `rule` saves it only if it
-  passes validation **and covers the very call on the card**; otherwise it returns 400, and the
-  card keeps waiting. A rule the owner believes approved this call must not quietly be about
-  something else. A rule cannot ride on a "no" either.
-- **The registry gate is unchanged.** The loop passes `approved=True` for a rule's yes, exactly
-  as for the owner's. The decision is the loop's, as a human one is; the registry still refuses
-  an unapproved risky call.
-- **Recorded.** On the timeline the row says which rule approved it (`approval: "rule"` plus the
-  rule, saved with the step). In the audit log the call is `approval: "rule"` with the rule.
-  Adding and deleting a rule are `rule_added` / `rule_deleted` lines. Rules never expire (owner's
-  decision). They are listed with a use count and deleted under Settings → Activity
-  (`/api/approval-rules`, owner-only like the log).
-- Mutation-checked: without the shell-syntax check (or only without `;`), the deny or notes
-  exclusion (bash and dir), the breadth check, the strict-mode override, the "covers this call"
-  check, the refusal on a "no", strict path containment or the per-user filter, a test fails.
-
-### Plan mode (`plan_mode.py`, `tools/readonly.py`, #114)
-
-For larger changes ("move the models to the new disk") the owner wants the whole plan first
-rather than a card per step. 📋 next to 🛡 travels with each request, like 🛡, and is honoured
-only where the host tools are offered (the owner on calivi-vm). Anywhere else it is ignored, so
-it can never strip anyone's tools.
-
-- **Planning turn.** The model gets only tools that change nothing (`Tool.plan_safe`):
-  `read_file`, `view_image`, non-host tools that are not `mutating`, and `bash` behind the
-  read-only list. It also gets `propose_plan` (summary, steps with exact commands and files,
-  risks, rollback). The registry enforces this (`execute(plan=True)`), as it does every gate.
-  A call plan mode refuses gets **no card**, since a "yes" would not run it.
-- **Read-only bash is an allow-list** (decided in #114), the inverse of the approval patterns.
-  The command must be simple (`shellwords.simple_words`: no `;` `|` `$` redirections…). Its
-  program must be listed by bare name, with an optional `sudo`/`sudo -n`, and its arguments must
-  pass that program's check: `systemctl status` passes, `systemctl stop` does not;
-  `journalctl` passes, `--vacuum-*` does not; `date +%F` passes, `date -s` does not; `ip addr`
-  passes, `ip link set` does not. Interpreters, `curl`/`wget`, `sed`/`awk`/`sort`/`tee` (each
-  can write) and `env` with a command are left out on purpose. A seatbelt, like the rest:
-  the list is only as good as each program's flags.
-- **The plan ends the turn.** A valid `propose_plan` emits `{"type":"plan"}`. The loop stops,
-  without another model call, and the plan is saved on the reply (`Message.plan`, status
-  `proposed`). Calls after it in the same message are answered "not run", so a replayed step
-  stays well-formed. An invalid plan goes back to the model as an error to fix.
-- **Decision.** The card (`PlanCard.jsx`) offers *Run it* / *Cancel* only on the chat's last
-  message. A reply is "change it": plan mode stays on and the model proposes again; chat mode
-  keeps no steps, so `_context_of` appends the plan as text. *Run it* is the next turn with
-  `run_plan`. The backend checks that the plan is the owner's, still `proposed`, and the chat's
-  last message (409 otherwise), marks it `approved`, and runs that turn **outside** plan mode.
-  *Cancel* marks it `cancelled`. Both decisions go to the audit log with the plan itself.
-- **Run turn.** The approved plan goes into the system layer. A host call whose command
-  (whitespace-normalised) or file path is in the plan runs without a card: approval `plan`,
-  where a card would have been. Any other call that changes something is flagged **off-plan**
-  (`off_plan` on the event, the step and the audit line) and goes through the normal approval
-  rules. Inspection (file reads, read-only commands) is never flagged. The model may adapt,
-  as decided in #114, and is told to say so first; the flag shows every deviation whether it
-  does or not. A plan never covers the deny list or `~/.calivi`, and 🛡 still asks for every
-  call.
-- **Phone layout:** with the host toggles the composer has four buttons, which left the text
-  box about 90px wide at 390px. For the owner, the text box takes its own row on a phone.
-- Mutation-checked: the registry gate, the host default and the spec filter; the read-only
-  checks for `date`, `ip`, `docker`, `find` and `journalctl`; inspection limited to read-only
-  bash; the turn ending on the plan; plan mode for non-owners; 🛡 over the plan; a stale,
-  decided or ungated plan decision; a run left in plan mode; the plan covering the notes or
-  the deny list; the plan missing from chat-mode history; and a card for a refused call. With
-  any one of these broken, a test fails.
-
-### Audit log of host-tool calls (`audit.py`, #115)
-
-The timeline lives with the chat; a deleted chat, a fork or compaction loses it. On a machine
-where a model has sudo the owner must be able to answer "what ran here, when, and who approved
-it" without the chats, so every **host-tool** call is appended to `CALIVI_AUDIT_LOG`
-(`/var/log/calivi/host-tools.jsonl` on calivi-vm; unset — off — in the Docker deployment).
-
-- **Two lines per call, joined by `id`.** `call` (time, chat, user, server, model, tool,
-  arguments, approval `auto` / `owner` / `rule` / `plan` / `denied`, and `off_plan` during a plan's run) is written **before** the tool runs, `result`
-  (ok, exit code, output sha256 + size, duration) after. The call that most needs a record is
-  the one that never returns — `systemctl restart calivi`, a reboot, a crash — and that is a
-  `call` with no `result`. A denied call has no `result` because nothing ran; Stop while it ran
-  writes `result` with `cancelled`.
-- **Hashes, not content.** The output, and the file content `write_file`/`edit_file` carry, are
-  recorded as sha256 + size: both routinely contain secrets, and the log would be a second copy
-  that outlives the chat. The command and the paths are verbatim — they are the record.
-- **Exit code** travels on `ToolResult.exit_code` (set by `bash`), not parsed from the text.
-- **Written by the backend, per event**: `open(O_APPEND)`, one `write()`, close. Concurrent
-  turns cannot interleave inside a line, and logrotate needs no signal or `copytruncate`.
-- **A failed write does not stop the tool**; it goes to the journal as a warning. Refusing every
-  host call because `/var/log` is full would leave the owner unable to repair it from the chat.
-- **Seatbelt, not tamper-proof.** `LogsDirectory=calivi` with mode `0750` makes the directory
-  the service account's, closed to the owner's account the model runs as — but that account
-  has sudo by design. The log survives the chat, not a model set on erasing it.
-- **Rotation**: `/etc/logrotate.d/calivi`, monthly, twelve kept, `delaycompress` so the previous
-  month stays readable. logrotate is a **Recommends**, not a Depends — a new Depends makes a
-  plain `apt-get upgrade` hold Calivi back, which is worse than a log that does not rotate.
-  Without it the file only grows (about half a kilobyte per call), and the reader is bounded.
-- **Settings → Activity** (`GET /api/activity`, `ActivityLog.jsx`): for the super admin on an
-  instance with host tools, 404 for everyone and everywhere else, like a privileged tool. It
-  reads the last 8 MB of the live file and of `.1`, merges `call` with `result`, newest first in
-  file order (timestamps tie at the millisecond), and adds the titles of the owner's chats
-  that still exist. Arguments render as raw JSON in a `<pre>`, as on the approval card.
-- `postrm purge` keeps `/var/log/calivi`, like the chats: it is the record of what ran.
-- Mutation-checked: logging every tool, keeping the output or the file content, an ungated
-  endpoint, another user's chat titles, a `result` for a denied call, and a Stop left
-  unrecorded each fail a test.
-
-### First registration on the appliance — claiming the machine
-
-On calivi-vm the first registration does more than create the super admin: it creates the
-machine's owner, a Linux account with passwordless sudo. `host_bootstrap.py` + the root helper
-`appliance/bootstrap/calivi_bootstrap_user.py`; only with `CALIVI_HOST_TOOLS=1` and no users.
-
-- **The setup code is what stops the LAN from claiming the machine.** Calivi's rule is "the first
-  registration is the super admin"; on an appliance that would mean whoever reaches port 80 first
-  gets a root shell. So the first registration must carry a code generated at first boot and
-  shown on the VM's console (`CALIVI_SETUP_CODE_FILE`). It is checked first — before any other
-  field is looked at — compared in constant time, case-insensitively (it is typed from a
-  console), and a missing code file **fails closed** (503). The code is long enough that
-  guessing it is not a plan, so it has no extra rate limit.
-- **Helper first, Calivi user second.** A failed helper leaves no Calivi user, so the
-  registration can be retried; a Calivi user without a Linux account would hold a
-  `host_tools` flag that points at nothing.
-- **Registration closes behind the owner.** It was open only so the owner could arrive; on a
-  machine whose super admin holds a root shell, further accounts are the owner's decision.
-- **The helper trusts nothing.** It runs as root, re-validates every field (Linux-safe username,
-  not reserved, not existing; no line breaks in the password — `chpasswd` reads lines; hostname;
-  a timezone that exists under zoneinfo; a single public-key line), reads the request from stdin
-  because argv shows in `ps`, checks each sudoers file with `visudo -cf` before it goes live, and
-  writes `/etc/calivi/host-user` **last**, so a half-finished run never looks finished. The
-  service account gets `calivi ALL=(<owner>) NOPASSWD: ALL` — the owner, not root.
-- **One shot.** An `O_EXCL` lock file is created before anything changes. A failure half-way
-  leaves the lock in place on purpose; recovery is on the console: inspect what exists
-  (`getent passwd <name>`, `/etc/sudoers.d/8?-calivi-*`), remove it, delete
-  `/etc/calivi/bootstrap.lock`, register again.
-- Validation is split into a pure `build_plan` and an `execute` that only ever runs on the VM,
-  so the tests can break every check without creating an account — the lesson from the host
-  tools' deny-list test.
-
-### The appliance image (`appliance/`)
-
-`build.sh` turns Debian 13 genericcloud into calivi-vm with `virt-customize`: it `apt install`s
-the Debian 13 package (for a release, the release's own `+deb13` asset, so the image holds the
-bytes that were tested and published), swaps the kernel and resets the machine identity.
-`proxmox-create.sh` creates a VM from the image.
-
-- **An image must not carry a published version with other bytes.** A VM's first boot runs
-  apt (Proxmox's cloud-init upgrades packages), and apt takes a published package with the same
-  version but a different hash as an upgrade. Found by booting an image built from a branch
-  whose version equalled the published 0.6.1: first boot replaced its Calivi with the published
-  one, and since that one ships no keyring, the VM's own updates broke. `build.sh` now compares
-  the package with apt.calivi.ai's index and stops; build a pre-release image with a new
-  revision (`DEB_REVISION=2`), and a release image with `--deb` and the release's asset. Decisions that are easy to undo by accident:
-
-- **Native, not Docker.** A containerised backend cannot reach the host's shell without an escape
-  hatch. On a single-purpose VM the container layer only gets in the way. nginx's site is
-  **derived** from `frontend/nginx.conf` at install time, so the CSP has one source. Each
-  substitution must match, or the install fails instead of shipping a proxy to
-  `calivi-backend`.
-- **`calivi.service` has no sandbox, on purpose.** Every command the host tools run is a child of
-  the unit and inherits its settings: `NoNewPrivileges` alone breaks sudo, `ProtectSystem` makes
-  the owner's `apt install` fail, and `PrivateTmp` gives their shell a private `/tmp`. The
-  service account being unprivileged is the control. `KillMode=process` keeps a job the owner
-  left running alive across a Calivi restart.
-- **Nothing per-machine is in the image.** `calivi-firstboot` creates `CALIVI_SECRET_KEY` and the
-  setup code on each VM's first boot. A key baked into a published image would let anyone forge a
-  session on every calivi-vm. The build also empties `machine-id` and resets cloud-init's state.
-  A `.path` unit re-runs the script when `/etc/calivi/host-user` appears, which drops the code
-  from the console banner (`/etc/issue.d`, whose `\4` agetty expands to the VM's address).
-- **Standard kernel, not the cloud one.** The genericcloud kernel leaves out most hardware
-  drivers, including the GPU drivers a passed-through card needs.
-- **q35 + OVMF with Secure Boot off.** This is ready for PCIe passthrough, and out-of-tree
-  drivers (NVIDIA's DKMS module) load without key enrolment.
-- **The appliance's `tools.yml`**: `max_iterations: 60`, and `web_search` off because the
-  appliance has no SearXNG; the model has curl.
-- **`preserve_hostname`.** cloud-init's `update_hostname` runs on every boot and would restore the
-  Proxmox VM name, so the bootstrap helper pins the owner's choice when one is given.
-
-Verified end to end on Proxmox VE 9 (2026-09-27): console banner, wrong code refused, claim with
-hostname, timezone and SSH key (sudoers, `preserve_hostname`, the code removed afterwards), then
-chats against a local model. The model inspected the VM, wrote, read and deleted a file with an
-approval card for `rm` (denial held, then approval ran it), ran `sudo apt-get install` without a
-card, and strict mode put a card on `uptime`.
-
-### The package (`packaging/`, #95)
-
-calivi-vm updates like the rest of the system: Calivi ships as `calivi_X.Y.Z-N+<distro>_amd64.deb`.
-`packaging/build-deb.sh` builds it inside the distribution's own image. Until the signed APT repository
-exists, the `.deb` is a release asset and is installed with `apt install ./calivi_….deb`.
-
-- **The venv is built where it runs** (`/opt/calivi/venv`, inside the container) because a venv
-  hard-codes its location. The app is byte-compiled at build time: the service account cannot
-  write `__pycache__` under a root-owned tree.
-- **One package per distribution.** Supported: Debian's current stable first (13 trixie), then
-  Ubuntu's two newest LTS (24.04 noble, 26.04 resolute) — a policy, not a fixed list. Their
-  Pythons differ (3.13, 3.12, 3.14), and the venv's compiled wheels are tied to one. So
-  `build-deb.sh --distro` builds inside that distribution's image, the `Depends` range comes
-  from the Python it found there, and the version carries a suffix (`+deb13`, `+ubuntu24.04`,
-  `+ubuntu26.04`). The suffix uses `+`, not `~`, so file names are safe in URLs, and
-  `0.6.1-1+deb13` sorts above the suffix-less `0.6.0-1`. The first matrix run found:
-  - three pins without Python 3.14 wheels, and `pydantic` 2.11 whose core had none either;
-  - SQLAlchemy 2.0.36 failing to import on 3.14 (`typing.Union` changed);
-  - a test that leaked sessions, which 3.14's collector freed too late (pool exhausted);
-  - a 10 ms timing test that failed on fast machines.
-
-  All fixed. The backend suite passes on all three Pythons.
-- **One install path.** `/usr/lib/calivi/configure`, run by `postinst`, holds everything that
-  turns the files into a running service: account, data dirs, default config, the nginx site
-  derived from `frontend/nginx.conf`, units, (re)start. Until 0.6.2 the image had a second path,
-  `install.sh`, which installed the same files at the same paths; since then the image installs
-  the package too, and `install.sh` is gone. `configure` exits before starting anything when
-  there is no running systemd, which is how it runs inside `virt-customize`. Paths are Debian's (`/usr/sbin`, `/usr/lib/calivi`,
-  `/usr/lib/systemd/system`), not `/usr/local`, which a package may not use.
-- **Taking over an older image** (0.3–0.5, the old `install.sh` layout): `preinst` moves an unowned
-  `/opt/calivi` aside, so no stale venv files survive; `postinst` deletes it once configured.
-  `configure` removes the old unit copies in `/etc/systemd/system` — they would override the
-  package's forever — and the `/usr/local` copies.
-- **Conffiles are only `calivi.env` and the cloud-init snippet.** The sudoers rule is deliberately
-  *not* a conffile. Tested: with it as one, `--force-confold` (how timar upgrades) kept an old
-  image's rule pointing at the removed `/usr/local/sbin` helper, which would break the first
-  registration of an unclaimed machine. It is part of the security design, not an admin
-  setting. For the same reason `CALIVI_BUSY_FILE` sits in the unit, not in `calivi.env`.
-- **An upgrade does not cut a running reply.** `configure` restarts at once when
-  `/run/calivi/busy` is absent. Otherwise it hands over to a transient
-  `calivi-restart-when-idle` unit that waits for the marker (at most 30 min). Meanwhile nginx
-  already serves the new frontend against the old backend.
-- **needrestart is told to leave Calivi alone** (`/etc/needrestart/conf.d/calivi.conf`, not a
-  conffile). Ubuntu ships needrestart and, since 24.04, lets it restart services on its own
-  after every apt run — including right after Calivi's upgrade, which undid the deferral above
-  and cut the reply. Found by the first install test on Ubuntu; Debian's cloud image has no
-  needrestart, so the Proxmox tests had missed it. It now only lists Calivi, whichever package
-  triggered it (a Python security update, too).
-- **Removal keeps data.** `remove` stops the service and drops the nginx site. `purge` also drops
-  `/etc/calivi` (key, setup code, owner marker). `/var/lib/calivi` and the owner's account stay:
-  deleting a user's chats is not a package manager's call.
-
-Verified on Proxmox with throwaway VMs:
-- a fresh Debian 13 install, claimed, with a host tool running as the new owner;
-- a claimed 0.5.0 image migrated with its chats intact, the old units and `/usr/local` files
-  gone, the service on the package's unit;
-- an unclaimed 0.5.0 image migrated, then claimed;
-- an upgrade during a 40-second tool call: postinst deferred, same PID until the reply ended,
-  then restarted, reply saved;
-- remove and purge;
-- the image rebuilt with the refactored `install.sh`, booted and claimed.
-
-### Package CI (`.github/workflows/packages.yml`, `packaging/test/`)
-
-Nothing is published for a distribution that was not tested on it, and nothing at all unless
-all three pass. Per distribution, on every pull request, push to `main` and published release:
-
-- **backend**: the test suite in the distribution's official image, on its own Python.
-- **build**: `build-deb.sh --distro`.
-- **install**: a real VM from the distribution's official cloud image, under KVM on the runner
-  (`vm.sh`: QEMU user networking, cloud-init seed, SSH and :80 forwarded to localhost).
-  `install_test.py` then checks, in order: install (the previous release's package when there is
-  one); claim (a wrong setup code creates nothing; the right one creates the owner with sudo, sets
-  the hostname, deletes the code and closes registration); upgrade to this build (key, session and
-  owner survive); a host-tool call (the owner's account, on this machine); an upgrade while a
-  reply streams (same PID until the reply is complete, then restarted); purge (data and owner
-  kept). needrestart is installed first on every distribution, so the deferral is tested against
-  it.
-- **The model is a script**, `fake_model.py`: an OpenAI-compatible server on the runner (the
-  guest reaches it as 10.0.2.2) whose reply is decided by the last user message — `RUN: <cmd>`
-  asks for a `bash` call, `SLOW: <n>` streams for n seconds. The tool call itself is real: it
-  runs through the host tools on the VM, so the whole chain from the model to `sudo -u <owner>`
-  is exercised without a GPU or a network model.
-- **The previous release** (`previous-release.sh`) is the newest release whose package for this
-  distribution has a lower version by dpkg's rules. So a pull request that has not bumped the
-  version still upgrades from the release it follows, and a release upgrades from the one
-  before. Ubuntu has none before 0.6.1, and its upgrade step is skipped until then.
-- **image**: `appliance/build.sh --deb` with this run's Debian 13 package (on a release, the very
-  file that gets attached and published), then `vm.sh` boots the image (`IMAGE=`) and
-  `install_test.py --image` checks the first boot — the package the image was built with, the
-  services, the standard kernel, unclaimed, machine-id and session key made on this boot — then
-  claim, the APT source, the host tool and the deferred restart. On a release the first boot also
-  upgrades packages, as Proxmox's cloud-init does; mutation-checked: an image whose package is
-  older than the published one (a pull request's) is replaced on that first boot, and the test
-  fails at "the package the image carries". The image is attached only if this passed too.
-  On GitHub's Ubuntu runner, `virt-customize --network` needed two things, both measured: passt
-  exits at once there (neither its AppArmor profile nor the user-namespace restriction was the
-  cause), so the job takes it out of the way and libguestfs falls back to QEMU user networking;
-  and the appliance brings eth0 up with a DHCP client copied from the host, which a runner does
-  not have — `isc-dhcp-client` for 24.04's libguestfs, `dhcpcd-base` for 26.04's (both read from
-  `supermin.d/packages`, both installed).
-- **Only a release builds its own version.** Every other run builds `X.Y.Z-1~ciN+<distro>`, which
-  dpkg sorts below the release `X.Y.Z-1+<distro>` and above the one before. Without it, every pull
-  request between a release and the next version bump carried the published version with other
-  bytes, and once the test VM had apt.calivi.ai as a source, apt refused to reinstall the build
-  as a "downgrade" (the first PR after 0.6.2 failed on all three). The same rule as `build.sh`'s
-  guard for images.
-- **publish** runs only for a published release and needs every job above for all three
-  distributions and the image. It checks that each package's version matches the tag, then
-  attaches the three `.deb`s, the image and their checksums, and `proxmox-create.sh`. A release whose tests fail therefore has no packages.
-
-### The APT repository (`packaging/apt/`, `.github/workflows/apt.yml`)
-
-`https://apt.calivi.ai` is GitHub Pages serving `orkun-soylu/calivi-apt`, a repository only
-the release workflow writes to. One suite per distribution, named by codename (`trixie`,
-`noble`, `resolute`), component `main`, amd64.
-
-- **Built from the release's assets, never from a build.** After `publish` has attached the
-  three tested `.deb`s, `apt.yml` downloads them, checks their checksums and that they match the
-  tag, and runs `publish.sh`. Nothing reaches the repository that did not pass all three install
-  tests. `apt.yml` can also be run by hand for an existing release.
-- **Stateless.** `publish.sh` adds the packages to `pool/<suite>/`, keeps the newest five per
-  suite (rollback: `apt install calivi=<version>`), and regenerates every index with
-  `apt-ftparchive`. There is no database to lose or to fall out of step with the files.
-- **Signed; the fingerprint is pinned** in `packaging/apt/fingerprint` (`4E28 2AB6 66CE 1E29 488B  06CF 6155 29D5
-  0438 1965`, RSA 4096, no passphrase: the secret store is the protection, no expiry: a rotation
-  would break every installed machine; the revocation certificate is kept offline).
-  `publish.sh` refuses to sign unless exactly that key is in the keyring, so a wrong secret
-  stops the publish instead of shipping a repository nobody's keyring trusts. `InRelease` and
-  `Release.gpg` use SHA-512.
-- **The package brings its own source.** `calivi.sources` (deb822, the build's codename) and
-  the key as `/usr/share/keyrings/calivi.gpg`, which only that source trusts (`Signed-By`), not
-  every repository on the machine. The source is a conffile, so an admin can disable it; both
-  files are byte for byte what the index page tells people to write by hand, so a machine set
-  up that way is taken over without a conffile question. The upgrade step tests it with the
-  source text taken from the index page itself, so the two cannot drift apart unnoticed;
-  mutation-checked: one extra comment line in the package's copy makes dpkg stop with "end of
-  file on stdin at conffile prompt". The key is
-  `packaging/apt/calivi.gpg`, and the build job checks it holds exactly the fingerprint in
-  `packaging/apt/fingerprint` — the one place the fingerprint is pinned, read by `apt.yml` too.
-  The install test checks the shipped files and that `apt update` against the real
-  apt.calivi.ai verifies with them.
-- **Two secrets, two jobs.** `APT_SIGNING_KEY` proves the packages come from here;
-  `APT_DEPLOY_KEY` is an SSH deploy key that can write to `calivi-apt` and nothing else.
-- **Tested with the real script.** The install job signs a repository with a throwaway key,
-  serves it on the runner, and the VM's last step adds it exactly as `apt.calivi.ai` documents
-  (`Signed-By` keyring, deb822 `.sources`) and runs `apt install calivi`. Mutation-checked: a
-  repository signed by another key fails `apt update` (`NO_PUBKEY`, "is not signed").
-
-Mutation-checked: a `configure` that restarts regardless of the busy marker fails the test at
-"the upgrade says it waits for the reply"; the build without the needrestart file failed on both
-Ubuntus at "the service was not restarted under the reply".
-
 ### Playwright MCP — evaluated and declined
 
 Browser automation was the motivating example for building the approval layer. It was then
@@ -1496,7 +1043,7 @@ as an unhandled `IntegrityError` (a 500).
 
 ## Tests
 
-### Frontend — `npm test` (vitest + jsdom, 132 tests)
+### Frontend — `npm test` (vitest + jsdom, 107 tests)
 
 ```bash
 cd frontend && npm install && npm test     # or: npm run test:watch
@@ -1519,7 +1066,7 @@ button, back gesture; `matchMedia` is mocked since jsdom has none),
 Fake timers (`vi.useFakeTimers`) deadlock with RTL's async `act` wrapper; the two tests that verify
 delay behaviour deliberately use **real** timers (~3s).
 
-### Backend — pytest (624 tests)
+### Backend — pytest (242 tests)
 
 `backend/tests/` — pytest + `httpx.ASGITransport` (a real HTTP layer, no live server needed). They
 do not ship in the prod image: the `Dockerfile` installs only `requirements.txt`, and the test
@@ -1540,17 +1087,11 @@ python3 -m venv .venv-test && ./.venv-test/bin/pip install -r requirements-dev.t
 `test_model_liveness.py`, `test_image_stripping.py`, `test_extract.py` (upload caps, and the
 parse subprocess: killed on timeout, capped in number), `test_secret_encryption.py` (ciphertext
 in the raw column, legacy plaintext, key rotation), `test_tools_registry.py` (the
-`mutating` gate, per-call approval, privileged tools), `test_privileged_tools.py` (the loop hands
-the registry the right caller: id 1 only, no approval card for a hidden tool),
-`test_host_tools.py` (the shell policy in both directions, real bash in a temporary home, the
-file tools), `test_view_image.py` (`view_image`, and the loop attaching a tool's images only for a
-model that can see), `test_ask_every_tool.py` (strict mode from all three streaming endpoints, and
-`/me`'s `host_tools`), `test_host_bootstrap.py` (the appliance's first registration: setup code,
-ordering, registration closing), `test_agent_steps.py` (agent mode: steps saved and replayed, the context budget, the guard
-with 🔧 off, stop, fork, compaction), `test_turns.py` (background turns: a closed tab does not stop the reply, re-attach replays,
-Stop saves the partial, one turn per chat with the history left untouched, deletion,
-ownership), `test_bootstrap_helper.py` (the root helper's validation —
-planning only, nothing is executed), `test_tool_loop.py` (the agentic loop's `tool_result.ok` flag — the error-prefix
+`mutating` gate and the name hint), `test_turns.py` (background turns: a closed tab does not stop
+the reply, re-attach replays, Stop saves the partial, one turn per chat with the history left
+untouched, deletion, ownership), `test_approvals.py` (the approval rendezvous: timeout is a denial,
+ownership checked twice, cleanup on cancel), `test_mcp.py`, `test_migrations.py` (old database
+shapes, including one from the calivi-vm era), `test_tool_loop.py` (the agentic loop's `tool_result.ok` flag — the error-prefix
 contract above), `test_compaction.py` (what reaches the model before/after compaction, full mode,
 edit/delete/fork invalidation, the save race, the column migration).
 
@@ -1568,64 +1109,11 @@ creates a real server and a real message → ownership is the only source of the
 under the same mutation). **When adding a new guard test, deliberately break the guard and confirm
 the test actually fails.**
 
-## Agent mode — persisted tool steps (#91)
-
-On calivi-vm a chat is an agent session, and the chat-mode decision above — persist only the
-final answer — throws away the agent's working memory: on "now restart it" the model no longer
-knows which unit it created or which command failed. So a chat has a **mode**: `chat` (unchanged)
-or `agent`. New chats are `agent` when `CALIVI_HOST_TOOLS=1`, `chat` otherwise; `PATCH` switches
-it, and a fork inherits it.
-
-- **One assistant row per turn, plus `messages.steps`.** The turn's tool traffic in provider shape
-  and order — assistant tool-call turns and tool results — with display fields on the results
-  (`ok`, `approval`). Edit, delete, fork and ordering keep working per message because the steps
-  travel with their row. The row's `content` is the text **after the last step**: the text
-  between steps is already in them, and keeping it in both would replay it twice.
-- **Written in the loop's `finally`**, so a stopped turn keeps the steps it ran. It is saved even
-  with empty content — its steps are then the whole reply, and replay adds no empty assistant
-  message after them. No chips in agent mode: the timeline replaces them.
-- **Replayed on later turns** (`_context_of`): each row expands to its steps, then its content.
-  Results go back through `_wrap_untrusted`, and the guard is in the system layer **whenever
-  history holds a replayed result** — including when 🔧 is off for this turn, which a mutation
-  test showed the "tools offered" condition alone did not cover.
-- **Context budget** (`compaction.py`): the results of the last `FULL_STEP_TURNS` (2) replies go
-  back in full; older ones are cut to head and tail (`OLD_STEP_CHARS`, 1.5k), where commands put
-  what matters. Tool *calls* are always kept, so the model still sees what it ran. The size
-  estimate counts replayed steps, or an agent chat would never reach the compaction suggestion;
-  the compaction transcript renders steps as `[ran tool {args}]` / `→ ok: first line` so a summary
-  remembers the actions, not the outputs.
-- **Live:** in agent mode `tool_result` also carries the clipped output, so the UI can fill the
-  step in as it happens.
-
-### The timeline (frontend)
-
-- **One view model for saved and live** (`lib/timeline.js`). `toTimeline(message.steps)` and
-  `applyPiece(items, event)` produce the same items: text between steps, and one row per call
-  with status (running / ok / failed / denied / interrupted), output and approval. A test
-  asserts that a live sequence and its saved form render the same. `useChatStream` moves the
-  streamed text into its own item when a tool call arrives, exactly as the backend splits it.
-- **`StepTimeline`**: the command (shell) or path (file tools) on the row; the arguments and
-  output expand on click. **Arguments and output are plain text in `<pre>`**, the
-  `ToolOutputModal` rule, because both are untrusted. Only the model's own words between steps
-  go through Markdown. The test checks the element is a `<pre>`: the test's Markdown mock
-  renders text too, so "no `<img>`" alone would not catch output routed through Markdown.
-- **The approval card renders in the waiting row.** In agent mode the free-standing card and the
-  activity line are not shown, and a test checks there is exactly one card.
-- **Mode toggle** in the chat header, shown only where `host_tools` is true. Switching back to
-  chat keeps the stored steps but stops replaying them.
-
-> **⚠️ `useChatStream.run` owns the stream state — one run at a time.** A new run aborts the one
-> still being followed, and a stale run's events and cleanup are ignored (a run id). Found in the
-> browser: a reloaded agent reply rendered its whole timeline **twice**. React StrictMode runs the
-> re-attach effect twice in development, so two followers fed the same state. The same race
-> existed since background turns (#86) — doubled text in chat mode, which a length-only check
-> had missed. Production does not double effects, but any repeated attach would have done the same.
-
 ## Background turns (`turns.py`)
 
 A reply used to live inside its HTTP request: a closed tab, a reload, a dropped connection or a
 chat switch on a phone cancelled the agentic loop half-way, and Stop *was* a disconnect. Fine
-for chat, not for calivi-vm, where one message can be minutes of tool calls (#85).
+for a reply that runs for minutes — a long tool loop, a large prompt on a local model (#85).
 
 - **The loop is a background task; the response only follows it.** `build_stream_response`
   hands its generator to `turns.start`, which runs it as an `asyncio` task and appends each
@@ -1647,7 +1135,7 @@ for chat, not for calivi-vm, where one message can be minutes of tool calls (#85
   refusing a second turn: by the time `start` runs, an unguarded edit has already rewritten the
   message and truncated the history underneath the running reply (a mutation test caught
   exactly this — the status code alone was still 409).
-- **Heartbeat in the follower**, not only during approvals: a long `apt install` or a large
+- **Heartbeat in the follower**, not only during approvals: a slow tool call or a large
   prefill is silent too, and nginx drops a response after 300s without bytes.
 - **Deleting a chat (or a user) cancels its turn — after the commit.** The delete endpoints run
   in a worker thread while the turn runs on the loop; cancelling *first* let the final save see
@@ -1661,11 +1149,6 @@ for chat, not for calivi-vm, where one message can be minutes of tool calls (#85
 - **In memory, deliberately** — the call made for approvals: a restart loses an in-flight
   turn (the user message stays, no reply is saved), as a crash always did. Single process, as
   approvals already assume.
-- **The busy marker** (`CALIVI_BUSY_FILE`, `/run/calivi/busy` on calivi-vm) exists while any
-  turn runs, and goes when the last one ends. An upgrade waits for it before restarting the
-  service (#95), because a restart is exactly the "in-flight turn lost" case above. It is
-  best effort: a marker that cannot be written never stops a reply. `RuntimeDirectory=` recreates
-  `/run/calivi` empty on every start, which is right, since a fresh process has no turns.
 
 Verified in a browser (headless Chromium against a live backend and a cloud model):
 - reloading mid-reply brought the Stop button back, the text kept growing, and exactly one reply
@@ -1761,8 +1244,8 @@ and caching a transient failure permanently again breaks 1. The tests carry weig
     the registry, the loop and the wire format did not change. ~~Encrypting stored MCP
     secrets~~ — **done**, see *Secrets at rest*. ~~**stdio**~~ — **done**, via a bridge
     container, see *stdio servers — the bridge*.
-  - ~~Persisting tool provenance as messages~~ — done for **agent** chats, see *Agent mode*. Chat
-    mode keeps the chips.
+  - Persisting tool provenance as messages — tried as calivi-vm's agent mode (steps saved with
+    the reply and replayed), removed with calivi-vm. Chats keep the chips.
   - A prompt-based fallback for non-tool models (not needed today — the models are strong
     tool-callers).
   - Live verification of the OpenAI path; a stress test for parallel multi-tool calls.
