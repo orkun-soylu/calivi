@@ -9,12 +9,7 @@ source-agnostic and MCP-ready:
 
 `mutating=True` tools only run when the caller passes `approved=True`, which the agentic loop
 does after a human says yes (see `approvals.py`). The check lives here rather than in the loop
-so a caller bug cannot skip it. A tool whose risk depends on its arguments (a shell command)
-decides per call through `needs_approval` instead; the same gate enforces the answer.
-
-`privileged=True` tools exist only for a privileged caller (the instance owner): they are left
-out of that caller's `specs()` and refused by `execute()` as if they did not exist. The loop
-decides who is privileged; the registry enforces it.
+so a caller bug cannot skip it.
 """
 from dataclasses import dataclass
 from typing import Awaitable, Callable
@@ -25,24 +20,6 @@ from typing import Awaitable, Callable
 ERROR_PREFIX = "ERROR:"
 
 
-class ToolResult(str):
-    """A text result that also carries images (data URIs) for the model to look at, or an exit code.
-
-    A `str`, so everything that handles results — the error-prefix test, clipping, the saved
-    steps — keeps working on the text. Only the agentic loop reads `images`: tool messages
-    carry text alone, so it attaches them to the next model call when the model can see.
-    """
-
-    images: list[str]
-    exit_code: int | None  # a command's exit status, for the audit log (audit.py); None if none
-
-    def __new__(cls, text: str, images: list[str] | None = None, exit_code: int | None = None):
-        obj = super().__new__(cls, text)
-        obj.images = list(images or [])
-        obj.exit_code = exit_code
-        return obj
-
-
 @dataclass
 class Tool:
     name: str
@@ -51,39 +28,6 @@ class Tool:
     handler: Callable[[dict], Awaitable[str]]
     source: str = "builtin"
     mutating: bool = False  # True → always needs a human yes before it runs
-    # Per-call decision for a tool whose risk depends on its arguments. Ignored when `mutating`
-    # is set (that already means "always").
-    needs_approval: Callable[[dict], bool] | None = None
-    privileged: bool = False  # True → invisible and unrunnable for a non-privileged caller
-    # Plan mode (#114): may this call run while the model only proposes? True / False, or a
-    # per-call check (bash: the read-only list). None → the default: a tool that changes nothing
-    # by its own declaration (not `mutating`, not a host tool) may; anything else may not.
-    plan_safe: bool | Callable[[dict], bool] | None = None
-
-    def offered_in_plan(self) -> bool:
-        """Listed for the model in plan mode at all (a per-call check still decides each call)."""
-        if self.plan_safe is None:
-            return not self.mutating and self.source != "host"
-        return bool(self.plan_safe)  # a function is truthy: offered, then checked per call
-
-    def allowed_in_plan(self, args: dict) -> bool:
-        if not callable(self.plan_safe):
-            return self.offered_in_plan()
-        try:
-            return bool(self.plan_safe(args))
-        except Exception:
-            return False  # a check that cannot decide must not allow
-
-    def requires_approval(self, args: dict) -> bool:
-        if self.mutating:
-            return True
-        if self.needs_approval is None:
-            return False
-        try:
-            return bool(self.needs_approval(args))
-        except Exception:
-            # A classifier that cannot decide must not grant: fail towards asking.
-            return True
 
 
 class ToolRegistry:
@@ -101,22 +45,12 @@ class ToolRegistry:
     def get(self, name: str) -> Tool | None:
         return self._tools.get(name)
 
-    def lookup(self, name: str, privileged: bool = False) -> Tool | None:
-        """`get` as seen by one caller: a privileged tool does not exist for anybody else."""
-        tool = self._tools.get(name)
-        if tool is not None and tool.privileged and not privileged:
-            return None
-        return tool
-
     def names(self) -> list[str]:
         return list(self._tools)
 
-    def specs(self, names: list[str] | None = None, privileged: bool = False,
-              plan: bool = False) -> list[dict]:
-        """Native tool-calling wire format (Ollama and OpenAI share the same schema).
-        `plan`: only the tools plan mode can use (#114)."""
+    def specs(self, names: list[str] | None = None) -> list[dict]:
+        """Native tool-calling wire format (Ollama and OpenAI share the same schema)."""
         tools = self._tools.values() if names is None else [self._tools[n] for n in names if n in self._tools]
-        tools = [t for t in tools if (privileged or not t.privileged) and (not plan or t.offered_in_plan())]
         return [
             {
                 "type": "function",
@@ -125,10 +59,7 @@ class ToolRegistry:
             for t in tools
         ]
 
-    async def execute(
-        self, name: str, args: dict, approved: bool = False, privileged: bool = False,
-        strict: bool = False, plan: bool = False,
-    ) -> str:
+    async def execute(self, name: str, args: dict, approved: bool = False) -> str:
         """Runs the tool and returns a plain-text result. Unknown/unapproved-mutating tool → an
         error string rather than an exception, so the model can recover and the loop survives.
 
@@ -136,40 +67,21 @@ class ToolRegistry:
         setting it, but the check stays **here**: loosening it because "the caller handles
         approval now" would move a security boundary into the caller, where a later refactor
         can silently skip it. The loop asks; the registry still refuses.
-
-        `privileged` follows the same rule: default False, and a privileged tool named by a
-        non-privileged caller gets the unknown-tool answer, so its existence does not leak.
-
-        `strict` is the user's "ask before every tool" mode: every call needs `approved`,
-        whatever the tool's own classification says. It can only add a question, never
-        remove one.
-
-        `plan` is plan mode (#114): only what the tool's `plan_safe` allows runs, approved or
-        not — the model proposes, nothing changes. Checked here for the same reason as above.
         """
         args = args or {}
-        tool = self.lookup(name, privileged)
+        tool = self.get(name)
         if tool is None:
-            return f"{ERROR_PREFIX} no tool named '{name}'.{self._name_hint(name, privileged)}"
-        if plan and not tool.allowed_in_plan(args):
-            return (f"{ERROR_PREFIX} plan mode: '{name}' was not run — only commands that change "
-                    "nothing can run while you plan. Put this step in the plan (propose_plan) "
-                    "instead; it runs once the owner approves.")
-        if (strict or tool.requires_approval(args)) and not approved:
-            # Not "changes state": under strict mode a harmless `uptime` lands here too, and a
-            # model told it changed state explains the refusal wrongly (seen on calivi-vm).
+            return f"{ERROR_PREFIX} no tool named '{name}'.{self._name_hint(name)}"
+        if tool.mutating and not approved:
             return f"{ERROR_PREFIX} the user did not approve this call to '{name}'; it was not run."
         return await tool.handler(args)
 
-    def _name_hint(self, name: str, privileged: bool = False) -> str:
+    def _name_hint(self, name: str) -> str:
         """Points at the real name when a model drops a namespace (calls `scan_packages` for
         `mcp__cve__scan_packages`). Only a hint: running the guessed tool would bypass the loop's
         per-name approval lookup, and an ambiguous guess could run the wrong server's tool."""
         bare = name.rsplit("__", 1)[-1]
-        matches = [
-            n for n, t in self._tools.items()
-            if n.rsplit("__", 1)[-1] == bare and (privileged or not t.privileged)
-        ]
+        matches = [n for n in self._tools if n.rsplit("__", 1)[-1] == bare]
         return f" Did you mean '{matches[0]}'?" if len(matches) == 1 else ""
 
 

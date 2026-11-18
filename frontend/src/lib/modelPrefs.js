@@ -6,18 +6,6 @@ export const USE_TOOLS_KEY = "calivi_use_tools";
 const LEGACY_WEB_SEARCH_KEY = "calivi_web_search"; // pre-rename; read once so the toggle
                                                    // does not silently reset to off on upgrade
 
-export const ASK_EVERY_TOOL_KEY = "calivi_ask_every_tool";
-
-export function loadAskEveryTool() {
-  return localStorage.getItem(ASK_EVERY_TOOL_KEY) === "1";
-}
-
-export const PLAN_MODE_KEY = "calivi_plan_mode";
-
-export function loadPlanMode() {
-  return localStorage.getItem(PLAN_MODE_KEY) === "1";
-}
-
 export function loadUseTools() {
   const v = localStorage.getItem(USE_TOOLS_KEY);
   if (v !== null) return v === "1";

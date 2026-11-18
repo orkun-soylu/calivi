@@ -9,15 +9,13 @@ import { useChatStream } from "../hooks/useChatStream.js";
 import { useServerModel } from "../hooks/useServerModel.js";
 import { fileToScaledDataUrl } from "../lib/images.js";
 import { imageOptionsPayload, loadImageOptions, saveImageOptions } from "../lib/imageOptions.js";
-import {
-  ASK_EVERY_TOOL_KEY, PLAN_MODE_KEY, USE_TOOLS_KEY, loadAskEveryTool, loadPlanMode, loadUseTools,
-} from "../lib/modelPrefs.js";
+import { USE_TOOLS_KEY, loadUseTools } from "../lib/modelPrefs.js";
 import { api } from "../api.js";
 import { useT } from "../i18n.js";
 
 /** Orchestrates the chat screen: combines the selected target (useServerModel), stream state
  * (useChatStream) and attachment/edit state; the rendering is done by child components. */
-export default function ChatView({ chat, servers, hostTools, onMessageSent, onForked, onOpenSettings, onBack }) {
+export default function ChatView({ chat, servers, onMessageSent, onForked, onOpenSettings, onBack }) {
   const t = useT();
   const { serverId, model, setTarget, upServers, selectedServer } = useServerModel(servers);
   const stream = useChatStream();
@@ -31,13 +29,6 @@ export default function ChatView({ chat, servers, hostTools, onMessageSent, onFo
   const [pending, setPending] = useState({ user: null, images: [], attachments: [] });
   const [lightbox, setLightbox] = useState(null); // image to display full size (data-URI)
   const [useTools, setUseTools] = useState(loadUseTools);
-  const [askEveryToolPref, setAskEveryTool] = useState(loadAskEveryTool);
-  // Only in effect where the toggle is visible — a preference left over in this browser must
-  // not put cards on a user who cannot see the switch that caused them.
-  const askEveryTool = !!hostTools && askEveryToolPref;
-  // 📋 plan mode (#114): the same rule — only where the model can operate the machine.
-  const [planModePref, setPlanMode] = useState(loadPlanMode);
-  const planMode = !!hostTools && planModePref;
 
   const [editingId, setEditingId] = useState(null);
   const [editContent, setEditContent] = useState("");
@@ -58,14 +49,6 @@ export default function ChatView({ chat, servers, hostTools, onMessageSent, onFo
     localStorage.setItem(USE_TOOLS_KEY, useTools ? "1" : "0");
   }, [useTools]);
 
-  useEffect(() => {
-    localStorage.setItem(ASK_EVERY_TOOL_KEY, askEveryToolPref ? "1" : "0");
-  }, [askEveryToolPref]);
-
-  useEffect(() => {
-    localStorage.setItem(PLAN_MODE_KEY, planModePref ? "1" : "0");
-  }, [planModePref]);
-
   // Clear attached images if the model does not support vision (they cannot be sent).
   useEffect(() => {
     if (!supportsVision) setImages([]);
@@ -85,7 +68,6 @@ export default function ChatView({ chat, servers, hostTools, onMessageSent, onFo
     const id = chat.id;
     stream.run(({ signal, onPiece }) => api.followTurn(id, { signal }, onPiece), {
       chatId: id,
-      agent: chat.mode === "agent",
       beforeClear: () => onMessageSent(),
     });
   }, [chat?.id, chat?.active_turn, stream.sending]);
@@ -154,12 +136,11 @@ export default function ChatView({ chat, servers, hostTools, onMessageSent, onFo
       ({ signal, onPiece }) =>
         api.sendMessage(
           chat.id,
-          { content, images: imgs, attachments: atts, serverId, model, useTools, askEveryTool, planMode, imageOptions: imageOpts, signal },
+          { content, images: imgs, attachments: atts, serverId, model, useTools, imageOptions: imageOpts, signal },
           onPiece
         ),
       {
         chatId: chat.id,
-        agent: chat.mode === "agent",
         // Clear the streaming bubble only AFTER the new message lands in the list (no empty gap).
         beforeClear: async () => {
           await onMessageSent();
@@ -167,36 +148,6 @@ export default function ChatView({ chat, servers, hostTools, onMessageSent, onFo
         },
       }
     );
-  }
-
-  // The plan card (#114). Run sends the next turn carrying the plan: the backend marks it approved
-  // and runs that turn outside plan mode. "Change it" is just a reply, so it needs no button.
-  async function handleRunPlan(messageId) {
-    if (stream.sending || !serverId || !model) return;
-    const content = t("plan.runMessage");
-    setPending({ user: content, images: [], attachments: [] });
-    await stream.run(
-      ({ signal, onPiece }) =>
-        api.sendMessage(
-          chat.id,
-          { content, serverId, model, useTools: true, askEveryTool, planMode, runPlan: messageId, signal },
-          onPiece
-        ),
-      {
-        chatId: chat.id,
-        agent: chat.mode === "agent",
-        beforeClear: async () => {
-          await onMessageSent();
-          setPending({ user: null, images: [], attachments: [] });
-        },
-      }
-    );
-  }
-
-  async function handleCancelPlan(messageId) {
-    if (stream.sending) return;
-    await api.cancelPlan(chat.id, messageId);
-    await onMessageSent();
   }
 
   function startEdit(m) {
@@ -212,9 +163,9 @@ export default function ChatView({ chat, servers, hostTools, onMessageSent, onFo
 
   // Answers a pending tool approval. The stream is still open and resumes on its own once the
   // backend records the decision, so there is nothing to do with the response here.
-  async function handleApprovalDecision(approvalId, approved, rule) {
+  async function handleApprovalDecision(approvalId, approved) {
     if (!chat) return;
-    await api.respondToApproval(chat.id, approvalId, approved, rule);
+    await api.respondToApproval(chat.id, approvalId, approved);
   }
 
   async function handleDeleteMessage(id) {
@@ -231,8 +182,8 @@ export default function ChatView({ chat, servers, hostTools, onMessageSent, onFo
     cancelEdit();
     await stream.run(
       ({ signal, onPiece }) =>
-        api.editMessage(chat.id, mid, { content, ...editTarget, useTools, askEveryTool, planMode, imageOptions: imageOpts, signal }, onPiece),
-      { chatId: chat.id, agent: chat.mode === "agent", afterClear: () => onMessageSent() }
+        api.editMessage(chat.id, mid, { content, ...editTarget, useTools, imageOptions: imageOpts, signal }, onPiece),
+      { chatId: chat.id, afterClear: () => onMessageSent() }
     );
   }
 
@@ -245,7 +196,7 @@ export default function ChatView({ chat, servers, hostTools, onMessageSent, onFo
       ({ signal, onPiece }) =>
         api.forkChat(
           chat.id,
-          { messageId: mid, content, ...editTarget, useTools, askEveryTool, planMode, imageOptions: imageOpts, signal },
+          { messageId: mid, content, ...editTarget, useTools, imageOptions: imageOpts, signal },
           (newId) => {
             // Follow the new chat *before* switching to it, so the switch does not detach.
             stream.setChatId(newId);
@@ -253,7 +204,7 @@ export default function ChatView({ chat, servers, hostTools, onMessageSent, onFo
           },
           onPiece
         ),
-      { agent: chat.mode === "agent", afterClear: () => onMessageSent() }
+      { afterClear: () => onMessageSent() }
     );
   }
 
@@ -276,13 +227,6 @@ export default function ChatView({ chat, servers, hostTools, onMessageSent, onFo
       setCompacting(null);
     }
     if (failed) stream.flashError(failed);
-    await onMessageSent();
-  }
-
-  // Agent mode (#91) keeps each reply's tool steps and replays them. Offered where the model can
-  // operate the host; a chat switched back to plain chat keeps its steps but stops replaying them.
-  async function toggleAgentMode() {
-    await api.updateChat(chat.id, { mode: chat.mode === "agent" ? "chat" : "agent" });
     await onMessageSent();
   }
 
@@ -327,24 +271,11 @@ export default function ChatView({ chat, servers, hostTools, onMessageSent, onFo
         <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1 md:flex-none">
           <ServerModelPicker servers={upServers} value={{ serverId, model }} onChange={setTarget} />
         </div>
-        {hostTools && (
-          <button
-            onClick={toggleAgentMode}
-            disabled={stream.sending}
-            aria-pressed={chat.mode === "agent"}
-            title={t(chat.mode === "agent" ? "mode.agentTitle" : "mode.chatTitle")}
-            className={`ml-auto shrink-0 rounded-full px-2.5 py-1 text-xs disabled:opacity-40 ${
-              chat.mode === "agent" ? "bg-accent text-white" : "bg-neutral-800 text-neutral-300 hover:bg-neutral-700"
-            }`}
-          >
-            {t(chat.mode === "agent" ? "mode.agent" : "mode.chat")}
-          </button>
-        )}
         {chat.compactable && (
           <button
             onClick={handleCompact}
             disabled={!!compacting || stream.sending}
-            className={`${hostTools ? "" : "ml-auto "}shrink-0 text-neutral-300 opacity-70 hover:opacity-100 disabled:opacity-30`}
+            className="ml-auto shrink-0 text-neutral-300 opacity-70 hover:opacity-100 disabled:opacity-30"
             title={t("compact.buttonTitle")}
           >
             <CompactIcon className="w-5 h-5" />
@@ -352,7 +283,7 @@ export default function ChatView({ chat, servers, hostTools, onMessageSent, onFo
         )}
         <button
           onClick={onOpenSettings}
-          className={`${chat.compactable || hostTools ? "" : "ml-auto "}shrink-0 text-neutral-300 opacity-70 hover:opacity-100`}
+          className={`${chat.compactable ? "" : "ml-auto "}shrink-0 text-neutral-300 opacity-70 hover:opacity-100`}
           title={t("common.settings")}
         >
           <SettingsIcon className="w-5 h-5" />
@@ -379,7 +310,6 @@ export default function ChatView({ chat, servers, hostTools, onMessageSent, onFo
         onDeleteMessage={handleDeleteMessage}
         onDecide={handleApprovalDecision}
         onInspect={setInspecting}
-        planActions={hostTools ? { onRun: handleRunPlan, onCancel: handleCancelPlan } : null}
       />
 
       <Composer
@@ -397,11 +327,6 @@ export default function ChatView({ chat, servers, hostTools, onMessageSent, onFo
         onPaste={handlePaste}
         useTools={useTools}
         onToggleUseTools={() => setUseTools((v) => !v)}
-        hostTools={!!hostTools}
-        askEveryTool={askEveryTool}
-        onToggleAskEveryTool={() => setAskEveryTool((v) => !v)}
-        planMode={planMode}
-        onTogglePlanMode={() => setPlanMode((v) => !v)}
         imageModel={imageModel}
         imageOptions={imageOptions}
         onImageOptionsChange={setImageOptions}

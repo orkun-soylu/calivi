@@ -9,6 +9,22 @@ Read this file before upgrading.
 
 ## [Unreleased]
 
+Calivi is a chat app again, and only that: **calivi-vm is removed** (#143).
+
+> **Upgrading:** Docker installs rebuild as usual; no schema change, and an existing database
+> opens as it is. **calivi-vm installs (the `.deb`, the Proxmox image) get no further releases** —
+> `0.7.1` is the last. apt.calivi.ai is being retired; remove `/etc/apt/sources.list.d/calivi.sources`
+> on such a machine. Its code stays in the git history, tagged `calivi-vm-final`.
+
+### Removed
+
+- **calivi-vm**: the Proxmox image, the `.deb` packages for Debian 13 / Ubuntu 24.04 / 26.04 and
+  their CI, the APT repository, the host tools (bash, file read / write / edit, view image), the
+  setup-code claim on first registration, machine notes, "Always allow" rules, plan mode (📋),
+  the activity log and "ask before every tool" (🛡).
+- **Agent mode** — the step timeline. It only switched on where the host tools did. Tool calls
+  show as chips under the message, as in every other chat.
+
 ## [0.7.1] — 2026-10-25
 
 Image-generation models as a chat target, and security updates for the document upload.

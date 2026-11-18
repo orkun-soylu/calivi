@@ -1,3 +1,0 @@
-# Calivi's only root command: turning the first registration into the machine's owner.
-# The trailing "" forbids arguments; the helper reads its request on stdin.
-calivi ALL=(root) NOPASSWD: /usr/sbin/calivi-bootstrap-user ""

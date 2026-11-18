@@ -36,7 +36,6 @@ export default function App() {
   const [me, setMe] = useState(null);
   const [authReady, setAuthReady] = useState(false);
   const [registrationEnabled, setRegistrationEnabled] = useState(true);
-  const [hostSetup, setHostSetup] = useState(false); // appliance: the next sign-up claims the machine
 
   const [chats, setChats] = useState([]);
   const [activeChatId, setActiveChatId] = useState(() => {
@@ -82,7 +81,6 @@ export default function App() {
       try {
         const cfg = await api.getAuthConfig();
         setRegistrationEnabled(cfg.registration_enabled);
-        setHostSetup(!!cfg.host_setup);
       } catch {
         /* ignore */
       }
@@ -222,7 +220,7 @@ export default function App() {
     return <div className="flex items-center justify-center h-dvh text-neutral-500">{t("common.loading")}</div>;
   }
   if (!me) {
-    return <AuthView registrationEnabled={registrationEnabled} hostSetup={hostSetup} onAuthed={handleAuthed} />;
+    return <AuthView registrationEnabled={registrationEnabled} onAuthed={handleAuthed} />;
   }
 
   // On a phone only one of the two panes is on screen: the list, or the open chat.
@@ -253,7 +251,6 @@ export default function App() {
           onBack={isMobile ? closeChat : undefined}
           chat={activeChat}
           servers={servers}
-          hostTools={!!me?.host_tools}
           onMessageSent={handleMessageSent}
           onForked={handleForked}
           onOpenSettings={() => setSettingsOpen(true)}

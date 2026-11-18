@@ -8,11 +8,6 @@ class RegisterIn(BaseModel):
     email: str
     username: str
     password: str
-    # Appliance only (host_bootstrap.py): the first registration claims the machine.
-    setup_code: str | None = None
-    hostname: str | None = None
-    timezone: str | None = None
-    ssh_key: str | None = None
 
 
 class LoginIn(BaseModel):
@@ -31,12 +26,6 @@ class UserOut(BaseModel):
     created_at: datetime.datetime
 
 
-class MeOut(UserOut):
-    """The signed-in user, plus what the UI needs to know about their own capabilities."""
-
-    host_tools: bool = False  # the host's shell is available to this user (calivi-vm owner)
-
-
 class UserUpdate(BaseModel):
     # Partial admin update: only the fields actually sent are applied.
     email: str | None = None
@@ -47,7 +36,6 @@ class UserUpdate(BaseModel):
 
 class AuthConfigOut(BaseModel):
     registration_enabled: bool
-    host_setup: bool = False  # the next registration claims this machine (needs the setup code)
 
 
 class SettingsUpdate(BaseModel):
@@ -157,20 +145,12 @@ class McpServerOut(BaseModel):
     tools: list[McpToolOut] = []  # every discovered tool, with its mode
 
 
-class RuleIn(BaseModel):
-    kind: str
-    pattern: str
-
-
 class ApprovalDecision(BaseModel):
     approved: bool
-    # "Always allow…" on the card (#113): save this rule, then approve. Only with approved=True.
-    rule: RuleIn | None = None
 
 
 class ChatCreate(BaseModel):
     title: str = "New Chat"
-    mode: Literal["chat", "agent"] | None = None  # None → agent on calivi-vm, chat elsewhere
 
 
 class ChatOut(BaseModel):
@@ -179,7 +159,6 @@ class ChatOut(BaseModel):
     id: int
     title: str
     pinned: bool = False
-    mode: str = "chat"
     created_at: datetime.datetime
     updated_at: datetime.datetime
 
@@ -188,7 +167,6 @@ class ChatUpdate(BaseModel):
     title: str | None = None
     pinned: bool | None = None
     context_mode: Literal["compact", "full"] | None = None
-    mode: Literal["chat", "agent"] | None = None
 
 
 class MessageOut(BaseModel):
@@ -202,8 +180,6 @@ class MessageOut(BaseModel):
     model_used: str | None
     server_used: str | None
     tokens_per_sec: float | None = None
-    steps: list[dict] | None = None  # agent mode: the reply's tool steps (outputs are untrusted text)
-    plan: dict | None = None  # plan mode (#114): the proposed plan and its status
     timestamp: datetime.datetime
 
 
@@ -241,9 +217,6 @@ class SendMessageIn(BaseModel):
     server_id: int | None = None  # None → chosen by the caller
     model: str | None = None  # None → chosen by the caller (on server_id if given)
     use_tools: bool = False  # when on, the tool layer is offered to the model (it decides what to call)
-    ask_every_tool: bool = False  # when on, every tool call waits for the user's approval
-    plan_mode: bool = False  # 📋 (#114): the model may only inspect, then proposes a plan
-    run_plan: int | None = None  # the id of the reply whose plan the owner approves with this turn
     image_options: ImageOptions | None = None  # image models only
 
 
@@ -253,8 +226,6 @@ class EditMessageIn(BaseModel):
     server_id: int | None = None
     model: str | None = None
     use_tools: bool = False
-    ask_every_tool: bool = False
-    plan_mode: bool = False
     image_options: ImageOptions | None = None  # image models only
 
 
@@ -266,6 +237,4 @@ class ForkIn(BaseModel):
     server_id: int | None = None
     model: str | None = None
     use_tools: bool = False
-    ask_every_tool: bool = False
-    plan_mode: bool = False
     image_options: ImageOptions | None = None  # image models only
